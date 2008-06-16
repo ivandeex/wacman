@@ -364,33 +364,9 @@ sub path2dn
 }
 
 
-sub ldap_has_attr ($$)
+sub nvl ($)
 {
-	my ($record, $attr) = @_;
-	return 0 if $config{force};
-	if ($record->exists($attr)) {
-		my $oldval = $record->get_value($attr); 
-		return 1 if ($oldval && ($oldval !~ /^\s*$/));
-	}
-	return 0;
-}
-
-
-sub ldap_cond_set ($$$)
-{
-	my ($record, $attr, $value) = @_;
-	return 0 if ldap_has_attr($record, $attr);
-	@_ = split(/,/, $record->dn);
-	my $short_dn = $_[0];
-	if ($record->exists($attr)) {
-		$record->replace($attr => $value);
-		$log->info("($short_dn): [$attr] := ($value)");
-		return 1;
-	} else {
-		$record->add($attr => $value);
-		$log->info("($short_dn): [$attr] += ($value)");
-		return 2;
-	}
+	return defined($_[0]) ? $_[0] : '';
 }
 
 
@@ -468,20 +444,21 @@ my $next_uidn;
 
 sub get_next_uidn
 {
-	unless (defined($next_uidn) && $next_uidn > 0) {
-		$next_uidn = 0;
-		my $res = ldap_search(	$srv,
-						base => $srv->{CFG}->{base},
-						filter => "(objectClass=posixAccount)",
-						attrs => [ 'uidNumber' ] );
-		for ($res->entries) {
-			my $uidn = $_->get_value('uidNumber');
-			$next_uidn = $uidn if $uidn > $next_uidn;
-		}
-		$next_uidn = $next_uidn > 0 ? $next_uidn + 1 : 1000;
+	if (defined($next_uidn) && $next_uidn > 0) {
+		return $next_uidn;
 	}
+	$next_uidn = 0;
+	my $res = ldap_search(	$srv,
+					base => $srv->{CFG}->{base},
+					filter => "(objectClass=posixAccount)",
+					attrs => [ 'uidNumber' ] );
+	for ($res->entries) {
+		my $uidn = $_->get_value('uidNumber');
+		$next_uidn = $uidn if $uidn > $next_uidn;
+	}
+	$next_uidn = $next_uidn > 0 ? $next_uidn + 1 : 1000;
 	$log->debug("next=$next_uidn");
-	return $next_uidn++;
+	return $next_uidn;
 }
 
 
@@ -554,7 +531,7 @@ sub massage_unix_account_entry
 		my $sn = $ua->get_value('sn');
 		$uid = lc(substr($gn, 0, 1) . $sn);
 		$uid =~ tr/абвгдежзийклмнопрстуфвцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeua/;		
-		$uchange++ if ldap_cond_set($ua, 'cn', $cn);
+		$uchange++ if ldap_cond_set($ua, 'uid', $uid);
 	}
 
 	# mail
@@ -876,6 +853,39 @@ sub dump_config
 }
 
 
+# ======== daemon mode ========
+
+
+sub write_pid
+{
+	return unless $config{pid_file};
+	open(PID_FILE, "> $config{pid_file}") || return;
+	print PID_FILE $$;
+	close PID_FILE;
+}
+
+
+sub check_for_updates
+{
+	my $changed = 0;
+	#$changed += is_fresh(check_agreement_stamps());
+	$changed += is_fresh(check_account_stamps());
+	return $changed;
+}
+
+
+sub daemon_poll
+{
+	while (1) {
+		if (check_for_updates()) {
+			$log->info("last=$last_stamp");
+			massage_accounts();
+		}
+		sleep $config{poll_interval};
+	}
+}
+
+
 # ======== connections ========
 
 
@@ -884,6 +894,14 @@ sub ldap_search
 	my $srv = shift;
 	my $res = $srv->search(@_);
 	return $res;
+}
+
+
+sub ldap_update ($$)
+{
+	my ($srv, $ent) = @_;
+	$ent->update($srv);
+	undef $next_uidn;
 }
 
 
@@ -930,36 +948,55 @@ sub disconnect_all
 }
 
 
-# ======== daemon mode ========
-
-
-sub write_pid
+sub ldap_has_attr ($$)
 {
-	return unless $config{pid_file};
-	open(PID_FILE, "> $config{pid_file}") || return;
-	print PID_FILE $$;
-	close PID_FILE;
-}
-
-
-sub check_for_updates
-{
-	my $changed = 0;
-	#$changed += is_fresh(check_agreement_stamps());
-	$changed += is_fresh(check_account_stamps());
-	return $changed;
-}
-
-
-sub daemon_poll
-{
-	while (1) {
-		if (check_for_updates()) {
-			$log->info("last=$last_stamp");
-			massage_accounts();
+	my ($record, $attr) = @_;
+	my $gui_mode = defined($record->{user_attr}) ? 1 : 0;
+	if ($gui_mode) {
+		if (defined($record->{user_attr}->{$attr})) {
+			my $state = $record->{user_attr}->{$attr}->{state};
+			return 1 if $state eq 'user';
+			return 0 if $state eq 'empty';
+			return 1 if $state eq 'orig';
+			return 0 if $state eq 'calc';
 		}
-		sleep $config{poll_interval};
+	} else {
+		if ($config{force}) {
+			return 0;
+		}
 	}
+	if ($record->exists($attr)) {
+		my $oldval = $record->get_value($attr); 
+		if ($oldval && ($oldval !~ /^\s*$/)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+
+sub ldap_cond_set ($$$)
+{
+	my ($record, $attr, $value) = @_;
+	if (ldap_has_attr($record, $attr)) {
+		return 0;
+	}
+	@_ = split(/,/, $record->dn);
+	my $short_dn = $_[0];
+	my $ret;
+	if ($record->exists($attr)) {
+		my $oldval = $record->get_value($attr);
+		$record->replace($attr => $value);
+		if (nvl($oldval) ne nvl($value)) {
+			$log->info("($short_dn): [$attr] := ($value)");
+		}
+		$ret = 1;
+	} else {
+		$record->add($attr => $value);
+		$log->info("($short_dn): [$attr] += ($value)");
+		$ret = 2;
+	}
+	return $ret;
 }
 
 
@@ -993,10 +1030,10 @@ my @user_gui_attrs = (
 
 
 my %state2pic = (
-	'user' => 'red.png',
-	'empty' => 'blue.png',
-	'orig' => 'green.png',
-	'calc' => 'yellow.png',
+	'user'  => 'yellow.png',
+	'orig'  => 'green.png',
+	'calc'  => 'blue.png',
+	'empty' => 'empty.png',
 );
 
 
@@ -1062,12 +1099,12 @@ sub users_refresh
 
 sub user_unselect
 {
-	return unless defined $user_name;
+	return 0 unless defined $user_name;
 	$user_name->set_text('');
-	for (values %$user_attrs) {
-		$_->{entry}->set_text('');
-		$_->{bulb}->set_image(create_image('empty.png'));
-	} 
+	for my $e (@user_attr_entries) {
+		$e->{entry}->set_text('');
+		$e->{bulb}->set_image(create_image('empty.png'));
+	}
 	$btn_apply->set_sensitive(0) ;
 	$btn_revert->set_sensitive(0);
 	$btn_fill->set_sensitive(0);
@@ -1096,19 +1133,20 @@ sub user_select
 	my $res = ldap_search(	$srv,
 					base => $srv->{CFG}->{base},
 					filter => "(&(objectClass=$user_class)(uid=$uid))" );
-	return if $res->code || scalar($res->entries) == 0;
+	if ($res->code || scalar($res->entries) == 0) {
+		print "something is wrong\n";
+	}
 
 	my $ua = $res->pop_entry;
 	$orig_acc = $ua;
 	undef $edit_acc;
 	$edit_acc = $ua->clone;
-	$edit_acc->{user_attrs} = $user_attrs;
 
 	@user_attr_entries = values(%$user_attrs);
 	for my $e (@user_attr_entries) {
 		my $value = nvl($ua->get_value($e->{attr}));
 		$e->{entry}->set_text($value);
-		$e->{old_val} = $e->{cur_val} = $e->{new_val} = $value;
+		$e->{new_val} = $e->{cur_val} = $e->{old_val} = $value;
 		$e->{state} = $value eq '' ? 'empty' : 'orig'; 
 		my $pic =  $state2pic{$e->{state}};
 		$pic = 'empty.png' unless defined $pic;
@@ -1121,65 +1159,54 @@ sub user_select
 }
 
 
-sub nvl ($)
-{
-	return defined($_[0]) ? $_[0] : '';
-}
-
-
 sub user_entry_attr_changed
 {
-	my ($entry, $event) = @_;
-	my $e = $entry->{user_attr};
-	return undef unless $e;
+	my ($entry0, $event0) = @_;
+	my $e0 = $entry0->{user_attr};
+	return undef unless $e0;
+	my $e;
 
+	$e0->{new_val} = nvl($e0->{entry}->get_text());
+	return undef if $e0->{cur_val} eq $e0->{new_val};
+
+	# read values
 	for $e (@user_attr_entries) {
-		$e->{}
-		$e->{new_val} = nvl($e->{entry}->get_text);
+		$e->{old_state} = $e->{state};
+		$edit_acc->replace($e->{attr}, $e->{new_val});
 	}
 
-	$e->{new_val} = $entry->get_text;
-	$edit_acc->replace($e->{attr}, $e->{new_val});
-
-	if ($e->{new_val} ne $e->{cur_val}) {
-		$e->{state} = $e->{new_val} eq '' ? 'empty' : 'user';
-		$e->{cur_val} = $e->{new_val};
-	}
-
-	for $e (values %$user_attrs) {
-		if ($e->{state} eq 'calc') {
-			$edit_acc->replace($e->{attr}, '');
-		}
-	}
-
+	# calculate calculatable fields
+	$e0->{state} = 'user';
+	$edit_acc->{user_attr} = $user_attrs;
 	my $changed = massage_unix_account_entry($edit_acc);
 
-	for $e (values %$user_attrs) {
-		$e->{new_val} = $edit_acc->get_value($e->{attr});
-		$e->{new_val} = '' unless defined $e->{new_val};
-		$e->{entry}->set_text($e->{new_val});
-		if ($e->{state} eq 'calc' && $e->{new_val} eq '') {
-			$e->{new_val} = $e->{cur_val};
-			$e->{cur_val} = '';
-			$edit_acc->replace($e->{attr}, $e->{new_val});
+	# analyze results
+	for $e (@user_attr_entries) {
+		my $val = nvl($edit_acc->get_value($e->{attr}));
+		my $state = $e->{state};
+		if ($val eq '') {
+			$state = 'empty';
+		} elsif ($val eq $e->{old_val}) {
+			$state = 'orig';
+		} elsif ($val eq $e->{cur_val}) {
+			$state = $e->{old_state};
+		} elsif ($val eq $e->{new_val}) {
+			$state = 'user';
+		} else {
+			$state = 'calc';
 		}
-		if ($e->{state} ne 'user') {
-			if ($e->{new_val} eq '') {
-				$e->{state} = 'empty';
-			} elsif ($e->{new_val} ne $e->{cur_val}) {
-				$e->{state} = 'calc';
-			} elsif ($e->{cur_val} eq $e->{old_val}) {
-				$e->{state} = 'orig';
-			} else {
-				$e->{state} = 'user';
-			}
-		}
+		$e->{cur_val} = $val;
+		$e->{entry}->set_text($val);
+		$e->{state} = $state;
 	}
 
-	for $e (values %$user_attrs) {
-		my $pic =  $state2pic{$e->{state}};
-		$pic = 'empty.png' unless defined $pic;
-		$e->{bulb}->set_image(create_image($pic));
+	# change indication
+	for $e (@user_attr_entries) {
+		if ($e->{state} ne $e->{old_state}) {
+			my $pic =  $state2pic{$e->{state}};
+			$pic = 'empty.png' unless defined $pic;
+			$e->{bulb}->set_image(create_image($pic));			
+		}
 	}
 
 	return undef;
