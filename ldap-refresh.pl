@@ -370,6 +370,13 @@ sub nvl ($)
 }
 
 
+sub ifnull ($$)
+{
+	my ($a, $b) = @_;
+	return (defined($a) && defined($b) && $a ne '' && $b ne '') ? $b : '';
+}
+
+
 sub convert_entry_full
 {
 	my $uen = shift;
@@ -494,8 +501,27 @@ sub massage_unix_account_entry
 
 	# read all scalar attributes
 	my $uchange = 0;
-	my $uid = $ua->get_value('uid');
-	my $cn = $ua->get_value('cn');
+	my $uid = nvl($ua->get_value('uid'));
+	my $cn = nvl($ua->get_value('cn'));
+	my $gn = nvl($ua->get_value('givenName'));
+	my $sn = nvl($ua->get_value('sn'));
+
+	# names
+	unless (ldap_has_attr($ua, 'cn')) {
+		my $bl = $sn || $gn ? ' ' : '';
+		$cn = "$gn$bl$sn";
+		$uchange++ if ldap_cond_set($ua, 'cn', $cn);
+	}
+
+	# user id
+	unless (ldap_has_attr($ua, 'uid')) {
+		$uid = $sn eq '' ? $gn : substr($gn, 0, 1) . $sn;
+		$uid =~ tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
+		$uid =~ tr/АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
+		$uid = lc($uid);
+		$uid =~ tr/0-9a-z/_/cs;
+		$uchange++ if ldap_cond_set($ua, 'uid', $uid);
+	}
 
 	# add the required classes
 	my (%classes);
@@ -514,34 +540,11 @@ sub massage_unix_account_entry
 		$uchange++ if ldap_cond_set($ua, 'uidNumber', get_next_uidn());
 	}
 
-	# names
-	unless (ldap_has_attr($ua, 'cn')) {
-		my $gn = $ua->get_value('givenName');
-		my $sn = $ua->get_value('sn');
-		$gn = '' unless defined $gn;
-		$sn = '' unless defined $sn;
-		my $blank = '';
-		$blank = ' ' if $sn || $gn;
-		$cn = "$gn$blank$sn";
-		$uchange++ if ldap_cond_set($ua, 'cn', $cn);
-	}
-
-	unless (ldap_has_attr($ua, 'uid')) {
-		my $gn = $ua->get_value('givenName');
-		my $sn = $ua->get_value('sn');
-		$uid = lc(substr($gn, 0, 1) . $sn);
-		$uid =~ tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeua/;		
-		$uid =~ tr/АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ/abvgdewzijklmnoprstufhc4wwxyxeua/;
-		$uid =~ tr/[A-Z]/[a-z]/;
-		$uid =~ tr/0-9a-z/_/cs;
-		$uchange++ if ldap_cond_set($ua, 'uid', $uid);
-	}
-
 	# mail
-	$uchange++ if ldap_cond_set($ua, 'mail', $uid.'@'.$config{unix_domain});
+	$uchange++ if ldap_cond_set($ua, 'mail', ifnull($uid, $uid.'@'.$config{unix_domain}));
 
 	# home directory
-	$uchange++ if ldap_cond_set($ua, 'homeDirectory', "/home/$uid");
+	$uchange++ if ldap_cond_set($ua, 'homeDirectory', ifnull($uid, "/home/$uid"));
 
 	# constant fields
 	for my $attr (keys %unix_fields_const) {
@@ -555,13 +558,13 @@ sub massage_unix_account_entry
 	);
 	$uchange++ if
 		ldap_cond_set($ua, 'ntUserHomeDir',
-					subst_path($config{ad_home_dir}, %path_subst));
+					ifnull($uid,subst_path($config{ad_home_dir}, %path_subst)));
 	$uchange++ if
 		ldap_cond_set($ua, 'ntUserProfile',
-					subst_path($config{ad_profile_path}, %path_subst));
+					ifnull($uid,subst_path($config{ad_profile_path}, %path_subst)));
 	$uchange++ if
 		ldap_cond_set($ua, 'ntUserScriptPath',
-					subst_path($config{ad_script_path}, %path_subst));
+					ifnull($uid,subst_path($config{ad_script_path}, %path_subst)));
 	$uchange++ if
 		ldap_cond_set($ua, 'ntUserDomainId', $uid);
 
@@ -789,6 +792,7 @@ sub is_fresh ($)
 	$log->debug("last=$last changed=$changed");
 	return $changed;
 }
+
 
 # ======== configuring ========
 
@@ -1080,10 +1084,11 @@ sub user_add
 	return if user_unselect();
 	my $model = $user_list->get_model;
 	my $node = $model->append(undef);
-	$model->set($node, 0, '', 1, '');
-	#$user_attr_entries[0]->{entry}->grab_focus;
+	$model->set($node, 0, '-', 1, '-');
 	my $path = $model->get_path($node);
 	$user_list->set_cursor($path);
+	my $first = $user_gui_attrs[0][1][1];
+	$user_attrs->{$first}->{entry}->grab_focus;
 	user_select($path, 0);
 }
 
@@ -1119,11 +1124,12 @@ sub user_unselect
 {
 	return 0 unless defined $user_name;
 	$user_name->set_text('');
+	@user_attr_entries = values(%$user_attrs);
 	for my $e (@user_attr_entries) {
 		$e->{entry}->set_text('');
-		$e->{bulb}->set_image(create_image('empty.png'));
+		$e->{entry}->set_editable(0);
 	}
-	$btn_apply->set_sensitive(0) ;
+	$btn_apply->set_sensitive(0);
 	$btn_revert->set_sensitive(0);
 	$btn_fill->set_sensitive(0);
 	$btn_delete->set_sensitive(0);
@@ -1148,8 +1154,7 @@ sub user_select
 	$btn_fill->set_sensitive(1);
 
 	my ($ua, $e);
-	@user_attr_entries = values(%$user_attrs);
-	if ($uid eq '') {
+	if ($uid eq '' || $uid eq '-') {
 		$ua = Net::LDAP::Entry->new;
 		for $e (@user_attr_entries) {
 			$ua->add($e->{attr} => '');
@@ -1172,6 +1177,7 @@ sub user_select
 	for $e (@user_attr_entries) {
 		my $value = nvl($ua->get_value($e->{attr}));
 		$e->{entry}->set_text($value);
+		$e->{entry}->set_editable(1);
 		$e->{new_val} = $e->{cur_val} = $e->{old_val} = $value;
 		$e->{state} = $value eq '' ? 'empty' : 'orig'; 
 		my $pic =  $state2pic{$e->{state}};
@@ -1179,7 +1185,7 @@ sub user_select
 		$e->{bulb}->set_image(create_image($pic));
 	}
 
-	$btn_fill->set_sensitive(1);
+	$btn_fill->set_sensitive(0);
 	$btn_delete->set_sensitive(1);
 	$user_attr_tabs->set_current_page(0);
 }
@@ -1193,7 +1199,7 @@ sub user_entry_attr_changed
 	my $e;
 
 	$e0->{new_val} = nvl($e0->{entry}->get_text());
-	return undef if $e0->{cur_val} eq $e0->{new_val};
+	return undef if nvl($e0->{cur_val}) eq nvl($e0->{new_val});
 
 	# read values
 	for $e (@user_attr_entries) {
@@ -1222,11 +1228,13 @@ sub user_entry_attr_changed
 			$state = 'calc';
 		}
 		$e->{cur_val} = $val;
-		$e->{entry}->set_text($val);
+		if ($val ne $e->{new_val}) {
+			$e->{entry}->set_text($val);
+		}
 		$e->{state} = $state;
 	}
 
-	# change indication
+	# refresh bulbs
 	for $e (@user_attr_entries) {
 		if ($e->{state} ne $e->{old_state}) {
 			my $pic =  $state2pic{$e->{state}};
@@ -1235,7 +1243,7 @@ sub user_entry_attr_changed
 		}
 	}
 
-	# change top label
+	# refresh top label
 	my $uid = nvl($user_attrs->{uid}->{cur_val});
 	my $cn = nvl($user_attrs->{cn}->{cur_val});
 	my $new_user_name = "$uid ($cn)";
