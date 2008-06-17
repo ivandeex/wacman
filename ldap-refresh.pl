@@ -1128,6 +1128,7 @@ sub user_unselect
 	for my $e (@user_attr_entries) {
 		$e->{entry}->set_text('');
 		$e->{entry}->set_editable(0);
+		$e->{bulb}->set_from_pixbuf(create_pic('empty.png'));
 	}
 	$btn_apply->set_sensitive(0);
 	$btn_revert->set_sensitive(0);
@@ -1182,7 +1183,7 @@ sub user_select
 		$e->{state} = $value eq '' ? 'empty' : 'orig'; 
 		my $pic =  $state2pic{$e->{state}};
 		$pic = 'empty.png' unless defined $pic;
-		$e->{bulb}->set_image(create_image($pic));
+		$e->{bulb}->set_from_pixbuf(create_pic($pic));
 	}
 
 	$btn_fill->set_sensitive(0);
@@ -1239,7 +1240,7 @@ sub user_entry_attr_changed
 		if ($e->{state} ne $e->{old_state}) {
 			my $pic =  $state2pic{$e->{state}};
 			$pic = 'empty.png' unless defined $pic;
-			$e->{bulb}->set_image(create_image($pic));			
+			$e->{bulb}->set_from_pixbuf(create_pic($pic));			
 		}
 	}
 
@@ -1276,20 +1277,11 @@ sub create_pic ($)
 }
 
 
-sub create_image ($)
-{
-	my $file = $_[0];
-	my $pic = create_pic($file);
-	return undef unless defined $pic;
-	return Gtk2::Image->new_from_pixbuf($pic);
-}
-
-
 sub create_button
 {
 	my ($text, $pic, $action, $owner_box) = @_;
 	my $button = Gtk2::Button->new_with_label($text);
-	$button->set_image(create_image($pic)) if $pic;		
+	$button->set_image(Gtk2::Image->new_from_pixbuf(create_pic($pic))) if $pic;		
 	$button->signal_connect("clicked" => $action) if $action;
 	$owner_box->pack_start($button, 0, 0, 1) if $owner_box;
 	return $button;
@@ -1355,10 +1347,7 @@ sub create_user_desc
 			my $label = Gtk2::Label->new($text);
 			$label->set_justify('left');
 			my $entry = Gtk2::Entry->new;
-			my $bulb = Gtk2::Button->new;
-			$bulb->set_relief('none');
-			$bulb->set_image(create_image('empty.png'));
-			$bulb->can_focus(0);
+			my $bulb = Gtk2::Image->new;
 			$abox->attach($bulb, 0, 1, $row, $row+1, [], [], 1, 1);
 			$abox->attach($label, 1, 2, $row, $row+1, [], [], 1, 1);
 			$abox->attach($entry, 2, 3, $row, $row+1, [ 'fill', 'expand' ], [], 1, 1);
