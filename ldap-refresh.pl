@@ -530,7 +530,10 @@ sub massage_unix_account_entry
 		my $gn = $ua->get_value('givenName');
 		my $sn = $ua->get_value('sn');
 		$uid = lc(substr($gn, 0, 1) . $sn);
-		$uid =~ tr/абвгдежзийклмнопрстуфвцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeua/;		
+		$uid =~ tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeua/;		
+		$uid =~ tr/АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ/abvgdewzijklmnoprstufhc4wwxyxeua/;
+		$uid =~ tr/[A-Z]/[a-z]/;
+		$uid =~ tr/0-9a-z/_/cs;
 		$uchange++ if ldap_cond_set($ua, 'uid', $uid);
 	}
 
@@ -926,7 +929,8 @@ sub ldap_connect
 		close PFILE;
 	}
 	$log->logdie("invalid credentials for $ref") unless $uri && $user && $pass; 
-	$ldap = Net::LDAP->new($uri, debug => $cfg->{debug}) or die "$@";
+	$ldap = Net::LDAP->new($uri, debug => $cfg->{debug})
+		or die "cannot connect to $uri: ".$@."\n";
 	$mesg = $ldap->bind($user, password => $pass);
 	$log->logdie("cannot bind as $ref: ".$mesg->error) if $mesg->code;
 	$ldap->{CFG} = $cfg;
@@ -981,19 +985,25 @@ sub ldap_cond_set ($$$)
 	if (ldap_has_attr($record, $attr)) {
 		return 0;
 	}
-	@_ = split(/,/, $record->dn);
-	my $short_dn = $_[0];
+	my $gui_mode = defined($record->{user_attr}) ? 1 : 0;
+	my $short_dn = '???';
+	if (defined($record->dn)) {
+		@_ = split(/,/, $record->dn);
+		$short_dn = $_[0];
+	}
 	my $ret;
 	if ($record->exists($attr)) {
 		my $oldval = $record->get_value($attr);
 		$record->replace($attr => $value);
 		if (nvl($oldval) ne nvl($value)) {
-			$log->info("($short_dn): [$attr] := ($value)");
+			$log->info("($short_dn): [$attr] := ($value)")
+				unless $gui_mode;
 		}
 		$ret = 1;
 	} else {
 		$record->add($attr => $value);
-		$log->info("($short_dn): [$attr] += ($value)");
+		$log->info("($short_dn): [$attr] += ($value)")
+			unless $gui_mode;
 		$ret = 2;
 	}
 	return $ret;
@@ -1005,15 +1015,15 @@ sub ldap_cond_set ($$$)
 
 my @user_gui_attrs = (
 	[ 'UNIX',
-		[ 'd', 'uid', 'Идентификатор' ],
 		[ 's', 'givenName', 'Имя' ],
 		[ 's', 'sn', 'Фамилия' ],
 		[ 's', 'cn', 'Полное имя' ],
+		[ 'd', 'uid', 'Идентификатор' ],
 		[ 's', 'mail', 'почта' ],
 		[ 's', 'uidNumber', '#пользователя' ],
 		[ 'g', 'gidNumber', '#группы' ],
 		[ 'G', '', 'прочие группы' ],
-		[ 's', 'unixHomeDirectory', 'домашний каталог' ],
+		[ 's', 'homeDirectory', 'домашний каталог' ],
 		[ 's', 'loginShell', 'Shell' ],
 	],
 	[ 'Windows',
@@ -1067,6 +1077,14 @@ sub user_fill
 
 sub user_add
 {
+	return if user_unselect();
+	my $model = $user_list->get_model;
+	my $node = $model->append(undef);
+	$model->set($node, 0, '', 1, '');
+	#$user_attr_entries[0]->{entry}->grab_focus;
+	my $path = $model->get_path($node);
+	$user_list->set_cursor($path);
+	user_select($path, 0);
 }
 
 
@@ -1129,21 +1147,29 @@ sub user_select
 	$user_name->set_text("$uid ($cn)");
 	$btn_fill->set_sensitive(1);
 
-	my $user_class = $config{user_class};
-	my $res = ldap_search(	$srv,
-					base => $srv->{CFG}->{base},
-					filter => "(&(objectClass=$user_class)(uid=$uid))" );
-	if ($res->code || scalar($res->entries) == 0) {
-		print "something is wrong\n";
+	my ($ua, $e);
+	@user_attr_entries = values(%$user_attrs);
+	if ($uid eq '') {
+		$ua = Net::LDAP::Entry->new;
+		for $e (@user_attr_entries) {
+			$ua->add($e->{attr} => '');
+		}
+	} else {
+		my $user_class = $config{user_class};
+		my $res = ldap_search(	$srv,
+						base => $srv->{CFG}->{base},
+						filter => "(&(objectClass=$user_class)(uid=$uid))" );
+		if ($res->code || scalar($res->entries) == 0) {
+			$log->info("cannot find uid [$uid]");
+			return undef;
+		}
+		$ua = $res->pop_entry;
 	}
-
-	my $ua = $res->pop_entry;
 	$orig_acc = $ua;
 	undef $edit_acc;
 	$edit_acc = $ua->clone;
 
-	@user_attr_entries = values(%$user_attrs);
-	for my $e (@user_attr_entries) {
+	for $e (@user_attr_entries) {
 		my $value = nvl($ua->get_value($e->{attr}));
 		$e->{entry}->set_text($value);
 		$e->{new_val} = $e->{cur_val} = $e->{old_val} = $value;
@@ -1207,6 +1233,14 @@ sub user_entry_attr_changed
 			$pic = 'empty.png' unless defined $pic;
 			$e->{bulb}->set_image(create_image($pic));			
 		}
+	}
+
+	# change top label
+	my $uid = nvl($user_attrs->{uid}->{cur_val});
+	my $cn = nvl($user_attrs->{cn}->{cur_val});
+	my $new_user_name = "$uid ($cn)";
+	if ($user_name->get_text() ne $new_user_name) {
+		$user_name->set_text("$uid ($cn)");
 	}
 
 	return undef;
