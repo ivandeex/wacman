@@ -1059,7 +1059,7 @@ my $pic_home = abs_path("$Bin/images");
 my $changed;
 my ($btn_apply, $btn_revert, $btn_fill);
 my ($btn_add, $btn_delete, $btn_refresh);
-my ($user_list, $user_name);
+my ($user_list, $user_name, $main_win);
 my ($user_attrs, @user_attr_entries, $user_attr_tabs);
 my ($orig_acc, $edit_acc);
 
@@ -1071,6 +1071,17 @@ sub user_apply
 
 sub user_revert
 {
+	my $dia = Gtk2::MessageDialog->new(
+					$main_win,
+					'destroy-with-parent',
+					'question', # message type
+					'yes-no', # which set of buttons?
+					"Действительно откатить модификации ?"
+				);
+	if ($dia->run eq 'yes') {
+		user_select();
+	}
+	$dia->destroy;
 }
 
 
@@ -1211,9 +1222,10 @@ sub user_entry_attr_changed
 	# calculate calculatable fields
 	$e0->{state} = 'user';
 	$edit_acc->{user_attr} = $user_attrs;
-	my $changed = massage_unix_account_entry($edit_acc);
+	massage_unix_account_entry($edit_acc);
 
 	# analyze results
+	my $chg = 0;
 	for $e (@user_attr_entries) {
 		my $val = nvl($edit_acc->get_value($e->{attr}));
 		my $state = $e->{state};
@@ -1233,6 +1245,7 @@ sub user_entry_attr_changed
 			$e->{entry}->set_text($val);
 		}
 		$e->{state} = $state;
+		$chg = 1 if $val ne $e->{old_val};
 	}
 
 	# refresh bulbs
@@ -1250,6 +1263,16 @@ sub user_entry_attr_changed
 	my $new_user_name = "$uid ($cn)";
 	if ($user_name->get_text() ne $new_user_name) {
 		$user_name->set_text("$uid ($cn)");
+	}
+
+	# refresh buttons
+	if ($chg != $changed) {
+		$changed = $chg;
+		$btn_apply->set_sensitive($chg);
+		$btn_revert->set_sensitive($chg);
+		$btn_refresh->set_sensitive(!$chg);
+		$btn_add->set_sensitive(!$chg);
+		$btn_delete->set_sensitive(!$chg);
 	}
 
 	return undef;
@@ -1417,7 +1440,7 @@ sub start_gui()
 	Gtk2->init;
 	my $gtkrc;
 	Gtk2::Rc->parse($gtkrc) if defined $gtkrc;
-	my $win = Gtk2::Window->new("toplevel");
+	$main_win = Gtk2::Window->new("toplevel");
 
 	my $tabs = Gtk2::Notebook->new;
 	$tabs->set_tab_pos("top");
@@ -1444,15 +1467,15 @@ sub start_gui()
 	$hpane->add1(Gtk2::Label->new(""));
 	$hpane->add2(Gtk2::Label->new(""));
 
-	$win->add($tabs);
+	$main_win->add($tabs);
 	user_unselect();
 
-	$win->signal_connect("delete_event" => \&gui_exit);
-	$win->signal_connect("destroy"      => \&gui_exit);
-	$win->set_default_size(900, 600);
-	$win->show_all;
-	my $pic = create_pic("tree.png");
-	$win->window->set_icon(undef, $pic->render_pixmap_and_mask(1));
+	$main_win->signal_connect("delete_event" => \&gui_exit);
+	$main_win->signal_connect("destroy"      => \&gui_exit);
+	$main_win->set_default_size(900, 600);
+	$main_win->show_all;
+	$main_win->window->set_icon(undef,
+							create_pic("tree.png")->render_pixmap_and_mask(1));
 	Gtk2->main;
 }
 
