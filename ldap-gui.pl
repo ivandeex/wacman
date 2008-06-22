@@ -59,11 +59,6 @@ my %config = (
 	xinstall_command	=>	'/usr/bin/sudo -S /usr/local/sbin/xinstall',
 	user_class			=>	'person',
 	poll_interval		=>	5,
-	log_file			=>	'ldap-refresh.log',
-	#log_file			=>	'/var/log/ldap-refresh.log',
-	pid_file			=>	'ldap-refresh.pid',
-	#pid_file			=>	'/var/run/ldap-refresh.pid',
-	log_level			=>	'info',
 
 	ad_retry_count		=>	3,
 	ad_can_create		=>	1,
@@ -136,9 +131,9 @@ my %ad_fields_const = (
 
 my $log;
 
-sub init_log ($$$)
+sub init_log ($)
 {
-	my ($level, $to_stdout, $to_file) = @_;
+	my $level = shift;
 	$level = 'warn' unless $level;
 	$level = lc($level);
 	my %levels = (
@@ -151,31 +146,14 @@ sub init_log ($$$)
 	);
 	croak "unknown log level $level\n" unless defined($levels{$level});
 	$level = $levels{$level};
-	if (!defined($to_stdout) && !defined($to_file)) {
-		$to_stdout = 1;
-		$to_file = 0;
-	}
-	if (!defined($to_file)) {
-		$to_file = 0;
-	}
 	$log = Log::Log4perl->get_logger("refresh");
 	my $layout = Log::Log4perl::Layout::PatternLayout->new('%d %c %p: %m%n');
-	if ($to_file) {
-		my $file_appender = Log::Log4perl::Appender->new(
-					"Log::Log4perl::Appender::File",
-					name      => "filelog",
-					filename  => $config{log_file});
-		$file_appender->layout($layout);
-		$log->add_appender($file_appender);
-	}
-	if ($to_stdout) {
-		my $stdout_appender =  Log::Log4perl::Appender->new(
-					"Log::Log4perl::Appender::Screen",
-					name      => "screenlog",
-					stderr    => 0);
-		$stdout_appender->layout($layout);
-  		$log->add_appender($stdout_appender);
-	}
+	my $stdout_appender =  Log::Log4perl::Appender->new(
+				"Log::Log4perl::Appender::Screen",
+				name      => "screenlog",
+				stderr    => 0);
+	$stdout_appender->layout($layout);
+	$log->add_appender($stdout_appender);
 	$log->level($level);
 }
 
@@ -1109,7 +1087,7 @@ sub is_new
 
 sub user_add
 {
-	return if user_unselect();
+	user_unselect();
 	my $model = $user_list->get_model;
 
 	my $node = $model->get_iter_first;
@@ -1148,7 +1126,7 @@ sub user_delete
 
 sub users_refresh
 {
-	return if user_unselect();
+	user_unselect();
 	my @attrs = ('uid', 'cn');
 	my $model = $user_list->get_model;
 	$model->clear;
@@ -1165,6 +1143,7 @@ sub users_refresh
 			$model->set($node, $i, $entry->get_value($attrs[$i]));
 		}
 	}
+	$btn_add->set_sensitive(1) if defined $btn_add;
 }
 
 
@@ -1183,7 +1162,7 @@ sub user_change
 sub user_unselect
 {
 	# exit if interface is not built complete
-	return 0 unless defined $user_name;
+	return unless defined $user_name;
 
 	$user_name->set_text('');
 	@user_attr_entries = values(%$user_attrs);
@@ -1337,7 +1316,20 @@ sub set_user_changed
 
 sub gui_exit
 {
-	return if user_unselect();
+	if ($changed) {
+		my $dia = Gtk2::MessageDialog->new(
+						$main_win,
+						'destroy-with-parent',
+						'question', # message type
+						'yes-no', # which set of buttons?
+						"Выйти и потерять изменения ?"
+					);
+		my $resp = $dia->run;
+		$dia->destroy;
+		return 1 if $resp ne 'yes';
+		$changed = 0;
+	}
+	user_unselect();
 	Gtk2->main_quit;
 }
 
@@ -1542,16 +1534,8 @@ sub main
 {
 	($pname = $0) =~ s/^.*\///;
 	my %opts;
-	my $cmd_ok = getopts("fgndDchv:", \%opts);
-	die <<USAGE
-usage: $pname [-f] [-v level] { -n [user...] | -d | -c }
-	-f		force updates
-	-v		set log level
-	-n		normal mode, update all or listed users
-	-d		daemon mode
-	-g		GUI mode (default)
-USAGE
-		if !$cmd_ok || $opts{h};
+	my $cmd_ok = getopts("Dhv:", \%opts);
+	die "usage: $pname [-v log_level]\n" if !$cmd_ok || $opts{h};
 
 	configure(@{$config{config_files}});
 	$config{force} = 1 if $opts{f};
@@ -1559,32 +1543,10 @@ USAGE
 	$level = $opts{v} if $opts{v};
 	dump_config() if $opts{D};
 
-	if ($opts{g}) {
-		# gui mode
-		init_log($level, 1, 0);
-		connect_all();
-		start_gui();
-		disconnect_all();
-	} elsif ($opts{n}) {
-		# normal mode: update all or listed users
-		my @args;
-		map { push @args, $_ unless $_ =~ /^\-/ } @ARGV;
-		init_log($level, 1, 0);
-		connect_all();
-		massage_accounts(@args);
-		disconnect_all();
-	} elsif ($opts{d}) {
-		# daemon mode: poll windows/unix users and update when needed
-		init_log($level, 0, 1);
-		write_pid();
-		connect_all();
-		daemon_poll();
-		disconnect_all();
-	} else {
-		# 	cgi_mode();
-		die "CGI mode not defined (or use -h for help)\n";
-	}
-	$log->info("done");
+	init_log($level);
+	connect_all();
+	start_gui();
+	disconnect_all();
 }
 
 main();
