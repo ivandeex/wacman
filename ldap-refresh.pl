@@ -1066,6 +1066,9 @@ my ($orig_acc, $edit_acc);
 
 sub user_apply
 {
+	set_user_changed(0);
+	user_select();
+	$btn_add->set_sensitive(1);
 }
 
 
@@ -1078,10 +1081,13 @@ sub user_revert
 					'yes-no', # which set of buttons?
 					"Действительно откатить модификации ?"
 				);
-	if ($dia->run eq 'yes') {
+	my $resp = $dia->run;
+	$dia->destroy;
+	if ($resp eq 'yes') {
+		set_user_changed(0);
+		$btn_add->set_sensitive(1);
 		user_select();
 	}
-	$dia->destroy;
 }
 
 
@@ -1090,22 +1096,53 @@ sub user_fill
 }
 
 
+sub is_new
+{
+	my $node = shift;
+	my $model = $user_list->get_model;
+	return 0 unless defined $node;
+	my $uid = $model->get($node, 0);
+	my $cn = $model->get($node, 1);
+	my $is_new = $uid eq '-' && $cn eq '-';
+	return $is_new ? 1 : 0;
+}
+
 sub user_add
 {
 	return if user_unselect();
 	my $model = $user_list->get_model;
-	my $node = $model->append(undef);
+
+	my $node = $model->get_iter_first;
+	while (defined $node) {
+		return if is_new($node);
+		$node = $model->iter_next($node);
+	}
+
+	$node = $model->append(undef);
 	$model->set($node, 0, '-', 1, '-');
 	my $path = $model->get_path($node);
 	$user_list->set_cursor($path);
 	my $first = $user_gui_attrs[0][1][1];
 	$user_attrs->{$first}->{entry}->grab_focus;
+	set_user_changed(0);
+	$btn_add->set_sensitive(0);
 	user_select($path, 0);
 }
 
 
 sub user_delete
 {
+	my ($path, $column) = $user_list->get_cursor;
+	my $model = $user_list->get_model;
+	if (defined $path) {
+		my $node = $model->get_iter($path);
+		if ($path->prev) {
+			$user_list->set_cursor($path);
+		}
+		$model->remove($node);
+		set_user_changed(0);
+		$btn_add->set_sensitive(1);
+	}
 }
 
 
@@ -1131,9 +1168,23 @@ sub users_refresh
 }
 
 
+sub user_change
+{
+	my ($path, $column) = $user_list->get_cursor;
+	my $model = $user_list->get_model;
+	if (defined $path) {
+		my $node = $model->get_iter($path);
+		$model->remove($node) if is_new($node);
+		$btn_add->set_sensitive(1);
+	}
+}
+
+
 sub user_unselect
 {
+	# exit if interface is not built complete
 	return 0 unless defined $user_name;
+
 	$user_name->set_text('');
 	@user_attr_entries = values(%$user_attrs);
 	for my $e (@user_attr_entries) {
@@ -1157,16 +1208,16 @@ sub user_select
 {
 	my ($path, $column) = $user_list->get_cursor;
 	my $model = $user_list->get_model;
-	my $iter = $model->get_iter($path);
-	my $uid = $model->get($iter, 0);
-	my $cn = $model->get($iter, 1);
+	my $node = $model->get_iter($path);
+	my $uid = $model->get($node, 0);
+	my $cn = $model->get($node, 1);
 	return unless defined $uid;
 
 	$user_name->set_text("$uid ($cn)");
 	$btn_fill->set_sensitive(1);
 
 	my ($ua, $e);
-	if ($uid eq '' || $uid eq '-') {
+	if (is_new($node)) {
 		$ua = Net::LDAP::Entry->new;
 		for $e (@user_attr_entries) {
 			$ua->add($e->{attr} => '');
@@ -1178,7 +1229,7 @@ sub user_select
 						filter => "(&(objectClass=$user_class)(uid=$uid))" );
 		if ($res->code || scalar($res->entries) == 0) {
 			$log->info("cannot find uid [$uid]");
-			return undef;
+			return;
 		}
 		$ua = $res->pop_entry;
 	}
@@ -1207,11 +1258,11 @@ sub user_entry_attr_changed
 {
 	my ($entry0, $event0) = @_;
 	my $e0 = $entry0->{user_attr};
-	return undef unless $e0;
+	return unless $e0;
 	my $e;
 
 	$e0->{new_val} = nvl($e0->{entry}->get_text());
-	return undef if nvl($e0->{cur_val}) eq nvl($e0->{new_val});
+	return if nvl($e0->{cur_val}) eq nvl($e0->{new_val});
 
 	# read values
 	for $e (@user_attr_entries) {
@@ -1266,16 +1317,21 @@ sub user_entry_attr_changed
 	}
 
 	# refresh buttons
-	if ($chg != $changed) {
-		$changed = $chg;
-		$btn_apply->set_sensitive($chg);
-		$btn_revert->set_sensitive($chg);
-		$btn_refresh->set_sensitive(!$chg);
-		$btn_add->set_sensitive(!$chg);
-		$btn_delete->set_sensitive(!$chg);
-	}
+	set_user_changed($chg);
+}
 
-	return undef;
+
+sub set_user_changed
+{
+	my $chg = shift;
+	return if $chg == $changed;
+	$changed = $chg;
+	$btn_apply->set_sensitive($chg);
+	$btn_revert->set_sensitive($chg);
+	$btn_refresh->set_sensitive(!$chg);
+	$btn_add->set_sensitive(!$chg);
+	$btn_delete->set_sensitive(!$chg);
+	$user_list->set_sensitive(!$chg);
 }
 
 
@@ -1430,6 +1486,7 @@ sub create_user_list
 	users_refresh();
 
 	$user_list->signal_connect(cursor_changed => \&user_select);
+	$user_list->signal_connect(move_cursor => \&user_change);
 
 	return $frame;
 }
@@ -1492,8 +1549,7 @@ usage: $pname [-f] [-v level] { -n [user...] | -d | -c }
 	-v		set log level
 	-n		normal mode, update all or listed users
 	-d		daemon mode
-	-g		GUI mode
-	-c		CGI mode (default), not yet implemented
+	-g		GUI mode (default)
 USAGE
 		if !$cmd_ok || $opts{h};
 
@@ -1510,7 +1566,7 @@ USAGE
 		start_gui();
 		disconnect_all();
 	} elsif ($opts{n}) {
-		# normal mode
+		# normal mode: update all or listed users
 		my @args;
 		map { push @args, $_ unless $_ =~ /^\-/ } @ARGV;
 		init_log($level, 1, 0);
@@ -1518,7 +1574,7 @@ USAGE
 		massage_accounts(@args);
 		disconnect_all();
 	} elsif ($opts{d}) {
-		# daemon mode
+		# daemon mode: poll windows/unix users and update when needed
 		init_log($level, 0, 1);
 		write_pid();
 		connect_all();
