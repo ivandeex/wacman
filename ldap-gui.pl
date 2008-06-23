@@ -3,9 +3,9 @@
 
 use strict;
 use warnings;
-no warnings 'utf8';
+#no warnings 'utf8';
 use utf8;
-use open ':utf8';
+#use open ':utf8';
 use Carp;
 use Getopt::Std;
 use Gtk2;
@@ -67,12 +67,13 @@ my %config = (
 	user_class			=>	'person',
 	unix_user_dn		=>	'uid=[uid],ou=People,dc=vihens,dc=ru',
 
-	ad_retry_count		=>	0,
-	ad_can_create		=>	1,
 	ad_initial_pass		=>	'123qweASD',
-	unix_user_classes	=>	[ qw(top person organizationalPerson inetOrgPerson posixAccount shadowAccount ntUser) ],	
+	unix_user_classes	=>	[
+			qw(top person organizationalPerson inetOrgPerson posixAccount shadowAccount ntUser)
+		],	
 	ad_user_classes		=>	[ qw(top user person organizationalPerson) ],	
 	ad_user_category	=>	'Person.Schema.Configuration',
+	ad_primary_group	=>	'Пользователи домена',
 	ad_user_groups		=>	[ 'Пользователи удаленного рабочего стола' ],
 	ad_user_container	=>	'Users',
 
@@ -530,6 +531,17 @@ sub ifnull ($$)
 }
 
 
+sub string2id ($)
+{
+	$_ = shift;
+	tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
+	tr/АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
+	$_ = lc;
+	tr/0-9a-z/_/cs;
+	$_;
+}
+
+
 # ======== massage ========
 
 
@@ -580,12 +592,12 @@ sub massage_accounts
 		@ids = map { $_->get_value('uid') } $res->entries;
 	}
 	for my $id (@ids) {
-		$log->info("massage id $id ...");
+		$log->debug("massage id $id ...");
 		my $ua = massage_unix_account($id);
 		if (defined $ua) {
 			massage_home_dir($ua);
 			# at this point we need to tell FDS to synchronize
-			massage_windows_account($ua)
+			massage_windows_account($ua);
 		}
 	}
 }
@@ -641,11 +653,7 @@ sub massage_unix_account_entry
 
 	# user id
 	unless (ldap_has_attr($ua, 'uid')) {
-		$uid = $sn eq '' ? $gn : substr($gn, 0, 1) . $sn;
-		$uid =~ tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
-		$uid =~ tr/АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
-		$uid = lc($uid);
-		$uid =~ tr/0-9a-z/_/cs;
+		$uid = string2id($sn eq '' ? $gn : substr($gn, 0, 1) . $sn);
 		$uchange++ if ldap_cond_set($ua, 'uid', $uid);
 	}
 
@@ -661,7 +669,7 @@ sub massage_unix_account_entry
 		my $lclass = lc($class);
 		unless (defined($classes{$class}) || defined($classes{$lclass})) {
 			$ua->add(objectClass => $class);
-			$log->info("$uid($cn): add class $class");
+			$log->debug("$uid($cn): add class $class");
 			$uchange++;
 		}
 	}
@@ -703,22 +711,30 @@ sub massage_unix_account_entry
 }
 
 
-my @ad_user_groups;
-
 sub windows_user_groups
 {
-	# refresh list of groups
-	if ($#ad_user_groups < 0) {
-		my $filter = join('', map("(cn=$_)", @{$config{ad_user_groups}}));
-		$filter = "(&(objectClass=group)(|$filter))";
-		my $res = ldap_search( $win, base => $win->{CFG}->{base}, filter => $filter );
-		if ($res->code) {
-			message_box('error', 'close',
-					"Ошибка чтения списка windows-групп: ".$res->error);
-		}
-		@ad_user_groups = $res->entries;
+	my $name = $config{ad_primary_group};
+	my $filter = "(&(objectClass=group)(cn=$name))";
+	my $res = ldap_search( $win, base => $win->{CFG}->{base},
+							filter => $filter, attrs => [ 'PrimaryGroupToken' ] );
+	my $group = $res->pop_entry;
+	my $group_id = 0;
+	$group_id = $group->get_value('PrimaryGroupToken') if defined $group;
+	$group_id = 0 unless $group_id;		
+	if ($res->code || !defined($group) || !$group_id) {
+		message_box('error', 'close',
+				"Ошибка чтения Windows-группы \"$name\" ($group_id): ".$res->error);
 	}
-	return @ad_user_groups;
+
+	$filter = join('', map("(cn=$_)", @{$config{ad_user_groups}}));
+	$filter = "(&(objectClass=group)(|$filter))";
+	$res = ldap_search( $win, base => $win->{CFG}->{base}, filter => $filter );
+	if ($res->code) {
+		message_box('error', 'close',
+				"Ошибка чтения списка Windows-групп: ".$res->error);
+	}
+	my @sec_groups = $res->entries;
+	return ($group_id, @sec_groups);
 }
 
 
@@ -732,52 +748,33 @@ sub windows_dn ($)
 }
 
 
-sub massage_windows_account
+sub massage_windows_account ($$)
 {
-	my $ua = shift;
+	my ($ua, $new_pwd) = @_;
 	my $uid = $ua->get_value('uid');
 	my $cn = $ua->get_value('cn');
 
-	$log->info("massage windows $uid ($cn) ...");
+	$log->debug("massage windows $uid ($cn) ...");
 	my $filter = "(&(objectClass=user)(cn=$cn))";
-	my ($res, $wa);
 	my $wchange = 0;
 	my $uchange = 0;
 	my $base = $win->{CFG}->{base};
 	my $attrs = [ '*', 'unicodePwd' ];
-	my $ok = 0;
-	my $created = 0;
-	my $unipwd;
 
-	for my $i (1 .. $config{ad_retry_count}) {
-		$res = ldap_search( $win, base => $base, filter => $filter, attrs => $attrs );
-		$wa = $res->pop_entry;
-		$ok = (!$res->code && defined($wa));
-		last if $ok;
-		$log->warn("retry $i on windows user ($cn) for uid ($uid) ...");
-		sleep 1;
-	}
+	my $res = ldap_search( $win, base => $base, filter => $filter, attrs => $attrs );
+	my $wa = $res->pop_entry;
 
-	$log->info("found windows $uid ($cn) ".$wa->dn." ...") if $ok;
-		
 	# still need full resynchronization here !
-	unless ($ok) {
-		if ($config{ad_can_create}) {
-			$log->info("creating windows user ($cn) for uid ($uid) ...");			
-		} else {
-			$log->error("cannot find windows user ($cn) for uid ($uid) ...");
-			return;
-		}
-
-		$log->info("will create entry ($cn) for uid ($uid) ...");
+	if ($res->code || !defined($wa))
+	{
+		$log->info("creating windows user ($cn) for uid ($uid) ...");			
 		my $ad_dc_domain = path2dn($config{ad_domain},'dc');
 		my $dn = "cn=$cn,".path2dn($config{ad_user_container}).",$ad_dc_domain";
 		$wa = Net::LDAP::Entry->new();
 		$wa->dn($dn);
 		$wa->add(objectClass => $config{ad_user_classes});
-		$log->info("created windows user: $dn");
-		$log->info("$cn: object classes: ".join(',',@{$config{ad_user_classes}}).")");
-		$created++;
+		$log->debug("created windows user: $dn");
+		$log->debug("$cn: object classes: ".join(',',@{$config{ad_user_classes}}).")");
 		$wchange++;
 		ldap_cond_set($wa, 'cn', $cn);
 		ldap_cond_set($wa, 'instanceType', 4);
@@ -813,29 +810,42 @@ sub massage_windows_account
 		$wchange++ if ldap_cond_set($wa, $wattr, $ad_fields_const{$wattr});
 	}
 
+	# primary group
+	my ($primary_group_id, @secondary_groups) = windows_user_groups();
+	# AD refuses to set PrimaryGroupID and by default adds to the Domain Users group.
+	#$wchange++ if ldap_cond_set($wa, 'PrimaryGroupID', $primary_group_id);
+
 	# update on server
 	if ($wchange) {
-		$res = ldap_update($win, $wa); 
-		my $ret = $res->error;
-		chop $ret;
-		chomp $ret;
-		$log->info("changed: cn=($cn), ret=($ret)");
-
-		ldap_update($srv, $ua) if $uchange;
+		$res = ldap_update($win, $wa);
+		if ($res->code) {
+			message_box('error', 'close',
+				"Ошибка обновления Windows-пользователя \"$cn\": ".$res->error);
+		}
+		if ($uchange) {
+			$res = ldap_update($srv, $ua);
+			if ($res->code) {
+				message_box('error', 'close',
+					"Ошибка пере-обновления Unix-пользователя: ".$res->error);
+			}
+		}
 	}
 
 	#$res = $win->modify($wa->dn, replace => { "unicodePwd" => $unipwd });
 
 	# add to required groups
-	for my $user_group (windows_user_groups()) {
-		$log->debug("user_group: ". $user_group->dn);
+	for my $grp (@secondary_groups) {
+		my $name = $grp->get_value('name');
 		my %members;
-		for ($user_group->get_value('member')) { $members{$_} = 1 }
-		# FIXME! performed twice!
+		for ($grp->get_value('member')) { $members{$_} = 1; }
 		unless (defined $members{$wa->dn}) {
-			$log->info("adding ($cn) to ".$user_group->dn);
-			$user_group->add( member => $wa->dn );
-			$user_group->update($win);
+			$grp->add( member => $wa->dn );
+			my $res = $grp->update($win);
+			if ($res->code) {
+				my $msg = "Ошибка добавления \"".$cn
+						."\" в Windows-группу \"".$name."\": ".$res->error;
+				message_box('error', 'close', $msg);
+			}
 		}
 	}
 
@@ -846,10 +856,10 @@ sub massage_home_dir ($)
 {
 	my ($ua, $gotta_ask) = @_;
 	my $home = $ua->get_value('homeDirectory');
-	$log->info("massage home $home ...");
+	$log->debug("massage home $home ...");
 	return 0 if -d $home;
 	return 1 if $gotta_ask;
-	$log->info("$home: gotta create");
+	$log->info("creating home: $home");
 	my $skel = $config{skel_dir};
 	my $xinstall = $config{xinstall_command};
 	my $uid = $ua->get_value('uidNumber');
@@ -1004,6 +1014,7 @@ sub set_entry_attr ($$$)
 	my ($ua, $e, $val) = @_;
 	my $attr = $e->{attr};
 	if ($attr) {
+		croak "wow" unless defined $ua;
 		if ($ua->exists($attr)) {
 			$ua->replace($attr, $val);
 		} else {
@@ -1126,6 +1137,8 @@ sub user_delete
 	if ($path->prev || $path->next) {
 		$user_list->set_cursor($path);
 		user_select();
+	} else {
+		user_unselect();
 	}
 }
 
@@ -1258,6 +1271,7 @@ sub user_entry_attr_changed
 	my ($entry0, $event0) = @_;
 	my $e0 = $entry0->{user_attr};
 	return unless $e0;
+	return unless $edit_acc;
 	my $e;
 
 	$e0->{new_val} = nvl($e0->{entry}->get_text());
