@@ -19,7 +19,7 @@ use Cwd 'abs_path';
 my ($srv, $win, $pname);
 
 my $changed;
-my ($btn_apply, $btn_revert, $btn_add, $btn_delete, $btn_refresh);
+my ($btn_user_apply, $btn_user_revert, $btn_user_add, $btn_user_delete, $btn_users_refresh);
 my ($user_list, $user_attr_frame, $user_name, $main_win);
 my ($user_attrs, @user_attr_entries, $user_attr_tabs);
 my ($orig_acc, $edit_acc);
@@ -28,8 +28,8 @@ my $pic_home = abs_path("$Bin/images");
 
 my $next_uidn;
 
-
 my %translations;
+
 
 sub _T
 {
@@ -112,6 +112,7 @@ my %servers = (
 	' Users '	=>	' Пользователи ',
 	' Groups '	=>	' Группы ',
 );
+
 
 my %config = (
 	debug				=>	0,
@@ -196,6 +197,32 @@ my %ad_fields_const = (
 
 
 my @user_gui_attrs = (
+	[ 'UNIX',
+		[ 's', 'givenName', _T('Name') ],
+		[ 's', 'sn', _T('Second name') ],
+		[ 's', 'cn', _T('Full name') ],
+		[ 'd', 'uid', _T('Identifier') ],
+		[ 's', 'mail', _T('Mail') ],
+		[ 's', 'uidNumber', _T('User#') ],
+		[ 'g', 'gidNumber', _T('Group#') ],
+		[ 'G', '', _T('Other groups') ],
+		[ 's', 'homeDirectory', _T('Home directory') ],
+		[ 's', 'loginShell', _T('Login shell') ],
+	],
+	[ 'Windows',
+		[ 's', 'ntUserHomeDir', _T('Home directory') ],
+		[ 's', 'ntUserHomeDirDrive', _T('Drive') ],
+		[ 's', 'ntUserProfile', _T('Profile') ],
+		[ 's', 'ntUserScriptPath', _T('Logon script') ]
+	],
+	[ 'Дополнительно',
+		[ 's', 'telephoneNumber', _T('Telephone') ],
+		[ 's', 'facsimileTelephoneNumber', _T('Fax number') ],
+	],
+);
+
+
+my @group_gui_attrs = (
 	[ 'UNIX',
 		[ 's', 'givenName', _T('Name') ],
 		[ 's', 'sn', _T('Second name') ],
@@ -597,10 +624,7 @@ sub next_unix_uidn
 		return $next_uidn;
 	}
 	$next_uidn = 0;
-	my $res = ldap_search( $srv,
-					base => $srv->{CFG}->{base},
-					filter => "(objectClass=posixAccount)",
-					attrs => [ 'uidNumber' ] );
+	my $res = ldap_search($srv, '(objectClass=posixAccount)', [ 'uidNumber' ]);
 	for ($res->entries) {
 		my $uidn = $_->get_value('uidNumber');
 		$next_uidn = $uidn if $uidn > $next_uidn;
@@ -628,10 +652,7 @@ sub massage_accounts
 	my @ids = @_;
 	if ($#ids < 0) {
 		my $user_class = $config{user_class};
-		my $res = ldap_search( $srv,
-						base => $srv->{CFG}->{base},
-						filter => "(objectClass=$user_class)",
-						attrs => [ 'uid' ] );
+		my $res = ldap_search($srv, "(objectClass=$user_class)", [ 'uid' ]);
 		# get all users
 		@ids = map { $_->get_value('uid') } $res->entries;
 	}
@@ -651,13 +672,9 @@ sub massage_unix_account
 {
 	my $id = shift;
 	my $user_class = $config{user_class};
-	my $res = ldap_search(	$srv,
-					base => $srv->{CFG}->{base},
-					filter => "(&(objectClass=$user_class)(uid=$id))" );
+	my $res = ldap_search($srv, "(&(objectClass=$user_class)(uid=$id))");
 	if ($res->code) {
-		$res = ldap_search( $srv,
-					base => $srv->{CFG}->{base},
-					filter => "(&(objectClass=person)(cn=$id))" )
+		$res = ldap_search($srv, "(&(objectClass=person)(cn=$id))");
 	}
 	if ($res->code) {
 		message_box('error', 'close', _T('User "%s" not found: %s',$id,$res->error));
@@ -758,9 +775,7 @@ sub massage_unix_account_entry
 sub windows_user_groups
 {
 	my $name = $config{ad_primary_group};
-	my $filter = "(&(objectClass=group)(cn=$name))";
-	my $res = ldap_search( $win, base => $win->{CFG}->{base},
-							filter => $filter, attrs => [ 'PrimaryGroupToken' ] );
+	my $res = ldap_search($win, "(&(objectClass=group)(cn=$name))", [ 'PrimaryGroupToken' ] );
 	my $group = $res->pop_entry;
 	my $group_id = 0;
 	$group_id = $group->get_value('PrimaryGroupToken') if defined $group;
@@ -770,9 +785,8 @@ sub windows_user_groups
 				_T('Error reading Windows group "%s" (%s): %s', $name, $group_id, $res->error));
 	}
 
-	$filter = join('', map("(cn=$_)", @{$config{ad_user_groups}}));
-	$filter = "(&(objectClass=group)(|$filter))";
-	$res = ldap_search( $win, base => $win->{CFG}->{base}, filter => $filter );
+	my $filter = join('', map("(cn=$_)", @{$config{ad_user_groups}}));
+	$res = ldap_search($win, "(&(objectClass=group)(|$filter))");
 	if ($res->code) {
 		message_box('error', 'close', _T('Error reading list of Windows groups: %s', $res->error));
 	}
@@ -799,13 +813,10 @@ sub massage_windows_account ($$)
 	my $cn = $ua->get_value('cn');
 
 	log_debug('massage windows %s (%s) ...', $uid, $cn);
-	my $filter = "(&(objectClass=user)(cn=$cn))";
 	my $wchange = 0;
 	my $uchange = 0;
-	my $base = $win->{CFG}->{base};
-	my $attrs = [ '*', 'unicodePwd' ];
 
-	my $res = ldap_search( $win, base => $base, filter => $filter, attrs => $attrs );
+	my $res = ldap_search($win, "(&(objectClass=user)(cn=$cn))", [ '*', 'unicodePwd' ]);
 	my $wa = $res->pop_entry;
 
 	# still need full resynchronization here !
@@ -902,14 +913,17 @@ sub massage_home_dir ($)
 	log_debug('refresh home directory "%s" ...', $home);
 	return 0 if -d $home;
 	return 1 if $gotta_ask;
-	log_info('creating home directory "$home"', $home);
+
+	log_info('creating home directory "%s"', $home);
 	my $skel = $config{skel_dir};
 	my $xinstall = $config{xinstall_command};
 	my $uid = $ua->get_value('uidNumber');
 	my $gid = $ua->get_value('gidNumber');
 	# FIXME: get rid of external script
 	my $stdall = `$xinstall "$uid" "$gid" "$skel" "$home" 2>&1`;
+	chomp $stdall;
 	log_debug('xinstall: [%s]', $stdall);
+
 	return 1;
 }
 
@@ -919,8 +933,11 @@ sub massage_home_dir ($)
 
 sub ldap_search
 {
-	my $srv = shift;
-	my $res = $srv->search(@_);
+	my ($srv, $filter, $attrs, $base, %params) = @_;
+	$params{filter} = $filter;
+	$params{base} = $base ? $base : $srv->{CFG}->{base};
+	$params{attrs} = $attrs if $attrs;
+	my $res = $srv->search(%params);
 	return $res;
 }
 
@@ -1109,7 +1126,7 @@ sub user_save
 	massage_accounts($uid);
 	user_select();
 	set_user_changed(0);
-	$btn_add->set_sensitive(1);
+	$btn_user_add->set_sensitive(1);
 }
 
 
@@ -1118,7 +1135,7 @@ sub user_revert
 	my $resp = message_box('question', 'yes-no', _T('Really revert changes ?'));
 	return if $resp ne 'yes';
 	set_user_changed(0);
-	$btn_add->set_sensitive(1);
+	$btn_user_add->set_sensitive(1);
 	user_select();
 }
 
@@ -1141,7 +1158,7 @@ sub user_add
 	my $first = $user_gui_attrs[0][1][1];
 	$user_attrs->{$first}->{entry}->grab_focus;
 	set_user_changed(0);
-	$btn_add->set_sensitive(0);
+	$btn_user_add->set_sensitive(0);
 	user_select($path, 0);
 }
 
@@ -1178,7 +1195,7 @@ sub user_delete
 
 	$model->remove($node);
 	set_user_changed(0);
-	$btn_add->set_sensitive(1);
+	$btn_user_add->set_sensitive(1);
 
 	if ($path->prev || $path->next) {
 		$user_list->set_cursor($path);
@@ -1199,10 +1216,7 @@ sub users_refresh
 	$model->clear;
 
 	my $user_class = $config{user_class};
-	my $res = ldap_search( $srv,
-					base => $srv->{CFG}->{base},
-					filter => "(objectClass=$user_class)",
-					attrs => \@attrs );
+	my $res = ldap_search($srv, "(objectClass=$user_class)", \@attrs);
 	my @users = $res->entries;
 	@users = sort { $a->get_value('uid') cmp $b->get_value('uid') } @users;
 
@@ -1213,7 +1227,7 @@ sub users_refresh
 		}
 	}
 
-	$btn_add->set_sensitive(1) if defined $btn_add;
+	$btn_user_add->set_sensitive(1) if defined $btn_user_add;
 }
 
 
@@ -1224,7 +1238,7 @@ sub user_change
 	if (defined $path) {
 		my $node = $model->get_iter($path);
 		$model->remove($node) if is_new_user($node);
-		$btn_add->set_sensitive(1);
+		$btn_user_add->set_sensitive(1);
 	}
 }
 
@@ -1243,9 +1257,9 @@ sub user_unselect
 		$e->{bulb}->set_from_pixbuf(create_pic('empty.png'));
 	}
 
-	$btn_apply->set_sensitive(0);
-	$btn_revert->set_sensitive(0);
-	$btn_delete->set_sensitive(0);
+	$btn_user_apply->set_sensitive(0);
+	$btn_user_revert->set_sensitive(0);
+	$btn_user_delete->set_sensitive(0);
 
 	$user_attr_tabs->set_current_page(0);
 	$user_attr_frame->set_sensitive(0);
@@ -1278,9 +1292,7 @@ sub user_select
 		}
 	} else {
 		my $user_class = $config{user_class};
-		my $filter = "(&(objectClass=$user_class)(uid=$uid))";
-		my $res = ldap_search(	$srv,
-						base => $srv->{CFG}->{base}, filter => $filter );
+		my $res = ldap_search($srv, "(&(objectClass=$user_class)(uid=$uid))");
 		if ($res->code || scalar($res->entries) == 0) {
 			my $msg = _T('Cannot display user "%s"', $uid);
 			$msg .= ": ".$res->error if $res->code;
@@ -1305,7 +1317,7 @@ sub user_select
 		$e->{bulb}->set_from_pixbuf(create_pic($pic));
 	}
 
-	$btn_delete->set_sensitive(1);
+	$btn_user_delete->set_sensitive(1);
 	$user_attr_tabs->set_current_page(0);
 	$user_attr_frame->set_sensitive(1);
 }
@@ -1384,11 +1396,11 @@ sub set_user_changed
 	my $chg = shift;
 	return if $chg == $changed;
 	$changed = $chg;
-	$btn_apply->set_sensitive($chg);
-	$btn_revert->set_sensitive($chg);
-	$btn_refresh->set_sensitive(!$chg);
-	$btn_add->set_sensitive(!$chg);
-	$btn_delete->set_sensitive(!$chg);
+	$btn_user_apply->set_sensitive($chg);
+	$btn_user_revert->set_sensitive($chg);
+	$btn_users_refresh->set_sensitive(!$chg);
+	$btn_user_add->set_sensitive(!$chg);
+	$btn_user_delete->set_sensitive(!$chg);
 	$user_list->set_sensitive(!$chg);
 }
 
@@ -1444,8 +1456,8 @@ sub create_user_desc
 
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Save'), "apply.png", \&user_save, \$btn_apply ],
-		[ _T('Revert'), "revert.png", \&user_revert,\$btn_revert ],
+		[ _T('Save'), "apply.png", \&user_save, \$btn_user_apply ],
+		[ _T('Revert'), "revert.png", \&user_revert,\$btn_user_revert ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
 
@@ -1490,6 +1502,9 @@ sub create_user_list
 }
 
 
+# ======== group gui ========
+
+
 # ======== main ========
 
 
@@ -1532,9 +1547,9 @@ sub gui_main
 	$hpane->add1(create_user_list());
 	$hpane->add2(create_user_desc());
 	my $buttons = create_button_bar (
-		[ _T('Create'), "add.png", \&user_add, \$btn_add ],
-		[ _T('Delete'), "delete.png", \&user_delete, \$btn_delete ],
-		[ _T('Refresh'), "refresh.png", \&users_refresh, \$btn_refresh ],
+		[ _T('Create'), "add.png", \&user_add, \$btn_user_add ],
+		[ _T('Delete'), "delete.png", \&user_delete, \$btn_user_delete ],
+		[ _T('Refresh'), "refresh.png", \&users_refresh, \$btn_users_refresh ],
 		[],
 		[ _T('Exit'), "exit.png", \&gui_exit ],
 	);
