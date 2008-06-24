@@ -3,20 +3,18 @@
 
 use strict;
 use warnings;
-#no warnings 'utf8';
 use utf8;
-#use open ':utf8';
 use Carp;
 use Getopt::Std;
 use Gtk2;
 use POSIX;
 use Encode;
+use Time::HiRes 'gettimeofday';
 use Net::LDAP;
 use Net::LDAP::Entry;
-use Log::Log4perl;
-use Log::Log4perl::Layout;
-use Log::Log4perl::Level;
 
+use FindBin qw[$Bin];
+use Cwd 'abs_path';
 
 my ($srv, $win, $pname);
 
@@ -26,6 +24,20 @@ my ($btn_add, $btn_delete, $btn_refresh);
 my ($user_list, $user_name, $main_win);
 my ($user_attrs, @user_attr_entries, $user_attr_tabs);
 my ($orig_acc, $edit_acc);
+
+my $pic_home = abs_path("$Bin/images");
+
+my $next_uidn;
+
+
+my %translations;
+
+sub _T
+{
+	my ($fmt, @args) = @_;
+	$fmt = $translations{$fmt} if defined $translations{$fmt};
+	return sprintf($fmt, @args);
+}
 
 
 # ======== config =========
@@ -39,7 +51,7 @@ use constant ADS_UF_NORMAL_ACCOUNT => hex(0x00000200);
 my %servers = (
 	win => {
 		uri		=>	'ldaps://xxx.winsrv.vpn',
-		user	=>	'cn=syncadmin,cn=builtin,dc=gclimate,dc=local',
+		user	=>	'cn=dirman,dc=gclimate,dc=local',
 		passfile=>	'/etc/ldap-gui.secret',
 		base	=>	'dc=gclimate,dc=local',
 		debug	=>	0,
@@ -47,7 +59,7 @@ my %servers = (
 	},
 	srv => {
 		uri		=>	'ldaps://xxx.el4.vihens.ru',
-		user	=>	'cn=dirman',
+		user	=>	'cn=dirman,dc=vihens,dc=ru',
 		passfile=>	'/etc/ldap-gui.secret',
 		base	=>	'dc=vihens,dc=ru',
 		debug	=>	0,
@@ -56,7 +68,42 @@ my %servers = (
 );
 
 
+%translations = (
+	'Domain Users'	=>	'Пользователи домена',
+	'Remote Users'	=>	'Пользователи удаленного рабочего стола',
+	'Name'			=>	'Имя',
+	'Second name'	=>	'Фамилия',
+	'Full name'		=>	'Полное имя',
+	'User not found: "%s"'	=>	'Не найден пользователь: "%s"',
+	'User "%s" not found: '	=>	'Пользователь "%s" не найден: ',
+	'Error reading list of Windows groups: '	=>	'Ошибка чтения списка Windows-групп: ',
+	'Error reading Windows group "%s" (%s): '	=>	'Ошибка чтения Windows-группы "%s" (%s): ',
+	'Error updating Windows-user "%s": '	=>	'Ошибка обновления Windows-пользьвателя "%s": ',
+	'Error re-updating Unix-user "%s": '	=>	'Ошибка пере-обновления Unix-пользьвателя "%s": ',
+	'Error adding "%s" to Windows-group "%s": %s'	=>	'Ошибка добавления "%s" в Windows-группу "%s": %s',
+	'Error saving user "%s": %s'	=>	'Ошибка сохранения пользователя "%s": %s',
+	'Really revert changes ?'	=>	'Действительно откатить модификации ?',
+	'Delete user "%s" ?'	=>	'Удалить пользователя "%s" ?',
+	'Error deleting Unix-user "%s": %s'	=>	'Ошибка удаления Unix-пользователя "%s": %s',
+	'Error deleting Windows-user "%s": %s'	=>	'Ошибка удаления Windows-пользователя "%s": %s',
+	'Cannot display user "%s"'	=>	'Не могу вывести пользователя "%s"',
+	'Exit and loose changes ?'	=>	'Выйти и потерять изменения ',
+	'Attributes'	=>	'Атрибуты',
+	'Save'	=>	'Сохранить',
+	'Revert'	=>	'Отменить',
+	'Fill'	=>	'Заполнить',
+	'Identifier'	=>	'Идентификатор',
+	'Full name'	=>	'Полное имя',
+	'Create'	=>	'Добавить',
+	'Delete'	=>	'Удалить',
+	'Refresh'	=>	'Обновить',
+	'Exit'	=>	'Выйти',
+	' Users '	=>	' Пользователи ',
+	' Groups '	=>	' Группы ',
+);
+
 my %config = (
+	debug				=>	0,
 	config_files		=>	[
 			'/etc/ldap-gui.cfg',
 			'~/.ldap-gui.cfg',
@@ -73,8 +120,8 @@ my %config = (
 		],	
 	ad_user_classes		=>	[ qw(top user person organizationalPerson) ],	
 	ad_user_category	=>	'Person.Schema.Configuration',
-	ad_primary_group	=>	'Пользователи домена',
-	ad_user_groups		=>	[ 'Пользователи удаленного рабочего стола' ],
+	ad_primary_group	=>	_T('Domain Users'),
+	ad_user_groups		=>	[ _T('Remote Users') ],
 	ad_user_container	=>	'Users',
 
 	unix_gids			=>	[ 100 ],
@@ -139,9 +186,9 @@ my %ad_fields_const = (
 
 my @user_gui_attrs = (
 	[ 'UNIX',
-		[ 's', 'givenName', 'Имя' ],
-		[ 's', 'sn', 'Фамилия' ],
-		[ 's', 'cn', 'Полное имя' ],
+		[ 's', 'givenName', _T('Name') ],
+		[ 's', 'sn', _T('Second name') ],
+		[ 's', 'cn', _T('Full name') ],
 		[ 'd', 'uid', 'Идентификатор' ],
 		[ 's', 'mail', 'почта' ],
 		[ 's', 'uidNumber', '#пользователя' ],
@@ -391,43 +438,42 @@ sub ldap_print_entry ($$$)
 
 # ======== Logging ========
 
-
-my $log;
-
-sub init_log ($)
+sub init_log
 {
-	my $level = shift;
-	$level = 'warn' unless $level;
-	$level = lc($level);
-	my %levels = (
-		0 => $FATAL,	fatal => $FATAL,
-		1 => $ERROR,	error => $ERROR,
-		2 => $WARN,		'warn'=> $WARN,
-		3 => $INFO,		info  => $INFO,
-		4 => $DEBUG,	debug => $DEBUG,
-		5 => $TRACE,	trace => $TRACE,
-	);
-	croak "unknown log level $level\n" unless defined($levels{$level});
-	$level = $levels{$level};
-	$log = Log::Log4perl->get_logger("refresh");
-	my $layout = Log::Log4perl::Layout::PatternLayout->new('%d %c %p: %m%n');
-	my $stdout_appender =  Log::Log4perl::Appender->new(
-				"Log::Log4perl::Appender::Screen",
-				name      => "screenlog",
-				stderr    => 0);
-	$stdout_appender->layout($layout);
-	$log->add_appender($stdout_appender);
-	$log->level($level);
+	my $fh = select STDOUT;
+	$| = 1;
+	select $fh;
+}
+
+sub log_msg
+{
+	my ($level, @msg) = @_;
+	my $msg = join('', @msg);
+	my ($s,$mi,$h,$d,$mo,$y) = localtime(time);
+	my ($secs, $usecs) = gettimeofday;
+	my $ms = int($usecs / 1000);
+	my $str = sprintf("%02d:%02d:%02d.%03d [%6s] %s\n", $h,$mi,$s,$ms, $level, $msg);
+	print STDOUT $str;
+	return $str;
+}
+
+sub log_debug
+{
+	 log_msg("debug",@_) if $config{debug};
+}
+
+sub log_info
+{
+	log_msg("info",@_)
+}
+
+sub log_error
+{
+	croak(log_msg("error",@_));
 }
 
 
 # ======== gui utils ========
-
-
-use FindBin qw[$Bin];
-use Cwd 'abs_path';
-
-my $pic_home = abs_path("$Bin/images");
 
 
 my %pic_cache;
@@ -534,18 +580,18 @@ sub ifnull ($$)
 sub string2id ($)
 {
 	$_ = shift;
-	tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
-	tr/АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
+	#tr/АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
+	tr/\x{410}\x{411}\x{412}\x{413}\x{414}\x{415}\x{416}\x{417}\x{418}\x{419}\x{41a}\x{41b}\x{41c}\x{41d}\x{41e}\x{41f}\x{420}\x{421}\x{422}\x{423}\x{424}\x{425}\x{426}\x{427}\x{428}\x{429}\x{42a}\x{42b}\x{42c}\x{42d}\x{42e}\x{42f}/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
+	#tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
+	tr/\x{430}\x{431}\x{432}\x{433}\x{434}\x{435}\x{436}\x{437}\x{438}\x{439}\x{43a}\x{43b}\x{43c}\x{43d}\x{43e}\x{43f}\x{440}\x{441}\x{442}\x{443}\x{444}\x{445}\x{446}\x{447}\x{448}\x{449}\x{44a}\x{44b}\x{44c}\x{44d}\x{44e}\x{44f}/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
 	$_ = lc;
 	tr/0-9a-z/_/cs;
-	$_;
+	return $_;
 }
 
 
-# ======== massage ========
+# ========  reworking  ========
 
-
-my $next_uidn;
 
 sub next_unix_uidn
 {
@@ -562,7 +608,7 @@ sub next_unix_uidn
 		$next_uidn = $uidn if $uidn > $next_uidn;
 	}
 	$next_uidn = $next_uidn > 0 ? $next_uidn + 1 : 1000;
-	$log->debug("next=$next_uidn");
+	log_debug("next=$next_uidn");
 	return $next_uidn;
 }
 
@@ -592,7 +638,7 @@ sub massage_accounts
 		@ids = map { $_->get_value('uid') } $res->entries;
 	}
 	for my $id (@ids) {
-		$log->debug("massage id $id ...");
+		log_debug("massage id $id ...");
 		my $ua = massage_unix_account($id);
 		if (defined $ua) {
 			massage_home_dir($ua);
@@ -616,7 +662,7 @@ sub massage_unix_account
 					filter => "(&(objectClass=person)(cn=$id))" )
 	}
 	if ($res->code) {
-		message_box('error', 'close', "Не найден пользователь \"$id\": ".$res->error);
+		message_box('error', 'close', _T('User "%s" not found: ',$id).$res->error);
 		return;
 	}
 	my $ua = $res->pop_entry;
@@ -624,10 +670,10 @@ sub massage_unix_account
 		if (massage_unix_account_entry($ua)) {
 			$res = ldap_update($srv, $ua); 
 			my $uid = $ua->get_value('uid');
-			$log->info("changed: uid=($uid), ret=(".$res->error.")");
+			log_info("changed: uid=($uid), ret=(".$res->error().")");
 		}
 	} else {
-		message_box('error', 'close', "Не найден пользователь: \"$id\"");
+		message_box('error', 'close', _T('User not found: "%s"',$id));
 	}
 	return $ua;
 }
@@ -669,7 +715,7 @@ sub massage_unix_account_entry
 		my $lclass = lc($class);
 		unless (defined($classes{$class}) || defined($classes{$lclass})) {
 			$ua->add(objectClass => $class);
-			$log->debug("$uid($cn): add class $class");
+			log_debug("$uid($cn): add class $class");
 			$uchange++;
 		}
 	}
@@ -723,15 +769,14 @@ sub windows_user_groups
 	$group_id = 0 unless $group_id;		
 	if ($res->code || !defined($group) || !$group_id) {
 		message_box('error', 'close',
-				"Ошибка чтения Windows-группы \"$name\" ($group_id): ".$res->error);
+				_T('Error reading Windows group "%s" (%s): ', $name, $group_id).$res->error);
 	}
 
 	$filter = join('', map("(cn=$_)", @{$config{ad_user_groups}}));
 	$filter = "(&(objectClass=group)(|$filter))";
 	$res = ldap_search( $win, base => $win->{CFG}->{base}, filter => $filter );
 	if ($res->code) {
-		message_box('error', 'close',
-				"Ошибка чтения списка Windows-групп: ".$res->error);
+		message_box('error', 'close', _T('Error reading list of Windows groups: ').$res->error);
 	}
 	my @sec_groups = $res->entries;
 	return ($group_id, @sec_groups);
@@ -754,7 +799,7 @@ sub massage_windows_account ($$)
 	my $uid = $ua->get_value('uid');
 	my $cn = $ua->get_value('cn');
 
-	$log->debug("massage windows $uid ($cn) ...");
+	log_debug("massage windows $uid ($cn) ...");
 	my $filter = "(&(objectClass=user)(cn=$cn))";
 	my $wchange = 0;
 	my $uchange = 0;
@@ -767,14 +812,14 @@ sub massage_windows_account ($$)
 	# still need full resynchronization here !
 	if ($res->code || !defined($wa))
 	{
-		$log->info("creating windows user ($cn) for uid ($uid) ...");			
+		log_info("creating windows user ($cn) for uid ($uid) ...");			
 		my $ad_dc_domain = path2dn($config{ad_domain},'dc');
 		my $dn = "cn=$cn,".path2dn($config{ad_user_container}).",$ad_dc_domain";
 		$wa = Net::LDAP::Entry->new();
 		$wa->dn($dn);
 		$wa->add(objectClass => $config{ad_user_classes});
-		$log->debug("created windows user: $dn");
-		$log->debug("$cn: object classes: ".join(',',@{$config{ad_user_classes}}).")");
+		log_debug("created windows user: $dn");
+		log_debug("$cn: object classes: ".join(',',@{$config{ad_user_classes}}).")");
 		$wchange++;
 		ldap_cond_set($wa, 'cn', $cn);
 		ldap_cond_set($wa, 'instanceType', 4);
@@ -820,13 +865,13 @@ sub massage_windows_account ($$)
 		$res = ldap_update($win, $wa);
 		if ($res->code) {
 			message_box('error', 'close',
-				"Ошибка обновления Windows-пользователя \"$cn\": ".$res->error);
+				_T('Error updating Windows-user "%s": ',$cn).$res->error);
 		}
 		if ($uchange) {
 			$res = ldap_update($srv, $ua);
 			if ($res->code) {
 				message_box('error', 'close',
-					"Ошибка пере-обновления Unix-пользователя: ".$res->error);
+					_T('Error re-updating Unix-user "%s": ',$cn).$res->error);
 			}
 		}
 	}
@@ -842,9 +887,8 @@ sub massage_windows_account ($$)
 			$grp->add( member => $wa->dn );
 			my $res = $grp->update($win);
 			if ($res->code) {
-				my $msg = "Ошибка добавления \"".$cn
-						."\" в Windows-группу \"".$name."\": ".$res->error;
-				message_box('error', 'close', $msg);
+				message_box('error', 'close',
+					_T('Error adding "%s" to Windows-group "%s": %s',$cn,$name,$res->error));
 			}
 		}
 	}
@@ -856,16 +900,16 @@ sub massage_home_dir ($)
 {
 	my ($ua, $gotta_ask) = @_;
 	my $home = $ua->get_value('homeDirectory');
-	$log->debug("massage home $home ...");
+	log_debug("massage home $home ...");
 	return 0 if -d $home;
 	return 1 if $gotta_ask;
-	$log->info("creating home: $home");
+	log_info("creating home: $home");
 	my $skel = $config{skel_dir};
 	my $xinstall = $config{xinstall_command};
 	my $uid = $ua->get_value('uidNumber');
 	my $gid = $ua->get_value('gidNumber');
 	my $stdall = `$xinstall "$uid" "$gid" "$skel" "$home" 2>&1`;
-	$log->debug("xinstall: [$stdall]");
+	log_debug("xinstall: [$stdall]");
 	return 1;
 }
 
@@ -918,11 +962,11 @@ sub ldap_connect
 		}
 		close PFILE;
 	}
-	$log->logdie("invalid credentials for $ref") unless $uri && $user && $pass; 
+	log_error("invalid credentials for $ref") unless $uri && $user && $pass; 
 	$ldap = Net::LDAP->new($uri, debug => $cfg->{debug})
 		or die "cannot connect to $uri: ".$@."\n";
 	$mesg = $ldap->bind($user, password => $pass);
-	$log->logdie("cannot bind as $ref: ".$mesg->error) if $mesg->code;
+	log_error("cannot bind as $ref: ".$mesg->error) if $mesg->code;
 	$ldap->{CFG} = $cfg;
 	return $ldap;
 }
@@ -982,12 +1026,12 @@ sub ldap_cond_set ($$$)
 		my $oldval = $record->get_value($attr);
 		$record->replace($attr => $value);
 		if (nvl($oldval) ne nvl($value)) {
-			$log->debug("($short_dn): [$attr] := ($value)");
+			log_debug("($short_dn): [$attr] := ($value)");
 		}
 		$ret = 1;
 	} else {
 		$record->add($attr => $value);
-		$log->debug("($short_dn): [$attr] += ($value)");
+		log_debug("($short_dn): [$attr] += ($value)");
 		$ret = 2;
 	}
 	return $ret;
@@ -1056,8 +1100,7 @@ sub user_save
 
 	my $res = ldap_update($srv, $ua);
 	if ($res->code) {
-		message_box('error', 'close',
-				"Ошибка сохранения пользователя \"$uid\": ".$res->error);
+		message_box('error', 'close', _T('Error saving user "%s": %s',$uid,$res->error));
 		return;
 	}
 
@@ -1070,7 +1113,7 @@ sub user_save
 
 sub user_revert
 {
-	my $resp = message_box('question', 'yes-no', "Действительно откатить модификации ?");
+	my $resp = message_box('question', 'yes-no', _T('Really revert changes ?'));
 	return if $resp ne 'yes';
 	set_user_changed(0);
 	$btn_add->set_sensitive(1);
@@ -1114,20 +1157,18 @@ sub user_delete
 
 	my $node = $model->get_iter($path);
 	my $uid = $model->get($node, 0);
-	my $resp = message_box('question', 'yes-no', "Удалить пользователя \"$uid\"  ?");
+	my $resp = message_box('question', 'yes-no', _T('Delete user "%s" ?',$uid));
 	return if $resp ne 'yes';
 
 	my $ua = $edit_acc;
 	my $res = ldap_delete($srv, $ua);
 	if ($res->code) {
-		message_box('error', 'close',
-			"Ошибка удаления Unix-пользователя \"$uid\": ".$res->error);
+		message_box('error', 'close', _T('Error deleting Unix-user "%s": %s', $uid, $res->error));
 		return;
 	}
 	$res = ldap_delete($win, windows_dn($ua));
 	if ($res->code) {
-		message_box('error', 'close',
-			"Ошибка удаления Windows-пользователя \"$uid\": ".$res->error);
+		message_box('error', 'close', _T('Error deleting Windows-user "%s": %s', $uid, $res->error));
 	}
 
 	$model->remove($node);
@@ -1237,7 +1278,7 @@ sub user_select
 		my $res = ldap_search(	$srv,
 						base => $srv->{CFG}->{base}, filter => $filter );
 		if ($res->code || scalar($res->entries) == 0) {
-			my $msg = "Не могу вывести пользователя \"$uid\"";
+			my $msg = _T('Cannot display user "%s"', $uid);
 			$msg .= ": ".$res->error if $res->code;
 			message_box('error', 'close', $msg);
 			return;
@@ -1351,7 +1392,7 @@ sub set_user_changed
 sub gui_exit
 {
 	if ($changed) {
-		my $resp = message_box('question', 'yes-no', "Выйти и потерять изменения ?");
+		my $resp = message_box('question', 'yes-no', _T('Exit and loose changes ?'));
 		return 1 if $resp ne 'yes';
 		$changed = 0;
 	}
@@ -1374,7 +1415,7 @@ sub create_user_desc
 	my $tabs = Gtk2::Notebook->new;
 	$user_attr_tabs = $tabs;
 	$tabs->set_tab_pos("top");
-	$frame = Gtk2::Frame->new("Атрибуты");
+	$frame = Gtk2::Frame->new(_T('Attributes'));
 	$frame->add($tabs);
 	$vbox->pack_start($frame, 1, 1, 0);
 
@@ -1410,9 +1451,9 @@ sub create_user_desc
 
 	my $buttons = create_button_bar(
 		[],
-		[ "Сохранить", "apply.png", \&user_save, \$btn_apply ],
-		[ "Отменить", "revert.png", \&user_revert,\$btn_revert ],
-		[ "Заполнить", "fill.png", \&user_fill, \$btn_fill ],
+		[ _T('Save'), "apply.png", \&user_save, \$btn_apply ],
+		[ _T('Revert'), "revert.png", \&user_revert,\$btn_revert ],
+		[ _T('Fill'), "fill.png", \&user_fill, \$btn_fill ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
 	
@@ -1422,7 +1463,7 @@ sub create_user_desc
 
 sub create_user_list
 {
-	my @user_list_titles = ('Идентификатор', 'Полное имя');
+	my @user_list_titles = (_T('Identifier'), _T('Full name'));
 
 	$user_list = Gtk2::TreeView->new;
 	$user_list->set_rules_hint(1);
@@ -1434,7 +1475,6 @@ sub create_user_list
 
 	for my $k (0 .. $#user_list_titles) {
 		my $renderer = Gtk2::CellRendererText->new;
-		$renderer->set(xalign => 0.0);
 		my $off = $user_list->insert_column_with_attributes(
 						-1, $user_list_titles[$k],
 						$renderer, text => $k
@@ -1472,7 +1512,7 @@ sub gui_main
 	$level = $opts{v} if $opts{v};
 	dump_config() if $opts{D};
 
-	init_log($level);
+	init_log();
 	connect_all();
 
 	Gtk2->init;
@@ -1487,19 +1527,19 @@ sub gui_main
 	$hpane->add1(create_user_list());
 	$hpane->add2(create_user_desc());
 	my $buttons = create_button_bar (
-		[ "Добавить", "add.png", \&user_add, \$btn_add ],
-		[ "Удалить", "delete.png", \&user_delete, \$btn_delete ],
-		[ "Обновить", "refresh.png", \&users_refresh, \$btn_refresh ],
+		[ _T('Create'), "add.png", \&user_add, \$btn_add ],
+		[ _T('Delete'), "delete.png", \&user_delete, \$btn_delete ],
+		[ _T('Refresh'), "refresh.png", \&users_refresh, \$btn_refresh ],
 		[],
-		[ "Выйти", "exit.png", \&gui_exit ],
+		[ _T('Exit'), "exit.png", \&gui_exit ],
 	);
 	my $vbox = Gtk2::VBox->new;
 	$vbox->pack_start($hpane, 1, 1, 1);
 	$vbox->pack_end($buttons, 0, 0, 1);
-	$tabs->append_page($vbox, " Пользователи ");
+	$tabs->append_page($vbox, _T(' Users '));
 
 	$vbox = Gtk2::VBox->new;
-	$tabs->append_page($vbox, " Группы ");
+	$tabs->append_page($vbox, _T(' Groups '));
 	$hpane = Gtk2::HPaned->new;
 	$vbox->pack_start($hpane, 1, 1, 1);
 	$hpane->add1(Gtk2::Label->new(""));
@@ -1523,4 +1563,3 @@ sub gui_main
 }
 
 gui_main();
-
