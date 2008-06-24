@@ -19,9 +19,8 @@ use Cwd 'abs_path';
 my ($srv, $win, $pname);
 
 my $changed;
-my ($btn_apply, $btn_revert, $btn_fill);
-my ($btn_add, $btn_delete, $btn_refresh);
-my ($user_list, $user_name, $main_win);
+my ($btn_apply, $btn_revert, $btn_add, $btn_delete, $btn_refresh);
+my ($user_list, $user_attr_frame, $user_name, $main_win);
 my ($user_attrs, @user_attr_entries, $user_attr_tabs);
 my ($orig_acc, $edit_acc);
 
@@ -74,16 +73,29 @@ my %servers = (
 	'Name'			=>	'Имя',
 	'Second name'	=>	'Фамилия',
 	'Full name'		=>	'Полное имя',
-	'User not found: "%s"'	=>	'Не найден пользователь: "%s"',
-	'User "%s" not found: '	=>	'Пользователь "%s" не найден: ',
-	'Error reading list of Windows groups: '	=>	'Ошибка чтения списка Windows-групп: ',
-	'Error reading Windows group "%s" (%s): '	=>	'Ошибка чтения Windows-группы "%s" (%s): ',
-	'Error updating Windows-user "%s": '	=>	'Ошибка обновления Windows-пользьвателя "%s": ',
-	'Error re-updating Unix-user "%s": '	=>	'Ошибка пере-обновления Unix-пользьвателя "%s": ',
+	'Identifier'	=>	'Идентификатор',
+	'Mail'			=>	'Почта',
+	'User#'			=>	'# пользователя',
+	'Group#'		=>	'# группы',
+	'Other groups'	=>	'Прочие группы',
+	'Home directory'=>	'Домашний каталог',
+	'Login shell'	=>	'Интерпретатор команд',
+	'Drive'			=>	'Диск',
+	'Profile'		=>	'Профиль',
+	'Logon script'	=>	'Сценарий входа',
+	'Telephone'		=>	'Телефон',
+	'Fax number'	=>	'Номер факса',
+	'User "%s" not found'	=>	'Не найден пользователь "%s"',
+	'User "%s" not found: %s'	=>	'Пользователь "%s" не найден: %s',
+	'Error reading list of Windows groups: %s'	=>	'Ошибка чтения списка Windows-групп: %s',
+	'Error reading Windows group "%s" (%s): %s'	=>	'Ошибка чтения Windows-группы "%s" (%s): %s',
+	'Error updating Windows-user "%s": %s'	=>	'Ошибка обновления Windows-пользьвателя "%s": %s',
+	'Error re-updating Unix-user "%s": %s'	=>	'Ошибка пере-обновления Unix-пользьвателя "%s": %s',
 	'Error adding "%s" to Windows-group "%s": %s'	=>	'Ошибка добавления "%s" в Windows-группу "%s": %s',
 	'Error saving user "%s": %s'	=>	'Ошибка сохранения пользователя "%s": %s',
 	'Really revert changes ?'	=>	'Действительно откатить модификации ?',
 	'Delete user "%s" ?'	=>	'Удалить пользователя "%s" ?',
+	'Cancel new user ?'		=>	'Отменить добавление пользователя ?',
 	'Error deleting Unix-user "%s": %s'	=>	'Ошибка удаления Unix-пользователя "%s": %s',
 	'Error deleting Windows-user "%s": %s'	=>	'Ошибка удаления Windows-пользователя "%s": %s',
 	'Cannot display user "%s"'	=>	'Не могу вывести пользователя "%s"',
@@ -91,7 +103,6 @@ my %servers = (
 	'Attributes'	=>	'Атрибуты',
 	'Save'	=>	'Сохранить',
 	'Revert'	=>	'Отменить',
-	'Fill'	=>	'Заполнить',
 	'Identifier'	=>	'Идентификатор',
 	'Full name'	=>	'Полное имя',
 	'Create'	=>	'Добавить',
@@ -189,23 +200,23 @@ my @user_gui_attrs = (
 		[ 's', 'givenName', _T('Name') ],
 		[ 's', 'sn', _T('Second name') ],
 		[ 's', 'cn', _T('Full name') ],
-		[ 'd', 'uid', 'Идентификатор' ],
-		[ 's', 'mail', 'почта' ],
-		[ 's', 'uidNumber', '#пользователя' ],
-		[ 'g', 'gidNumber', '#группы' ],
-		[ 'G', '', 'прочие группы' ],
-		[ 's', 'homeDirectory', 'домашний каталог' ],
-		[ 's', 'loginShell', 'Shell' ],
+		[ 'd', 'uid', _T('Identifier') ],
+		[ 's', 'mail', _T('Mail') ],
+		[ 's', 'uidNumber', _T('User#') ],
+		[ 'g', 'gidNumber', _T('Group#') ],
+		[ 'G', '', _T('Other groups') ],
+		[ 's', 'homeDirectory', _T('Home directory') ],
+		[ 's', 'loginShell', _T('Login shell') ],
 	],
 	[ 'Windows',
-		[ 's', 'ntUserHomeDir', 'Домашний каталог' ],
-		[ 's', 'ntUserHomeDirDrive', 'Диск' ],
-		[ 's', 'ntUserProfile', 'Профиль' ],
-		[ 's', 'ntUserScriptPath', 'Сценарий входа' ]
+		[ 's', 'ntUserHomeDir', _T('Home directory') ],
+		[ 's', 'ntUserHomeDirDrive', _T('Drive') ],
+		[ 's', 'ntUserProfile', _T('Profile') ],
+		[ 's', 'ntUserScriptPath', _T('Logon script') ]
 	],
 	[ 'Дополнительно',
-		[ 's', 'telephoneNumber', 'Телефон' ],
-		[ 's', 'facsimileTelephoneNumber', 'Факс' ],
+		[ 's', 'telephoneNumber', _T('Telephone') ],
+		[ 's', 'facsimileTelephoneNumber', _T('Fax number') ],
 	],
 );
 
@@ -219,6 +230,7 @@ my %state2pic = (
 
 
 # ======== configuring ========
+
 
 sub configure
 {
@@ -236,7 +248,7 @@ sub configure
 			next if /^\s*\#/;
 			if (/^\s*\[\s*(\S+)\s*\]\s*$/) {
 				$mode = $1;
-				die "incorrect section \"$mode\" in $file: $_\n"
+				log_error('incorrect section "%s" in %s: %s', $mode, $file, $_)
 					unless $modes{$mode};
 				next;
 			} elsif (/^\s*(\S+)\s*=\s*(.*?)\s*$/) {
@@ -260,12 +272,13 @@ sub configure
 					$config{$name} = $val;				
 				}
 			} else {
-				die "incorrect line in $file: $_\n";
+				log_error('incorrect line in %s: %s', $file, $_);
 			}
 		}
 		close(CONFIG);
 	}
 }
+
 
 sub dump_config
 {
@@ -273,7 +286,8 @@ sub dump_config
 	for (sort keys %{$servers{win}}) { print "win{$_} = \"$servers{win}->{$_}\"\n"; }
 	for (sort keys %config) {
 		my $val = $config{$_};
-		$val = ($val =~ /^ARRAY\(\S+\)$/) ? '[ '.join(', ',map("\"$_\"",@$val)).' ]' : "\"$val\"";
+		$val = ($val =~ /^ARRAY\(\S+\)$/)
+					? '[ '.join(', ',map("\"$_\"",@$val)).' ]' : "\"$val\"";
 		print "config{$_} = $val\n";
 	}
 }
@@ -389,7 +403,7 @@ for my $key (keys(%atrname2convtype)) {
 }
 
 
-sub ldap_convert_attr
+sub ldap_convert_attr ($$$)
 {
 	my ($attr, $value, $dir) = @_;
 	$attr =~ tr/[A-Z]/[a-z]/;
@@ -401,9 +415,8 @@ sub ldap_convert_attr
 	return $value;
 }
 
-sub ldap_attr2disp { return ldap_convert_attr($_[0], $_[1], 0); }
-
-sub ldap_disp2attr { return ldap_convert_attr($_[0], $_[1], 1); }
+sub ldap_attr2disp ($$)		{ return ldap_convert_attr($_[0], $_[1], 0); }
+sub ldap_disp2attr ($$)		{ return ldap_convert_attr($_[0], $_[1], 1); }
 
 
 sub ldap_print_entry ($$$)
@@ -438,39 +451,24 @@ sub ldap_print_entry ($$$)
 
 # ======== Logging ========
 
-sub init_log
-{
-	my $fh = select STDOUT;
-	$| = 1;
-	select $fh;
-}
 
 sub log_msg
 {
-	my ($level, @msg) = @_;
-	my $msg = join('', @msg);
+	my ($level, $fmt, @args) = @_;
+	$fmt = $translations{$fmt} if defined $translations{$fmt};
+	my $msg = sprintf($fmt, @args);
 	my ($s,$mi,$h,$d,$mo,$y) = localtime(time);
 	my ($secs, $usecs) = gettimeofday;
 	my $ms = int($usecs / 1000);
-	my $str = sprintf("%02d:%02d:%02d.%03d [%6s] %s\n", $h,$mi,$s,$ms, $level, $msg);
-	print STDOUT $str;
+	my $str = sprintf("%02d:%02d:%02d.%03d [%5s] %s\n", $h,$mi,$s,$ms, $level, $msg);
+	croak($str) if $level eq 'error';
+	print STDOUT $str if $level ne 'debug' || $config{debug};
 	return $str;
 }
 
-sub log_debug
-{
-	 log_msg("debug",@_) if $config{debug};
-}
-
-sub log_info
-{
-	log_msg("info",@_)
-}
-
-sub log_error
-{
-	croak(log_msg("error",@_));
-}
+sub log_debug	{ log_msg('debug', @_); }
+sub log_info	{ log_msg('info', @_); }
+sub log_error	{ log_msg('error', @_); }
 
 
 # ======== gui utils ========
@@ -608,7 +606,7 @@ sub next_unix_uidn
 		$next_uidn = $uidn if $uidn > $next_uidn;
 	}
 	$next_uidn = $next_uidn > 0 ? $next_uidn + 1 : 1000;
-	log_debug("next=$next_uidn");
+	log_debug('next uidn: %d', $next_uidn);
 	return $next_uidn;
 }
 
@@ -638,7 +636,7 @@ sub massage_accounts
 		@ids = map { $_->get_value('uid') } $res->entries;
 	}
 	for my $id (@ids) {
-		log_debug("massage id $id ...");
+		log_debug("massage id %s ...", $id);
 		my $ua = massage_unix_account($id);
 		if (defined $ua) {
 			massage_home_dir($ua);
@@ -662,7 +660,7 @@ sub massage_unix_account
 					filter => "(&(objectClass=person)(cn=$id))" )
 	}
 	if ($res->code) {
-		message_box('error', 'close', _T('User "%s" not found: ',$id).$res->error);
+		message_box('error', 'close', _T('User "%s" not found: %s',$id,$res->error));
 		return;
 	}
 	my $ua = $res->pop_entry;
@@ -670,10 +668,10 @@ sub massage_unix_account
 		if (massage_unix_account_entry($ua)) {
 			$res = ldap_update($srv, $ua); 
 			my $uid = $ua->get_value('uid');
-			log_info("changed: uid=($uid), ret=(".$res->error().")");
+			log_info('changed: uid=(%s), ret=(%s)', $uid, $res->error);
 		}
 	} else {
-		message_box('error', 'close', _T('User not found: "%s"',$id));
+		message_box('error', 'close', _T('User "%s" not found',$id));
 	}
 	return $ua;
 }
@@ -715,7 +713,7 @@ sub massage_unix_account_entry
 		my $lclass = lc($class);
 		unless (defined($classes{$class}) || defined($classes{$lclass})) {
 			$ua->add(objectClass => $class);
-			log_debug("$uid($cn): add class $class");
+			log_debug('%s(%s): add class %s', $uid, $cn, $class);
 			$uchange++;
 		}
 	}
@@ -769,15 +767,16 @@ sub windows_user_groups
 	$group_id = 0 unless $group_id;		
 	if ($res->code || !defined($group) || !$group_id) {
 		message_box('error', 'close',
-				_T('Error reading Windows group "%s" (%s): ', $name, $group_id).$res->error);
+				_T('Error reading Windows group "%s" (%s): %s', $name, $group_id, $res->error));
 	}
 
 	$filter = join('', map("(cn=$_)", @{$config{ad_user_groups}}));
 	$filter = "(&(objectClass=group)(|$filter))";
 	$res = ldap_search( $win, base => $win->{CFG}->{base}, filter => $filter );
 	if ($res->code) {
-		message_box('error', 'close', _T('Error reading list of Windows groups: ').$res->error);
+		message_box('error', 'close', _T('Error reading list of Windows groups: %s', $res->error));
 	}
+
 	my @sec_groups = $res->entries;
 	return ($group_id, @sec_groups);
 }
@@ -799,7 +798,7 @@ sub massage_windows_account ($$)
 	my $uid = $ua->get_value('uid');
 	my $cn = $ua->get_value('cn');
 
-	log_debug("massage windows $uid ($cn) ...");
+	log_debug('massage windows %s (%s) ...', $uid, $cn);
 	my $filter = "(&(objectClass=user)(cn=$cn))";
 	my $wchange = 0;
 	my $uchange = 0;
@@ -812,14 +811,14 @@ sub massage_windows_account ($$)
 	# still need full resynchronization here !
 	if ($res->code || !defined($wa))
 	{
-		log_info("creating windows user ($cn) for uid ($uid) ...");			
+		log_info('creating windows user (%s) for uid (%s) ...', $cn, $uid);			
 		my $ad_dc_domain = path2dn($config{ad_domain},'dc');
 		my $dn = "cn=$cn,".path2dn($config{ad_user_container}).",$ad_dc_domain";
 		$wa = Net::LDAP::Entry->new();
 		$wa->dn($dn);
 		$wa->add(objectClass => $config{ad_user_classes});
-		log_debug("created windows user: $dn");
-		log_debug("$cn: object classes: ".join(',',@{$config{ad_user_classes}}).")");
+		log_debug('created windows user: %s', $dn);
+		log_debug('%s: object classes: (%s)', $cn, join(',',@{$config{ad_user_classes}}));
 		$wchange++;
 		ldap_cond_set($wa, 'cn', $cn);
 		ldap_cond_set($wa, 'instanceType', 4);
@@ -865,13 +864,13 @@ sub massage_windows_account ($$)
 		$res = ldap_update($win, $wa);
 		if ($res->code) {
 			message_box('error', 'close',
-				_T('Error updating Windows-user "%s": ',$cn).$res->error);
+				_T('Error updating Windows-user "%s": %s', $cn, $res->error));
 		}
 		if ($uchange) {
 			$res = ldap_update($srv, $ua);
 			if ($res->code) {
 				message_box('error', 'close',
-					_T('Error re-updating Unix-user "%s": ',$cn).$res->error);
+					_T('Error re-updating Unix-user "%s": %s', $cn, $res->error));
 			}
 		}
 	}
@@ -888,7 +887,7 @@ sub massage_windows_account ($$)
 			my $res = $grp->update($win);
 			if ($res->code) {
 				message_box('error', 'close',
-					_T('Error adding "%s" to Windows-group "%s": %s',$cn,$name,$res->error));
+					_T('Error adding "%s" to Windows-group "%s": %s', $cn, $name, $res->error));
 			}
 		}
 	}
@@ -900,16 +899,17 @@ sub massage_home_dir ($)
 {
 	my ($ua, $gotta_ask) = @_;
 	my $home = $ua->get_value('homeDirectory');
-	log_debug("massage home $home ...");
+	log_debug('refresh home directory "%s" ...', $home);
 	return 0 if -d $home;
 	return 1 if $gotta_ask;
-	log_info("creating home: $home");
+	log_info('creating home directory "$home"', $home);
 	my $skel = $config{skel_dir};
 	my $xinstall = $config{xinstall_command};
 	my $uid = $ua->get_value('uidNumber');
 	my $gid = $ua->get_value('gidNumber');
+	# FIXME: get rid of external script
 	my $stdall = `$xinstall "$uid" "$gid" "$skel" "$home" 2>&1`;
-	log_debug("xinstall: [$stdall]");
+	log_debug('xinstall: [%s]', $stdall);
 	return 1;
 }
 
@@ -950,7 +950,7 @@ sub ldap_connect
 	my ($uri, $user, $pass, $pfile) =
 		($cfg->{uri}, $cfg->{user}, $cfg->{pass}, $cfg->{passfile});
 	if (!$pass && $pfile) {
-		open (PFILE, $pfile) or die "cannot open passfile $pfile\n";
+		open (PFILE, $pfile) or log_error('cannot open passfile "%s"', $pfile);
 		$pass = "";
 		while (<PFILE>) {
 			chomp;
@@ -962,11 +962,13 @@ sub ldap_connect
 		}
 		close PFILE;
 	}
-	log_error("invalid credentials for $ref") unless $uri && $user && $pass; 
+	unless ($uri && $user && $pass) {
+		log_error('invalid credentials for %s', $ref);
+	} 
 	$ldap = Net::LDAP->new($uri, debug => $cfg->{debug})
-		or die "cannot connect to $uri: ".$@."\n";
+		or log_error('cannot connect to %s: %s', $uri, $@);
 	$mesg = $ldap->bind($user, password => $pass);
-	log_error("cannot bind as $ref: ".$mesg->error) if $mesg->code;
+	log_error('cannot bind as %s: %s', $ref, $mesg->error) if $mesg->code;
 	$ldap->{CFG} = $cfg;
 	return $ldap;
 }
@@ -1026,34 +1028,34 @@ sub ldap_cond_set ($$$)
 		my $oldval = $record->get_value($attr);
 		$record->replace($attr => $value);
 		if (nvl($oldval) ne nvl($value)) {
-			log_debug("($short_dn): [$attr] := ($value)");
+			log_debug('(%s): [%s] := (%s)', $short_dn, $attr, $value);
 		}
 		$ret = 1;
 	} else {
 		$record->add($attr => $value);
-		log_debug("($short_dn): [$attr] += ($value)");
+		log_debug('(%s): [%s] += (%s)', $short_dn, $attr, $value);
 		$ret = 2;
 	}
 	return $ret;
 }
 
 
-# ======== gui =========
+# ======== user gui =========
 
 
-sub is_new ($)
+sub is_new_user ($)
 {
 	my $node = shift;
 	my $model = $user_list->get_model;
 	return 0 unless defined $node;
 	my $uid = $model->get($node, 0);
 	my $cn = $model->get($node, 1);
-	my $is_new = $uid eq '-' && $cn eq '-';
-	return $is_new ? 1 : 0;
+	my $is_new_user = $uid eq '-' && $cn eq '-';
+	return $is_new_user ? 1 : 0;
 }
 
 
-sub set_entry_attr ($$$)
+sub set_user_attr ($$$)
 {
 	my ($ua, $e, $val) = @_;
 	my $attr = $e->{attr};
@@ -1068,7 +1070,7 @@ sub set_entry_attr ($$$)
 }
 
 
-sub get_entry_attr ($$)
+sub get_user_attr ($$)
 {
 	my ($ua, $e) = @_;
 	my $attr = $e->{attr};
@@ -1094,13 +1096,13 @@ sub user_save
 
 	my $ua = $edit_acc;
 	for my $e (@user_attr_entries) {
-		set_entry_attr($ua, $e, $e->{cur_val});
+		set_user_attr($ua, $e, $e->{cur_val});
 	}
 	my $old_dn = $ua->dn(unix_dn($ua));
 
 	my $res = ldap_update($srv, $ua);
 	if ($res->code) {
-		message_box('error', 'close', _T('Error saving user "%s": %s',$uid,$res->error));
+		message_box('error', 'close', _T('Error saving user "%s": %s', $uid, $res->error));
 		return;
 	}
 
@@ -1121,11 +1123,6 @@ sub user_revert
 }
 
 
-sub user_fill
-{
-}
-
-
 sub user_add
 {
 	user_unselect();
@@ -1133,7 +1130,7 @@ sub user_add
 
 	my $node = $model->get_iter_first;
 	while (defined $node) {
-		return if is_new($node);
+		return if is_new_user($node);
 		$node = $model->iter_next($node);
 	}
 
@@ -1157,18 +1154,26 @@ sub user_delete
 
 	my $node = $model->get_iter($path);
 	my $uid = $model->get($node, 0);
-	my $resp = message_box('question', 'yes-no', _T('Delete user "%s" ?',$uid));
-	return if $resp ne 'yes';
 
-	my $ua = $edit_acc;
-	my $res = ldap_delete($srv, $ua);
-	if ($res->code) {
-		message_box('error', 'close', _T('Error deleting Unix-user "%s": %s', $uid, $res->error));
-		return;
-	}
-	$res = ldap_delete($win, windows_dn($ua));
-	if ($res->code) {
-		message_box('error', 'close', _T('Error deleting Windows-user "%s": %s', $uid, $res->error));
+	if (is_new_user($node)) {
+		my $resp = message_box('question', 'yes-no', _T('Cancel new user ?', $uid));
+		return if $resp ne 'yes';		
+	} else {
+		my $resp = message_box('question', 'yes-no', _T('Delete user "%s" ?', $uid));
+		return if $resp ne 'yes';
+
+		my $ua = $edit_acc;
+		my $res = ldap_delete($srv, $ua);
+		if ($res->code) {
+			message_box('error', 'close',
+					_T('Error deleting Unix-user "%s": %s', $uid, $res->error));
+			return;
+		}
+		$res = ldap_delete($win, windows_dn($ua));
+		if ($res->code) {
+			message_box('error', 'close',
+				_T('Error deleting Windows-user "%s": %s', $uid, $res->error));
+		}
 	}
 
 	$model->remove($node);
@@ -1218,7 +1223,7 @@ sub user_change
 	my $model = $user_list->get_model;
 	if (defined $path) {
 		my $node = $model->get_iter($path);
-		$model->remove($node) if is_new($node);
+		$model->remove($node) if is_new_user($node);
 		$btn_add->set_sensitive(1);
 	}
 }
@@ -1240,10 +1245,10 @@ sub user_unselect
 
 	$btn_apply->set_sensitive(0);
 	$btn_revert->set_sensitive(0);
-	$btn_fill->set_sensitive(0);
 	$btn_delete->set_sensitive(0);
 
 	$user_attr_tabs->set_current_page(0);
+	$user_attr_frame->set_sensitive(0);
 
 	undef $orig_acc;
 	undef $edit_acc;
@@ -1264,13 +1269,12 @@ sub user_select
 	return unless defined $uid;
 
 	$user_name->set_text("$uid ($cn)");
-	$btn_fill->set_sensitive(1);
 
 	my ($ua, $e);
-	if (is_new($node)) {
+	if (is_new_user($node)) {
 		$ua = Net::LDAP::Entry->new;
 		for $e (@user_attr_entries) {
-			set_entry_attr($ua, $e, '');
+			set_user_attr($ua, $e, '');
 		}
 	} else {
 		my $user_class = $config{user_class};
@@ -1301,9 +1305,9 @@ sub user_select
 		$e->{bulb}->set_from_pixbuf(create_pic($pic));
 	}
 
-	$btn_fill->set_sensitive(0);
 	$btn_delete->set_sensitive(1);
 	$user_attr_tabs->set_current_page(0);
+	$user_attr_frame->set_sensitive(1);
 }
 
 
@@ -1321,7 +1325,7 @@ sub user_entry_attr_changed
 	# read values
 	for $e (@user_attr_entries) {
 		$e->{old_state} = $e->{state};
-		set_entry_attr($edit_acc, $e, $e->{new_val});
+		set_user_attr($edit_acc, $e, $e->{new_val});
 	}
 
 	# calculate calculatable fields
@@ -1332,7 +1336,7 @@ sub user_entry_attr_changed
 	# analyze results
 	my $chg = 0;
 	for $e (@user_attr_entries) {
-		my $val = get_entry_attr($edit_acc, $e);
+		my $val = get_user_attr($edit_acc, $e);
 		my $state = $e->{state};
 		if ($val eq '') {
 			$state = 'empty';
@@ -1389,18 +1393,6 @@ sub set_user_changed
 }
 
 
-sub gui_exit
-{
-	if ($changed) {
-		my $resp = message_box('question', 'yes-no', _T('Exit and loose changes ?'));
-		return 1 if $resp ne 'yes';
-		$changed = 0;
-	}
-	user_unselect();
-	Gtk2->main_quit;
-}
-
-
 sub create_user_desc
 {
 	my $vbox = Gtk2::VBox->new(0, 0);
@@ -1417,6 +1409,7 @@ sub create_user_desc
 	$tabs->set_tab_pos("top");
 	$frame = Gtk2::Frame->new(_T('Attributes'));
 	$frame->add($tabs);
+	$user_attr_frame = $frame;
 	$vbox->pack_start($frame, 1, 1, 0);
 
 	for (@user_gui_attrs) {
@@ -1453,10 +1446,9 @@ sub create_user_desc
 		[],
 		[ _T('Save'), "apply.png", \&user_save, \$btn_apply ],
 		[ _T('Revert'), "revert.png", \&user_revert,\$btn_revert ],
-		[ _T('Fill'), "fill.png", \&user_fill, \$btn_fill ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
-	
+
 	return $vbox;
 }
 
@@ -1500,19 +1492,32 @@ sub create_user_list
 
 # ======== main ========
 
+
+sub gui_exit
+{
+	if ($changed) {
+		my $resp = message_box('question', 'yes-no', _T('Exit and loose changes ?'));
+		return 1 if $resp ne 'yes';
+		$changed = 0;
+	}
+	user_unselect();
+	Gtk2->main_quit;
+}
+
+
 sub gui_main
 {
 	($pname = $0) =~ s/^.*\///;
 	my %opts;
-	my $cmd_ok = getopts("Dhv:", \%opts);
-	die "usage: $pname [-v log_level]\n" if !$cmd_ok || $opts{h};
+	my $cmd_ok = getopts("Dhd", \%opts);
+
+	my $fh = select(STDOUT); $| = 1; select($fh);
+	log_error('usage: $pname [-d]') if !$cmd_ok || $opts{h};
 
 	configure(@{$config{config_files}});
-	my $level = $config{log_level} if defined $config{log_level};
-	$level = $opts{v} if $opts{v};
 	dump_config() if $opts{D};
+	$config{debug} = 1 if $opts{d};
 
-	init_log();
 	connect_all();
 
 	Gtk2->init;
@@ -1548,14 +1553,14 @@ sub gui_main
 	$main_win->add($tabs);
 	user_unselect();
 
-	$main_win->signal_connect("delete_event" => \&gui_exit);
-	$main_win->signal_connect("destroy"      => \&gui_exit);
+	$main_win->signal_connect(delete_event	=> \&gui_exit);
+	$main_win->signal_connect(destroy		=> \&gui_exit);
+	$main_win->signal_connect('map'			=> \&users_refresh);
 	$main_win->set_default_size(900, 600);
+
 	$main_win->show_all;
 	$main_win->window->set_icon(undef,
 							create_pic("tree.png")->render_pixmap_and_mask(1));
-
-	users_refresh();
 
 	Gtk2->main;
 
