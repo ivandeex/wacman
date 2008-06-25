@@ -16,13 +16,17 @@ use Net::LDAP::Entry;
 use FindBin qw[$Bin];
 use Cwd 'abs_path';
 
-my ($srv, $win, $pname);
+my ($srv, $win, $pname, $main_win);
 
-my $changed;
 my ($btn_user_apply, $btn_user_revert, $btn_user_add, $btn_user_delete, $btn_users_refresh);
-my ($user_list, $user_attr_frame, $user_name, $main_win);
+my ($user_list, $user_attr_frame, $user_name);
 my ($user_attrs, @user_attr_entries, $user_attr_tabs);
-my ($orig_acc, $edit_acc);
+my ($orig_acc, $edit_acc, $user_changed);
+
+my ($btn_group_apply, $btn_group_revert, $btn_group_add, $btn_group_delete, $btn_groups_refresh);
+my ($group_list, $group_attr_frame, $group_name);
+my ($group_attrs, @group_attr_entries, $group_attr_tabs);
+my ($orig_grp, $edit_grp, $group_changed);
 
 my $pic_home = abs_path("$Bin/images");
 
@@ -111,6 +115,15 @@ my %servers = (
 	'Exit'	=>	'Выйти',
 	' Users '	=>	' Пользователи ',
 	' Groups '	=>	' Группы ',
+	'Group name'	=>	'Название группы',
+	'Group number'	=>	'Номер группы',
+	'Description'	=>	'Описание',
+	'Members'		=>	'Члены группы',
+	'Error saving group "%s": %s'	=>	'Ошибка сохранения группы "%s": %s',
+	'Cancel new group ?'	=>	'Отменить добавление группы ?',
+	'Delete group "%s" ?'	=>	'Удалить группу "%s"',
+	'Error deleting group "%s": %s'	=> 'Ошибка удаления группы "%s": %s',
+	'Cannot display group "%s"'	=>	'Не могу отобразить группу "%s"',
 );
 
 
@@ -223,27 +236,11 @@ my @user_gui_attrs = (
 
 
 my @group_gui_attrs = (
-	[ 'UNIX',
-		[ 's', 'givenName', _T('Name') ],
-		[ 's', 'sn', _T('Second name') ],
-		[ 's', 'cn', _T('Full name') ],
-		[ 'd', 'uid', _T('Identifier') ],
-		[ 's', 'mail', _T('Mail') ],
-		[ 's', 'uidNumber', _T('User#') ],
-		[ 'g', 'gidNumber', _T('Group#') ],
-		[ 'G', '', _T('Other groups') ],
-		[ 's', 'homeDirectory', _T('Home directory') ],
-		[ 's', 'loginShell', _T('Login shell') ],
-	],
-	[ 'Windows',
-		[ 's', 'ntUserHomeDir', _T('Home directory') ],
-		[ 's', 'ntUserHomeDirDrive', _T('Drive') ],
-		[ 's', 'ntUserProfile', _T('Profile') ],
-		[ 's', 'ntUserScriptPath', _T('Logon script') ]
-	],
-	[ 'Дополнительно',
-		[ 's', 'telephoneNumber', _T('Telephone') ],
-		[ 's', 'facsimileTelephoneNumber', _T('Fax number') ],
+	[ 'POSIX',
+		[ 's', 'cn', _T('Group name') ],
+		[ 's', 'gidNumber', _T('Group number') ],
+		[ 's', 'description', _T('Description') ],
+		[ 'U', '', _T('Members') ],
 	],
 );
 
@@ -1103,7 +1100,7 @@ sub user_save
 {
 	my ($path, $column) = $user_list->get_cursor;
 	return unless defined $path;
-	return unless $changed;
+	return unless $user_changed;
 
 	my $model = $user_list->get_model;
 	my $node = $model->get_iter($path);
@@ -1267,7 +1264,7 @@ sub user_unselect
 	undef $orig_acc;
 	undef $edit_acc;
 
-	$changed = 0;
+	$user_changed = 0;
 
 	return 0;
 }
@@ -1276,6 +1273,7 @@ sub user_unselect
 sub user_select
 {
 	my ($path, $column) = $user_list->get_cursor;
+	return unless defined $path;
 	my $model = $user_list->get_model;
 	my $node = $model->get_iter($path);
 	my $uid = $model->get($node, 0);
@@ -1394,8 +1392,8 @@ sub user_entry_attr_changed
 sub set_user_changed
 {
 	my $chg = shift;
-	return if $chg == $changed;
-	$changed = $chg;
+	return if $chg == $user_changed;
+	$user_changed = $chg;
 	$btn_user_apply->set_sensitive($chg);
 	$btn_user_revert->set_sensitive($chg);
 	$btn_users_refresh->set_sensitive(!$chg);
@@ -1505,17 +1503,364 @@ sub create_user_list
 # ======== group gui ========
 
 
+sub is_new_group ($)
+{
+	my $node = shift;
+	my $model = $group_list->get_model;
+	return 0 unless defined $node;
+	my $gid = $model->get($node, 0);
+	return ($gid eq '-' ? 1 : 0);
+}
+
+
+sub set_group_attr ($$$)
+{
+	return set_user_attr($_[0], $_[1], $_[2]);
+}
+
+
+sub get_group_attr ($$)
+{
+	return get_user_attr($_[0], $_[1]);
+}
+
+
+sub group_save
+{
+	my ($path, $column) = $group_list->get_cursor;
+	return unless defined $path;
+	return unless $group_changed;
+
+	my $model = $group_list->get_model;
+	my $node = $model->get_iter($path);
+	my $gid = $group_attrs->{gid}->{cur_val};
+	$model->set($node, 0, $gid);
+
+	my $ga = $edit_grp;
+	for my $e (@group_attr_entries) {
+		set_group_attr($ga, $e, $e->{cur_val});
+	}
+	my $old_dn = $ga->dn(unix_dn($ga));
+
+	my $res = ldap_update($srv, $ga);
+	if ($res->code) {
+		message_box('error', 'close', _T('Error saving group "%s": %s', $gid, $res->error));
+		return;
+	}
+
+	group_select();
+	set_group_changed(0);
+	$btn_group_add->set_sensitive(1);
+}
+
+
+sub group_revert
+{
+	my $resp = message_box('question', 'yes-no', _T('Really revert changes ?'));
+	return if $resp ne 'yes';
+	set_group_changed(0);
+	$btn_group_add->set_sensitive(1);
+	group_select();
+}
+
+
+sub group_add
+{
+	group_unselect();
+	my $model = $group_list->get_model;
+
+	my $node = $model->get_iter_first;
+	while (defined $node) {
+		return if is_new_group($node);
+		$node = $model->iter_next($node);
+	}
+
+	$node = $model->append(undef);
+	$model->set($node, 0, '-');
+	$user_list->set_cursor($model->get_path($node));
+	my $first = $group_gui_attrs[0][1][1];
+	$group_attrs->{$first}->{entry}->grab_focus;
+	set_group_changed(0);
+	$btn_group_add->set_sensitive(0);
+	group_select();
+}
+
+
+sub group_delete
+{
+	my ($path, $column) = $group_list->get_cursor;
+	my $model = $group_list->get_model;
+	return unless defined $path;
+
+	my $node = $model->get_iter($path);
+	my $gid = $model->get($node, 0);
+
+	if (is_new_group($node)) {
+		my $resp = message_box('question', 'yes-no', _T('Cancel new group ?', $gid));
+		return if $resp ne 'yes';		
+	} else {
+		my $resp = message_box('question', 'yes-no', _T('Delete group "%s" ?', $gid));
+		return if $resp ne 'yes';
+
+		my $ga = $edit_grp;
+		my $res = ldap_delete($srv, $ga);
+		if ($res->code) {
+			message_box('error', 'close',
+					_T('Error deleting group "%s": %s', $gid, $res->error));
+			return;
+		}
+	}
+
+	$model->remove($node);
+	set_group_changed(0);
+	$btn_group_add->set_sensitive(1);
+
+	if ($path->prev || $path->next) {
+		$group_list->set_cursor($path);
+		group_select();
+	} else {
+		group_unselect();
+	}
+}
+
+
+sub groups_refresh
+{
+	group_unselect();
+
+	my $model = $group_list->get_model;
+	$model->clear;
+
+	my $res = ldap_search($srv, '(objectClass=posixGroup)', ['cn']);
+	my @groups = $res->entries;
+	@groups = sort { $a->get_value('cn') cmp $b->get_value('cn') } @groups;
+
+	for my $entry (@groups) {
+		my $node = $model->append(undef);
+		$model->set($node, 0, $entry->get_value('cn'));
+	}
+
+	$btn_group_add->set_sensitive(1) if defined $btn_group_add;
+}
+
+
+sub group_change
+{
+	my ($path, $column) = $group_list->get_cursor;
+	my $model = $group_list->get_model;
+	if (defined $path) {
+		my $node = $model->get_iter($path);
+		$model->remove($node) if is_new_group($node);
+		$btn_group_add->set_sensitive(1);
+	}
+}
+
+
+sub group_unselect
+{
+	# exit if interface is not built complete
+	return unless defined $group_name;
+
+	$group_name->set_text('');
+
+	@group_attr_entries = values %$group_attrs;
+	for my $e (@group_attr_entries) {
+		$e->{entry}->set_text('');
+		$e->{entry}->set_editable(0);
+	}
+
+	$btn_group_apply->set_sensitive(0);
+	$btn_group_revert->set_sensitive(0);
+	$btn_group_delete->set_sensitive(0);
+	$group_attr_frame->set_sensitive(0);
+
+	undef $orig_grp;
+	undef $edit_grp;
+
+	$group_changed = 0;
+
+	return 0;
+}
+
+
+sub group_select
+{
+	my ($path, $column) = $group_list->get_cursor;
+	return unless defined $path;
+	my $model = $group_list->get_model;
+	my $node = $model->get_iter($path);
+	my $gid = $model->get($node, 0);
+	return unless defined $gid;
+
+	$group_name->set_text($gid);
+
+	my ($ga, $e);
+	if (is_new_group($node)) {
+		$ga = Net::LDAP::Entry->new;
+		for $e (@group_attr_entries) {
+			set_group_attr($ga, $e, '');
+		}
+	} else {
+		my $res = ldap_search($srv, "(&(objectClass=posixGroup)(cn=$gid))");
+		if ($res->code || scalar($res->entries) == 0) {
+			my $msg = _T('Cannot display group "%s"', $gid);
+			$msg .= ": ".$res->error if $res->code;
+			message_box('error', 'close', $msg);
+			return;
+		}
+		$ga = $res->pop_entry;
+	}
+
+	$orig_grp = $ga;
+	undef $edit_grp;
+	$edit_grp = $ga->clone;
+
+	for $e (@group_attr_entries) {
+		my $value = nvl($ga->get_value($e->{attr}));
+		$e->{entry}->set_text($value);
+		$e->{entry}->set_editable(1);
+		$e->{new_val} = $e->{cur_val} = $e->{old_val} = $value;
+	}
+
+	$btn_group_delete->set_sensitive(1);
+	$group_attr_frame->set_sensitive(1);
+}
+
+
+sub group_entry_attr_changed
+{
+	my ($entry0, $event0) = @_;
+	my $e0 = $entry0->{group_attr};
+	return unless $e0 && $edit_grp;
+
+	$e0->{new_val} = nvl($e0->{entry}->get_text());
+	return if nvl($e0->{cur_val}) eq nvl($e0->{new_val});
+	$e0->{cur_val} = $e0->{new_val};
+
+	my $chg = 0;
+	for my $e (@group_attr_entries) {
+		$chg = 1 if $e->{new_val} ne $e->{old_val};
+	}
+
+	# refresh top label
+	$group_name->set_text(nvl($group_attrs->{cn}->{cur_val}));
+	set_group_changed($chg);
+}
+
+
+sub set_group_changed
+{
+	my $chg = shift;
+	return if $chg == $group_changed;
+	$group_changed = $chg;
+	$btn_group_apply->set_sensitive($chg);
+	$btn_group_revert->set_sensitive($chg);
+	$btn_groups_refresh->set_sensitive(!$chg);
+	$btn_group_add->set_sensitive(!$chg);
+	$btn_group_delete->set_sensitive(!$chg);
+	$group_list->set_sensitive(!$chg);
+}
+
+
+sub create_group_desc
+{
+	my $vbox = Gtk2::VBox->new(0, 0);
+	my $frame;
+
+	$group_name = Gtk2::Label->new;
+	my $bname = Gtk2::Button->new;
+	$bname->add($group_name);
+	$bname->set_sensitive(0);
+	$vbox->pack_start($bname, 0, 1, 4);
+
+	my $tabs = Gtk2::Notebook->new;
+	$group_attr_tabs = $tabs;
+	$tabs->set_tab_pos("top");
+	$frame = Gtk2::Frame->new(_T('Attributes'));
+	$frame->add($tabs);
+	$group_attr_frame = $frame;
+	$vbox->pack_start($frame, 1, 1, 0);
+
+	for (@group_gui_attrs) {
+		my ($tab_name, @tab_attrs) = @$_;
+		my $scroll = Gtk2::ScrolledWindow->new(undef, undef);
+		$tabs->append_page($scroll, $tab_name);
+		$scroll->set_policy('automatic', 'automatic');
+		$scroll->set_border_width(0);
+
+		my $abox = Gtk2::Table->new($#tab_attrs + 1, 3);
+		$scroll->add_with_viewport($abox);
+
+		for my $row (0 .. $#tab_attrs) {
+			my $gui_attr = $tab_attrs[$row];
+			my ($type, $attr, $text) = @$gui_attr;
+			my $label = Gtk2::Label->new($text);
+			$label->set_justify('left');
+			my $entry = Gtk2::Entry->new;
+			my $bulb = Gtk2::Image->new;
+			$abox->attach($label, 1, 2, $row, $row+1, [], [], 1, 1);
+			$abox->attach($entry, 2, 3, $row, $row+1, [ 'fill', 'expand' ], [], 1, 1);
+			$group_attrs->{$attr} = $entry->{user_attr} = {
+				type => $type,
+				attr => $attr,
+				entry => $entry,
+			};
+			$entry->signal_connect(key_release_event => \&group_entry_attr_changed)
+		}
+	}
+
+	my $buttons = create_button_bar(
+		[],
+		[ _T('Save'), "apply.png", \&group_save, \$btn_group_apply ],
+		[ _T('Revert'), "revert.png", \&group_revert,\$btn_group_revert ],
+	);
+	$vbox->pack_end($buttons, 0, 0, 2);
+
+	return $vbox;
+}
+
+
+sub create_group_list
+{
+	$group_list = Gtk2::TreeView->new;
+	$group_list->set_rules_hint(1);
+	$group_list->get_selection->set_mode('single');
+	$group_list->set_size_request(300, 300);
+
+	my $model = Gtk2::TreeStore->new('Glib::String');
+	$group_list->set_model($model);
+
+	my $off = $group_list->insert_column_with_attributes(
+					-1, _T('Group name'), Gtk2::CellRendererText->new, text => 0);
+	$group_list->get_column($off - 1)->set_clickable(1);
+
+	my $scroll = Gtk2::ScrolledWindow->new(undef, undef);
+	$scroll->set_policy('automatic', 'automatic');  
+	$scroll->add($group_list);
+
+	my $frame = Gtk2::Frame->new;
+	$frame->set_shadow_type('in');
+	$frame->add($scroll);
+
+	$group_list->signal_connect(cursor_changed => \&group_select);
+	$group_list->signal_connect(move_cursor => \&group_change);
+
+	return $frame;
+}
+
+
 # ======== main ========
 
 
 sub gui_exit
 {
-	if ($changed) {
+	if ($user_changed || $group_changed) {
 		my $resp = message_box('question', 'yes-no', _T('Exit and loose changes ?'));
 		return 1 if $resp ne 'yes';
-		$changed = 0;
+		$user_changed = $group_changed = 0;
 	}
 	user_unselect();
+	group_unselect();
 	Gtk2->main_quit;
 }
 
@@ -1543,6 +1888,8 @@ sub gui_main
 	my $tabs = Gtk2::Notebook->new;
 	$tabs->set_tab_pos("top");
 
+	my $vbox = Gtk2::VBox->new;
+	$tabs->append_page($vbox, _T(' Users '));
 	my $hpane = Gtk2::HPaned->new;
 	$hpane->add1(create_user_list());
 	$hpane->add2(create_user_desc());
@@ -1553,29 +1900,36 @@ sub gui_main
 		[],
 		[ _T('Exit'), "exit.png", \&gui_exit ],
 	);
-	my $vbox = Gtk2::VBox->new;
 	$vbox->pack_start($hpane, 1, 1, 1);
 	$vbox->pack_end($buttons, 0, 0, 1);
-	$tabs->append_page($vbox, _T(' Users '));
 
 	$vbox = Gtk2::VBox->new;
 	$tabs->append_page($vbox, _T(' Groups '));
 	$hpane = Gtk2::HPaned->new;
+	$hpane->add1(create_group_list());
+	$hpane->add2(create_group_desc());
+	$buttons = create_button_bar (
+		[ _T('Create'), "add.png", \&group_add, \$btn_group_add ],
+		[ _T('Delete'), "delete.png", \&group_delete, \$btn_group_delete ],
+		[ _T('Refresh'), "refresh.png", \&groups_refresh, \$btn_groups_refresh ],
+		[],
+		[ _T('Exit'), "exit.png", \&gui_exit ],
+	);
 	$vbox->pack_start($hpane, 1, 1, 1);
-	$hpane->add1(Gtk2::Label->new(""));
-	$hpane->add2(Gtk2::Label->new(""));
+	$vbox->pack_end($buttons, 0, 0, 1);
 
 	$main_win->add($tabs);
 	user_unselect();
+	group_unselect();
 
 	$main_win->signal_connect(delete_event	=> \&gui_exit);
 	$main_win->signal_connect(destroy		=> \&gui_exit);
-	$main_win->signal_connect('map'			=> \&users_refresh);
-	$main_win->set_default_size(900, 600);
+	$main_win->signal_connect(map	=> sub { users_refresh(); groups_refresh(); });
 
+	$main_win->set_default_size(900, 600);
 	$main_win->show_all;
 	$main_win->window->set_icon(undef,
-							create_pic("tree.png")->render_pixmap_and_mask(1));
+				create_pic("tree.png")->render_pixmap_and_mask(1));
 
 	Gtk2->main;
 
