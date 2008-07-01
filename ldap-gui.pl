@@ -172,8 +172,8 @@ my %unix_fields_const = (
 	ntUserHomeDirDrive => 'H',
 	ntUserAcctExpires => NO_EXPIRE,
 	gidNumber => 100,
-	telephoneNumber => '0',
-	facsimileTelephoneNumber => '0',
+	telephoneNumber => '',
+	facsimileTelephoneNumber => '',
 );
 
 
@@ -728,8 +728,9 @@ sub has_attr ($$)
 	my ($obj, $attr) = @_;
 
 	$obj->{a} = {} unless defined $obj->{a};
-	return 0 unless defined $obj->{a}->{$attr};
+
 	my $a = $obj->{a}->{$attr};
+	return 0 unless defined $a;
 
 	my $state = nvl($a->{state});
 	return $state2has{$state} if defined $state2has{$state};
@@ -742,7 +743,8 @@ sub get_attr ($$)
 {
 	my ($obj, $attr) = @_;
 	$obj->{a} = {} unless defined $obj->{a};
-	return defined($obj->{a}->{$attr}) ? nvl($obj->{a}->{attr}->{cur}) : '';
+	my $a = $obj->{a}->{$attr};
+	return defined($a) ? nvl($a->{cur}) : '';
 }
 
 
@@ -754,15 +756,10 @@ sub set_attr ($$$)
 	$sdn = ($sdn =~ /^\s*(.*?)\s*,/) ? $1 : '???';
 
 	if (defined($obj->{a}) && defined($obj->{a}->{$attr})) {
-		my $a = $obj->{a}->{attr};
+		my $a = $obj->{a}->{$attr};
 		$a->{new} = $val;
 		log_info('(%s): [%s] := (%s)', $sdn, $attr, $val)
 			if $a->{old} ne $a->{new};
-		cluck "undefined old" unless defined $a->{old};
-		cluck "undefined new" unless defined $a->{new};
-		cluck "undefined val" unless defined $val;
-		cluck "undefined sdn" unless defined $sdn;
-		cluck "undefined attr" unless defined $attr;
 	} else {
 		my $a = {
 			parent => $obj,
@@ -792,8 +789,10 @@ sub set_ldap_attr ($$$)
 {
 	my ($uo, $attr, $val) = @_;
 	my $ldap = $uo->{ldap};
-	if ($ldap->exists($attr)) {
-		$ldap->replace($attr, $val);
+	if (nvl($val) eq '') {
+		$ldap->delete($attr);
+	} elsif ($ldap->exists($attr)) {
+		$ldap->replace($attr => $val);
 	} else {
 		$ldap->add($attr => $val);
 	}
@@ -847,33 +846,35 @@ sub rework_unix_account
 	}
 	$uo->{changed} = 0;
 
+	$uo->{dn} = $uo->{ldap}->dn;
 	for my $attr ($uo->{ldap}->attributes(nooptions => 1)) {
 		my $type = 's';
-		my $ua = {
+		my $val = get_ldap_attr($uo, $attr);
+		my $a = {
 			parent => $uo,
 			visual => 0,
 			type => $type,
 			attr => $attr,
 		};
-		$uo->{a}->{$attr} = $ua;
-		my $val = get_ldap_attr($uo, $attr);
-		$ua->{new} = $ua->{cur} = $ua->{old} = $ua->{usr} = $val;
-		$ua->{state} = $val eq '' ? 'empty' : 'orig';
+		$a->{new} = $a->{cur} = $a->{old} = $a->{usr} = $val;
+		$a->{state} = $val eq '' ? 'empty' : 'orig';
+		$uo->{a}->{$attr} = $a;
 	}
-	$uo->{dn} = $uo->{ldap}->dn;
 
 	rework_unix_account_entry($uo);
-	for my $ua (values %{$uo->{a}}) {
-		$ua->{cur} = $ua->{new};
-		$uo->{changed} = 1 if $ua->{cur} ne $ua->{old};
+
+	for my $a (values %{$uo->{a}}) {
+		$a->{cur} = $a->{new} if $a->{attr} !~ /telephone/;
+		$uo->{changed} = 1 if $a->{cur} ne $a->{old};
 	}
 
 	if ($uo->{changed}) {
 		$uo->{dn} = unix_user_dn($uo) unless $uo->{dn};
-		for my $ua (values %{$uo->{a}}) { set_ldap_attr($uo, $ua, $ua->{cur}); }
+		for my $a (values %{$uo->{a}}) { set_ldap_attr($uo, $a, $a->{cur}); }
 		$uo->{ldap}->dn($uo->{dn});
-		$res = ldap_update($srv, $uo->{ldap}); 
-		log_info('changed: uid=(%s), ret=(%s)', $uo->{a}->{uid}, $res->error);
+		$res = ldap_update($srv, $uo->{ldap});
+		log_info('error updating user "%s": %s', get_attr($uo, 'uid'), $res->error)
+			if $res->code;
 	}
 
 	return $uo;
