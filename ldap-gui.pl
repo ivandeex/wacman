@@ -4,7 +4,7 @@
 use strict;
 use warnings;
 use utf8;
-use Carp;
+use Carp qw(cluck croak);
 use Getopt::Std;
 use Gtk2;
 use POSIX;
@@ -18,19 +18,18 @@ use Cwd 'abs_path';
 
 my ($srv, $win, $pname, $main_win);
 
-my ($btn_user_apply, $btn_user_revert, $btn_user_add, $btn_user_delete, $btn_users_refresh);
-my ($user_list, $user_attr_frame, $user_name);
-my ($user_attrs, @user_attr_entries, $user_attr_tabs);
-my ($orig_acc, $edit_acc, $user_changed);
+my ($btn_usr_apply, $btn_usr_revert, $btn_usr_add, $btn_usr_delete, $btn_usr_refresh);
+my ($user_list, $user_attr_frame, $user_attr_tabs, $user_name);
+my $user_obj = {};
 
-my ($btn_group_apply, $btn_group_revert, $btn_group_add, $btn_group_delete, $btn_groups_refresh);
+my ($btn_grp_apply, $btn_grp_revert, $btn_grp_add, $btn_grp_delete, $btn_grp_refresh);
 my ($group_list, $group_attr_frame, $group_name);
-my ($group_attrs, @group_attr_entries, $group_attr_tabs);
-my ($orig_grp, $edit_grp, $group_changed);
+my $group_obj = {};
+
+my ($next_uidn, $next_gidn);
 
 my $pic_home = abs_path("$Bin/images");
-
-my $next_uidn;
+my %pic_cache;
 
 my %translations;
 
@@ -39,7 +38,8 @@ sub _T
 {
 	my ($fmt, @args) = @_;
 	$fmt = $translations{$fmt} if defined $translations{$fmt};
-	return sprintf($fmt, @args);
+	my $ret = sprintf($fmt, @args);
+	return $ret;
 }
 
 
@@ -59,6 +59,7 @@ my %servers = (
 		base	=>	'dc=gclimate,dc=local',
 		debug	=>	0,
 		convert	=>	0,
+		disabled=>	0,
 	},
 	srv => {
 		uri		=>	'ldaps://xxx.el4.vihens.ru',
@@ -67,6 +68,7 @@ my %servers = (
 		base	=>	'dc=vihens,dc=ru',
 		debug	=>	0,
 		convert	=>	1,
+		disabled=>	0,
 	}
 );
 
@@ -113,6 +115,7 @@ my %servers = (
 	'Delete'	=>	'Удалить',
 	'Refresh'	=>	'Обновить',
 	'Exit'	=>	'Выйти',
+	'Close'	=>	'Закрыть',
 	' Users '	=>	' Пользователи ',
 	' Groups '	=>	' Группы ',
 	'Group name'	=>	'Название группы',
@@ -129,6 +132,7 @@ my %servers = (
 
 my %config = (
 	debug				=>	0,
+	nodirs				=>	0,
 	config_files		=>	[
 			'/etc/ldap-gui.cfg',
 			'~/.ldap-gui.cfg',
@@ -136,13 +140,14 @@ my %config = (
 		],
 	skel_dir			=>	'/etc/skel',
 	xinstall_command	=>	'/usr/bin/sudo -S /usr/local/sbin/xinstall',
-	user_class			=>	'person',
 	unix_user_dn		=>	'uid=[uid],ou=People,dc=vihens,dc=ru',
+	unix_group_dn		=>	'cn=[cn],ou=Groups,dc=vihens,dc=ru',
 
 	ad_initial_pass		=>	'123qweASD',
 	unix_user_classes	=>	[
 			qw(top person organizationalPerson inetOrgPerson posixAccount shadowAccount ntUser)
 		],	
+	unix_group_classes	=>	[ qw(top posixGroup) ],	
 	ad_user_classes		=>	[ qw(top user person organizationalPerson) ],	
 	ad_user_category	=>	'Person.Schema.Configuration',
 	ad_primary_group	=>	_T('Domain Users'),
@@ -167,6 +172,8 @@ my %unix_fields_const = (
 	ntUserHomeDirDrive => 'H',
 	ntUserAcctExpires => NO_EXPIRE,
 	gidNumber => 100,
+	telephoneNumber => '0',
+	facsimileTelephoneNumber => '0',
 );
 
 
@@ -498,8 +505,6 @@ sub log_error	{ log_msg('error', @_); }
 # ======== gui utils ========
 
 
-my %pic_cache;
-
 sub create_pic ($)
 {
 	my $file = $_[0];
@@ -515,11 +520,23 @@ sub create_pic ($)
 sub create_button
 {
 	my ($text, $pic, $action, $owner_box) = @_;
-	my $button = Gtk2::Button->new_with_label($text);
-	$button->set_image(Gtk2::Image->new_from_pixbuf(create_pic($pic))) if $pic;		
+	my $button = Gtk2::Button->new;
+	$button->set_label($text) if $text;
+	set_button_image($button, $pic) if $pic;		
 	$button->signal_connect("clicked" => $action) if $action;
 	$owner_box->pack_start($button, 0, 0, 1) if $owner_box;
 	return $button;
+}
+
+
+sub set_button_image ($$)
+{
+	my ($button, $pic) = @_;
+	if ($pic) {
+		$button->set_image(Gtk2::Image->new_from_pixbuf(create_pic($pic)));
+	} else {
+		$button->set_image(undef);		
+	}		
 }
 
 
@@ -556,6 +573,21 @@ sub message_box ($$$)
 	my $ret = $dia->run;
 	$dia->destroy;
 	return $ret;
+}
+
+
+sub set_window_icon ($$)
+{
+	my ($win, $pic) = @_;
+	$win->window->set_icon(undef, create_pic($pic)->render_pixmap_and_mask(1));
+}
+
+
+sub destroy_popup ($$)
+{
+	my ($win, $btn) = @_;
+	$btn->set_sensitive(1) if defined $btn;
+	$win->destroy;
 }
 
 
@@ -607,12 +639,33 @@ sub string2id ($)
 	#tr/абвгдежзийклмнопрстуфхцчшщъыьэюя/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
 	tr/\x{430}\x{431}\x{432}\x{433}\x{434}\x{435}\x{436}\x{437}\x{438}\x{439}\x{43a}\x{43b}\x{43c}\x{43d}\x{43e}\x{43f}\x{440}\x{441}\x{442}\x{443}\x{444}\x{445}\x{446}\x{447}\x{448}\x{449}\x{44a}\x{44b}\x{44c}\x{44d}\x{44e}\x{44f}/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
 	$_ = lc;
+	s/^\s+//;
+	s/\s+$//;
+	s/\s+/ /g;
 	tr/0-9a-z/_/cs;
+	my $maxlen = 16;
+	$_ = substr($_, 0, $maxlen) if length > $maxlen;
 	return $_;
 }
 
 
-# ========  reworking  ========
+sub split_list ($)
+{
+	my $s = shift;
+	$s =~ s/^\s+//;
+	$s =~ s/\s+$//;
+	$s =~ s/\s+/ /g;
+	return split(/\s*\;\s*/, $s);
+}
+
+
+sub join_list (@)
+{
+	return join(';', @_);
+}
+
+
+# ========  rework helpers  ========
 
 
 sub next_unix_uidn
@@ -632,120 +685,260 @@ sub next_unix_uidn
 }
 
 
-sub unix_dn ($)
+sub next_unix_gidn
 {
-	my $ua = shift;
+	if (defined($next_gidn) && $next_gidn > 0) {
+		return $next_gidn;
+	}
+	$next_gidn = 0;
+	my $res = ldap_search($srv, '(objectClass=posixGroup)', [ 'gidNumber' ]);
+	for ($res->entries) {
+		my $gidn = $_->get_value('gidNumber');
+		$next_gidn = $gidn if $gidn > $next_gidn;
+	}
+	$next_gidn = $next_gidn > 0 ? $next_gidn + 1 : 1000;
+	log_debug('next gidn: %d', $next_gidn);
+	return $next_gidn;
+}
+
+
+sub unix_user_dn ($)
+{
+	my $uo = shift;
 	my $dn = $config{unix_user_dn};
-	my $uid = $ua->get_value('uid');
-	my $cn = $ua->get_value('cn');
+	my $uid = $uo->{a}->{uid}->{cur};
+	my $cn = $uo->{a}->{uid}->{cur};
 	$dn =~ s/\[uid\]/$uid/g;
 	$dn =~ s/\[cn\]/$uid/g;
 	return $dn;
 }
 
 
-sub massage_accounts
+my %state2has = (
+	force => 0,
+	user => 1,
+	empty => 0,
+	orig => 1,
+	calc => 0,
+);
+
+
+sub has_attr ($$)
+{
+	my ($obj, $attr) = @_;
+
+	$obj->{a} = {} unless defined $obj->{a};
+	return 0 unless defined $obj->{a}->{$attr};
+	my $a = $obj->{a}->{$attr};
+
+	my $state = nvl($a->{state});
+	return $state2has{$state} if defined $state2has{$state};
+
+	return nvl($a->{cur}) ne '' ? 1 : 0;
+}
+
+
+sub get_attr ($$)
+{
+	my ($obj, $attr) = @_;
+	$obj->{a} = {} unless defined $obj->{a};
+	return defined($obj->{a}->{$attr}) ? nvl($obj->{a}->{attr}->{cur}) : '';
+}
+
+
+sub set_attr ($$$)
+{
+	my ($obj, $attr, $val) = @_;
+
+	my $sdn = nvl($obj->{dn});
+	$sdn = ($sdn =~ /^\s*(.*?)\s*,/) ? $1 : '???';
+
+	if (defined($obj->{a}) && defined($obj->{a}->{$attr})) {
+		my $a = $obj->{a}->{attr};
+		$a->{new} = $val;
+		log_info('(%s): [%s] := (%s)', $sdn, $attr, $val)
+			if $a->{old} ne $a->{new};
+		cluck "undefined old" unless defined $a->{old};
+		cluck "undefined new" unless defined $a->{new};
+		cluck "undefined val" unless defined $val;
+		cluck "undefined sdn" unless defined $sdn;
+		cluck "undefined attr" unless defined $attr;
+	} else {
+		my $a = {
+			parent => $obj,
+			attr => $attr,
+			visual => 0,
+			old => '',
+			cur => '',
+			new => $val,
+			usr => $val,
+		};
+		$obj->{a}->{$attr} = $a;
+		log_info('(%s): [%s] += (%s)', $sdn, $attr, $val)
+	}
+}
+
+
+sub cond_set ($$$)
+{
+	my ($obj, $attr, $val) = @_;
+	my $has = has_attr($obj, $attr);
+	set_attr($obj,$attr,$val) unless $has;
+	return $has;
+}
+
+
+sub set_ldap_attr ($$$)
+{
+	my ($uo, $attr, $val) = @_;
+	my $ldap = $uo->{ldap};
+	if ($ldap->exists($attr)) {
+		$ldap->replace($attr, $val);
+	} else {
+		$ldap->add($attr => $val);
+	}
+}
+
+
+sub get_ldap_attr ($$)
+{
+	my ($uo, $attr) = @_;
+	my $ldap = $uo->{ldap};
+	return nvl($ldap->get_value($attr));
+}
+
+
+# ========  reworking  ========
+
+
+sub rework_accounts
 {
 	my @ids = @_;
 	if ($#ids < 0) {
-		my $user_class = $config{user_class};
-		my $res = ldap_search($srv, "(objectClass=$user_class)", [ 'uid' ]);
+		my $res = ldap_search($srv, "(objectClass=person)", [ 'uid' ]);
 		# get all users
 		@ids = map { $_->get_value('uid') } $res->entries;
 	}
 	for my $id (@ids) {
 		log_debug("massage id %s ...", $id);
-		my $ua = massage_unix_account($id);
-		if (defined $ua) {
-			massage_home_dir($ua);
-			# at this point we need to tell FDS to synchronize
-			massage_windows_account($ua);
+		my $uo = rework_unix_account($id);
+		if ($uo) {
+			rework_home_dir($uo) unless $config{nodirs};
+			# at this point we need to tell FDS to synchronize...
+			rework_windows_account($uo) unless $win->{cfg}->{disabled};
 		}
 	}
 }
 
 
-sub massage_unix_account
+sub rework_unix_account
 {
 	my $id = shift;
-	my $user_class = $config{user_class};
-	my $res = ldap_search($srv, "(&(objectClass=$user_class)(uid=$id))");
-	if ($res->code) {
-		$res = ldap_search($srv, "(&(objectClass=person)(cn=$id))");
-	}
+	my $uo = {};
+	my $res = ldap_search($srv, "(&(objectClass=person)(uid=$id))");
 	if ($res->code) {
 		message_box('error', 'close', _T('User "%s" not found: %s',$id,$res->error));
-		return;
+		return undef;
 	}
-	my $ua = $res->pop_entry;
-	if (defined $ua) {
-		if (massage_unix_account_entry($ua)) {
-			$res = ldap_update($srv, $ua); 
-			my $uid = $ua->get_value('uid');
-			log_info('changed: uid=(%s), ret=(%s)', $uid, $res->error);
-		}
-	} else {
+	$uo->{ldap} = $res->pop_entry;
+	unless (defined $uo->{ldap}) {
 		message_box('error', 'close', _T('User "%s" not found',$id));
+		return undef;
 	}
-	return $ua;
+	$uo->{changed} = 0;
+
+	for my $attr ($uo->{ldap}->attributes(nooptions => 1)) {
+		my $type = 's';
+		my $ua = {
+			parent => $uo,
+			visual => 0,
+			type => $type,
+			attr => $attr,
+		};
+		$uo->{a}->{$attr} = $ua;
+		my $val = get_ldap_attr($uo, $attr);
+		$ua->{new} = $ua->{cur} = $ua->{old} = $ua->{usr} = $val;
+		$ua->{state} = $val eq '' ? 'empty' : 'orig';
+	}
+	$uo->{dn} = $uo->{ldap}->dn;
+
+	rework_unix_account_entry($uo);
+	for my $ua (values %{$uo->{a}}) {
+		$ua->{cur} = $ua->{new};
+		$uo->{changed} = 1 if $ua->{cur} ne $ua->{old};
+	}
+
+	if ($uo->{changed}) {
+		$uo->{dn} = unix_user_dn($uo) unless $uo->{dn};
+		for my $ua (values %{$uo->{a}}) { set_ldap_attr($uo, $ua, $ua->{cur}); }
+		$uo->{ldap}->dn($uo->{dn});
+		$res = ldap_update($srv, $uo->{ldap}); 
+		log_info('changed: uid=(%s), ret=(%s)', $uo->{a}->{uid}, $res->error);
+	}
+
+	return $uo;
 }
 
 
-sub massage_unix_account_entry
+sub rework_unix_account_entry ($)
 {
-	my $ua = shift;
+	my $uo = shift;
 
 	# read all scalar attributes
-	my $uchange = 0;
-	my $uid = nvl($ua->get_value('uid'));
-	my $cn = nvl($ua->get_value('cn'));
-	my $gn = nvl($ua->get_value('givenName'));
-	my $sn = nvl($ua->get_value('sn'));
+	my $uid = get_attr($uo, 'uid');
+	my $cn = get_attr($uo, 'cn');
+	my $gn = get_attr($uo, 'givenName');
+	my $sn = get_attr($uo, 'sn');
 
 	# names
-	unless (ldap_has_attr($ua, 'cn')) {
+	unless (has_attr($uo, 'cn')) {
 		my $bl = $sn && $gn ? ' ' : '';
 		$cn = "$gn$bl$sn";
-		$uchange++ if ldap_cond_set($ua, 'cn', $cn);
+		cond_set($uo, 'cn', $cn);
 	}
 
 	# user id
-	unless (ldap_has_attr($ua, 'uid')) {
+	unless (has_attr($uo, 'uid')) {
 		$uid = string2id($sn eq '' ? $gn : substr($gn, 0, 1) . $sn);
-		$uchange++ if ldap_cond_set($ua, 'uid', $uid);
 	}
+	$uid = string2id($uid);
+	set_attr($uo, 'uid', $uid);
 
 	# dn
-	if (nvl($ua->dn) eq '') {
-		$ua->dn(unix_dn($ua));
+	if (nvl($uo->{dn}) eq '') {
+		$uo->{dn} = unix_user_dn($uo);
 	}
 
-	# add the required classes
-	my (%classes);
-	for ($ua->get_value('objectClass')) { $classes{$_} = $classes{lc} = 1; }
-	for my $class (@{$config{unix_user_classes}}) {
-		my $lclass = lc($class);
-		unless (defined($classes{$class}) || defined($classes{$lclass})) {
-			$ua->add(objectClass => $class);
-			log_debug('%s(%s): add class %s', $uid, $cn, $class);
-			$uchange++;
-		}
+	# add the required classes (works directly on ldap entry !)
+	my %classes;
+	for ($uo->{ldap}->get_value('objectClass')) {
+		$classes{lc} = 1;
+	}
+	for my $cl (@{$config{unix_user_classes}}) {
+		next if defined $classes{lc($cl)};
+		$uo->{ldap}->add(objectClass => $cl);
+		$uo->{changed} = 1;
 	}
 
 	# assign next available UID number
-	unless (ldap_has_attr($ua, 'uidNumber')) {
-		$uchange++ if ldap_cond_set($ua, 'uidNumber', next_unix_uidn());
+	my $uidn;
+	if (has_attr($uo, 'uidNumber')) {
+		$uidn = get_attr($uo, 'uidNumber');
+		$uidn =~ tr/0123456789//cd;
+	} else {
+		$uidn = next_unix_uidn();
 	}
+	set_attr($uo, 'uidNumber', $uidn);
 
 	# mail
-	$uchange++ if ldap_cond_set($ua, 'mail', ifnull($uid, $uid.'@'.$config{unix_domain}));
+	cond_set($uo, 'mail', ifnull($uid, $uid.'@'.$config{unix_domain}));
 
 	# home directory
-	$uchange++ if ldap_cond_set($ua, 'homeDirectory', ifnull($uid, "/home/$uid"));
+	cond_set($uo, 'homeDirectory', ifnull($uid, "/home/$uid"));
 
 	# constant fields
 	for my $attr (keys %unix_fields_const) {
-		$uchange++ if ldap_cond_set($ua, $attr, $unix_fields_const{$attr});
+		cond_set($uo, $attr, $unix_fields_const{$attr});
 	}
 
 	# fields for NT
@@ -753,39 +946,35 @@ sub massage_unix_account_entry
 		'SERVER'	=>	$config{home_server},
 		'USER'		=>	$uid,
 	);
-	$uchange++ if
-		ldap_cond_set($ua, 'ntUserHomeDir',
-					ifnull($uid,subst_path($config{ad_home_dir}, %path_subst)));
-	$uchange++ if
-		ldap_cond_set($ua, 'ntUserProfile',
-					ifnull($uid,subst_path($config{ad_profile_path}, %path_subst)));
-	$uchange++ if
-		ldap_cond_set($ua, 'ntUserScriptPath',
-					ifnull($uid,subst_path($config{ad_script_path}, %path_subst)));
-	$uchange++ if
-		ldap_cond_set($ua, 'ntUserDomainId', $uid);
-
-	return $uchange;
+	cond_set($uo, 'ntUserHomeDir',
+			ifnull($uid, subst_path($config{ad_home_dir}, %path_subst)));
+	cond_set($uo, 'ntUserProfile',
+			ifnull($uid, subst_path($config{ad_profile_path}, %path_subst)));
+	cond_set($uo, 'ntUserScriptPath',
+			ifnull($uid, subst_path($config{ad_script_path}, %path_subst)));
+	cond_set($uo, 'ntUserDomainId', $uid);
 }
 
 
 sub windows_user_groups
 {
 	my $name = $config{ad_primary_group};
-	my $res = ldap_search($win, "(&(objectClass=group)(cn=$name))", [ 'PrimaryGroupToken' ] );
+	my $res = ldap_search($win, "(&(objectClass=group)(cn=$name))",
+							[ 'PrimaryGroupToken' ] );
 	my $group = $res->pop_entry;
 	my $group_id = 0;
 	$group_id = $group->get_value('PrimaryGroupToken') if defined $group;
 	$group_id = 0 unless $group_id;		
 	if ($res->code || !defined($group) || !$group_id) {
 		message_box('error', 'close',
-				_T('Error reading Windows group "%s" (%s): %s', $name, $group_id, $res->error));
+			_T('Error reading Windows group "%s" (%s): %s', $name, $group_id, $res->error));
 	}
 
 	my $filter = join('', map("(cn=$_)", @{$config{ad_user_groups}}));
 	$res = ldap_search($win, "(&(objectClass=group)(|$filter))");
 	if ($res->code) {
-		message_box('error', 'close', _T('Error reading list of Windows groups: %s', $res->error));
+		message_box('error', 'close',
+			_T('Error reading list of Windows groups: %s', $res->error));
 	}
 
 	my @sec_groups = $res->entries;
@@ -793,106 +982,118 @@ sub windows_user_groups
 }
 
 
-sub windows_dn ($)
+sub windows_user_dn ($)
 {
-	my $ua = shift;
-	my $cn = $ua->get_value('cn');
+	my $uo = shift;
+	my $cn = get_attr($uo, 'cn');
 	my $ad_dc_domain = path2dn($config{ad_domain},'dc');
 	my $dn = "cn=$cn,".path2dn($config{ad_user_container}).",$ad_dc_domain";
 	return $dn;
 }
 
 
-sub massage_windows_account ($$)
+sub rework_windows_account ($)
 {
-	my ($ua, $new_pwd) = @_;
-	my $uid = $ua->get_value('uid');
-	my $cn = $ua->get_value('cn');
+	my $uo = @_;
 
-	log_debug('massage windows %s (%s) ...', $uid, $cn);
-	my $wchange = 0;
-	my $uchange = 0;
+	my $uid = get_attr($uo, 'uid');
+	my $cn = get_attr($uo, 'cn');
 
+	log_debug('rework windows user %s (%s) ...', $uid, $cn);
+
+	my $wo = {
+		changed => 0,
+		a => {},
+	};
 	my $res = ldap_search($win, "(&(objectClass=user)(cn=$cn))", [ '*', 'unicodePwd' ]);
-	my $wa = $res->pop_entry;
+	$wo->{ldap} = $res->pop_entry;
 
-	# still need full resynchronization here !
-	if ($res->code || !defined($wa))
-	{
+	if (defined($wo->{ldap})) {
+		for my $attr ($wo->{ldap}->attributes(nooptions => 1)) {
+			my $type = 's';
+			my $wa = {
+				parent => $wo,
+				visual => 0,
+				type => $type,
+				attr => $attr,
+			};
+			$wo->{a}->{$attr} = $wa;
+			my $val = get_ldap_attr($wo, $attr);
+			$wa->{new} = $wa->{cur} = $wa->{old} = $wa->{usr} = $val;
+			$wa->{state} = $val eq '' ? 'empty' : 'orig';
+		}
+		$wo->{dn} = $uo->{ldap}->dn;
+	}
+	else {
 		log_info('creating windows user (%s) for uid (%s) ...', $cn, $uid);			
-		my $ad_dc_domain = path2dn($config{ad_domain},'dc');
-		my $dn = "cn=$cn,".path2dn($config{ad_user_container}).",$ad_dc_domain";
-		$wa = Net::LDAP::Entry->new();
-		$wa->dn($dn);
-		$wa->add(objectClass => $config{ad_user_classes});
-		log_debug('created windows user: %s', $dn);
-		log_debug('%s: object classes: (%s)', $cn, join(',',@{$config{ad_user_classes}}));
-		$wchange++;
-		ldap_cond_set($wa, 'cn', $cn);
-		ldap_cond_set($wa, 'instanceType', 4);
-		my $obj_category = path2dn($config{ad_user_category}).",$ad_dc_domain";
-		ldap_cond_set($wa, 'objectCategory', $obj_category);
+		my $obj_cat = join(',', path2dn($config{ad_user_category}),
+								path2dn($config{ad_domain},'dc'));
+		$wo->{ldap} = Net::LDAP::Entry->new();
+		$wo->{ldap}->add(objectClass => $config{ad_user_classes});
+		$wo->{changed} = 1;
+		cond_set($wo, 'cn', $cn);
+		cond_set($wo, 'instanceType', 4);
+		cond_set($wo, 'objectCategory', $obj_cat);
 
 		if (defined($config{ad_initial_pass})) {
 			my $unipwd = "";
 			map { $unipwd .= "$_\000" } split(//, "\"$config{ad_initial_pass}\"");
-			ldap_cond_set($wa, 'unicodePwd', $unipwd);
+			cond_set($wo, 'unicodePwd', $unipwd);
 			# FIXME! also need to change unix pwd
 		}
 
-		ldap_cond_set($wa, 'userAccountControl', 512);
+		cond_set($wo, 'userAccountControl', 512);
 		# FIXME! #ADS_UF_NORMAL_ACCOUNT);
+
+		$wo->{dn} = windows_user_dn($uo);
 	}
 
 	my $ad_principal = $uid.'@'.$config{ad_domain};
-	$wchange++ if ldap_cond_set($wa, 'userPrincipalName', $ad_principal);	
+	cond_set($wo, 'userPrincipalName', $ad_principal);	
 
 	# copy fields from unix
-	my $wattr;
-	for $wattr (sort keys %ad_fields_from_unix) {
+	for my $wattr (keys %ad_fields_from_unix) {
 		next unless $wattr;
 		my $uattr = $ad_fields_from_unix{$wattr};
-		my $ok = ($uattr && ldap_has_attr($ua, $uattr));
+		my $ok = ($uattr && has_attr($uo, $uattr));
 		next unless $ok;
-		$wchange++ if ldap_cond_set($wa, $wattr, $ua->get_value($uattr));
+		cond_set($wo, $wattr, get_attr($uo, $uattr));
 	}
 
 	# constant fields
-	for $wattr (sort keys %ad_fields_const) {
-		$wchange++ if ldap_cond_set($wa, $wattr, $ad_fields_const{$wattr});
+	for (keys %ad_fields_const) {
+		cond_set($wo, $_, $ad_fields_const{$_});
 	}
 
-	# primary group
 	my ($primary_group_id, @secondary_groups) = windows_user_groups();
 	# AD refuses to set PrimaryGroupID and by default adds to the Domain Users group.
-	#$wchange++ if ldap_cond_set($wa, 'PrimaryGroupID', $primary_group_id);
+	#cond_set($wo, 'PrimaryGroupID', $primary_group_id);
 
 	# update on server
-	if ($wchange) {
-		$res = ldap_update($win, $wa);
+	for my $wa (values %{$wo->{a}}) {
+		$wa->{cur} = $wa->{new};
+		$wo->{changed} = 1 if $wa->{cur} ne $wa->{old};
+	}
+	if ($wo->{changed}) {
+		$wo->{dn} = windows_user_dn($uo) unless $wo->{dn};
+		for my $wa (values %{$wo->{a}}) { set_ldap_attr($wo, $wa, $wa->{cur}); }
+		$wo->{ldap}->dn($wo->{dn});
+		$res = ldap_update($win, $wo->{ldap});
 		if ($res->code) {
 			message_box('error', 'close',
 				_T('Error updating Windows-user "%s": %s', $cn, $res->error));
 		}
-		if ($uchange) {
-			$res = ldap_update($srv, $ua);
-			if ($res->code) {
-				message_box('error', 'close',
-					_T('Error re-updating Unix-user "%s": %s', $cn, $res->error));
-			}
-		}
 	}
 
-	#$res = $win->modify($wa->dn, replace => { "unicodePwd" => $unipwd });
-
 	# add to required groups
+	my $dn = $wo->{dn};
 	for my $grp (@secondary_groups) {
 		my $name = $grp->get_value('name');
 		my %members;
 		for ($grp->get_value('member')) { $members{$_} = 1; }
-		unless (defined $members{$wa->dn}) {
-			$grp->add( member => $wa->dn );
-			my $res = $grp->update($win);
+		unless (defined $members{$dn}) {
+			$grp->add( member => $dn );
+			my $res = ldap_update($win, $grp);
 			if ($res->code) {
 				message_box('error', 'close',
 					_T('Error adding "%s" to Windows-group "%s": %s', $cn, $name, $res->error));
@@ -903,25 +1104,46 @@ sub massage_windows_account ($$)
 }
 
 
-sub massage_home_dir ($)
+sub rework_home_dir ($)
 {
-	my ($ua, $gotta_ask) = @_;
-	my $home = $ua->get_value('homeDirectory');
-	log_debug('refresh home directory "%s" ...', $home);
-	return 0 if -d $home;
-	return 1 if $gotta_ask;
+	my $uo = shift;
+	my $home = get_attr($uo, 'homeDirectory');
+	return 0 if $home eq '' || -d $home;
 
 	log_info('creating home directory "%s"', $home);
 	my $skel = $config{skel_dir};
 	my $xinstall = $config{xinstall_command};
-	my $uid = $ua->get_value('uidNumber');
-	my $gid = $ua->get_value('gidNumber');
+	my $uid = get_attr($uo, 'uidNumber');
+	my $gid = get_attr($uo, 'gidNumber');
 	# FIXME: get rid of external script
 	my $stdall = `$xinstall "$uid" "$gid" "$skel" "$home" 2>&1`;
 	chomp $stdall;
 	log_debug('xinstall: [%s]', $stdall);
 
 	return 1;
+}
+
+
+# NOTE: structure of this routine is correct
+#       user massage routines shouls work the same way
+sub rework_unix_group ($)
+{
+	my $go = shift;
+
+	$go->{a}->{cn}->{new} = string2id($go->{a}->{cn}->{cur});
+
+	my $gn0 = nvl($go->{a}->{gidNumber}->{cur});
+	my $gn = $gn0;
+	$gn = next_unix_gidn() unless $gn;
+	$gn =~ tr/0123456789//cd;
+	$go->{a}->{gidNumber}->{new} = $gn;
+
+	my $dn = $config{unix_group_dn};
+	for my $ga (values %{$go->{a}}) {
+		$dn =~ s/\[$ga->{attr}\]/$ga->{new}/g;
+		last if $dn !~ /\[\w+\]/;
+	}
+	$go->{dn} = $dn;
 }
 
 
@@ -932,7 +1154,7 @@ sub ldap_search
 {
 	my ($srv, $filter, $attrs, $base, %params) = @_;
 	$params{filter} = $filter;
-	$params{base} = $base ? $base : $srv->{CFG}->{base};
+	$params{base} = $base ? $base : $srv->{cfg}->{base};
 	$params{attrs} = $attrs if $attrs;
 	my $res = $srv->search(%params);
 	return $res;
@@ -944,6 +1166,7 @@ sub ldap_update ($$)
 	my ($srv, $ent) = @_;
 	my $res = $ent->update($srv);
 	undef $next_uidn;
+	undef $next_gidn;
 	return $res;
 }
 
@@ -961,8 +1184,16 @@ sub ldap_connect
 	my $ref = shift;
 	my $cfg = $servers{$ref};
 	my ($ldap, $mesg, $entry);
-	my ($uri, $user, $pass, $pfile) =
-		($cfg->{uri}, $cfg->{user}, $cfg->{pass}, $cfg->{passfile});
+
+	if ($cfg->{disabled}) {
+		$ldap = Net::LDAP->new;
+		$ldap->{cfg} = $cfg;
+		return $ldap;
+	}
+
+	my ($uri, $user) = ($cfg->{uri}, $cfg->{user});
+	my ($pass, $pfile) = ($cfg->{pass}, $cfg->{passfile});
+
 	if (!$pass && $pfile) {
 		open (PFILE, $pfile) or log_error('cannot open passfile "%s"', $pfile);
 		$pass = "";
@@ -978,12 +1209,13 @@ sub ldap_connect
 	}
 	unless ($uri && $user && $pass) {
 		log_error('invalid credentials for %s', $ref);
-	} 
+	}
+ 
 	$ldap = Net::LDAP->new($uri, debug => $cfg->{debug})
 		or log_error('cannot connect to %s: %s', $uri, $@);
 	$mesg = $ldap->bind($user, password => $pass);
 	log_error('cannot bind as %s: %s', $ref, $mesg->error) if $mesg->code;
-	$ldap->{CFG} = $cfg;
+	$ldap->{cfg} = $cfg;
 	return $ldap;
 }
 
@@ -997,60 +1229,8 @@ sub connect_all
 
 sub disconnect_all
 {
-	$srv->unbind;
-	$win->unbind;	
-}
-
-
-sub ldap_has_attr ($$)
-{
-	my ($record, $attr) = @_;
-	my $gui_mode = defined($record->{user_attr}) ? 1 : 0;
-	if ($gui_mode) {
-		if (defined($record->{user_attr}->{$attr})) {
-			my $state = $record->{user_attr}->{$attr}->{state};
-			return 1 if $state eq 'user';
-			return 0 if $state eq 'empty';
-			return 1 if $state eq 'orig';
-			return 0 if $state eq 'calc';
-		}
-		return 0;
-	}
-	if ($record->exists($attr)) {
-		my $oldval = $record->get_value($attr); 
-		if ($oldval && ($oldval !~ /^\s*$/)) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-
-sub ldap_cond_set ($$$)
-{
-	my ($record, $attr, $value) = @_;
-	if (ldap_has_attr($record, $attr)) {
-		return 0;
-	}
-	my $short_dn = '???';
-	if (defined($record->dn)) {
-		@_ = split(/,/, $record->dn);
-		$short_dn = $_[0];
-	}
-	my $ret;
-	if ($record->exists($attr)) {
-		my $oldval = $record->get_value($attr);
-		$record->replace($attr => $value);
-		if (nvl($oldval) ne nvl($value)) {
-			log_debug('(%s): [%s] := (%s)', $short_dn, $attr, $value);
-		}
-		$ret = 1;
-	} else {
-		$record->add($attr => $value);
-		log_debug('(%s): [%s] += (%s)', $short_dn, $attr, $value);
-		$ret = 2;
-	}
-	return $ret;
+	$srv->unbind unless $srv->{cfg}->{disabled};
+	$win->unbind unless $win->{cfg}->{disabled};
 }
 
 
@@ -1069,61 +1249,34 @@ sub is_new_user ($)
 }
 
 
-sub set_user_attr ($$$)
-{
-	my ($ua, $e, $val) = @_;
-	my $attr = $e->{attr};
-	if ($attr) {
-		croak "wow" unless defined $ua;
-		if ($ua->exists($attr)) {
-			$ua->replace($attr, $val);
-		} else {
-			$ua->add($attr => $val);
-		}
-	}
-}
-
-
-sub get_user_attr ($$)
-{
-	my ($ua, $e) = @_;
-	my $attr = $e->{attr};
-	if ($attr) {
-		return nvl($ua->get_value($attr));
-	} else {
-		return '';
-	}
-}
-
-
 sub user_save
 {
 	my ($path, $column) = $user_list->get_cursor;
 	return unless defined $path;
-	return unless $user_changed;
+	my $uo = $user_obj;
+	return unless $uo->{changed};
 
 	my $model = $user_list->get_model;
 	my $node = $model->get_iter($path);
-	my $uid = $user_attrs->{uid}->{cur_val};
-	my $cn = $user_attrs->{cn}->{cur_val};
+	my $uid = $user_obj->{uid}->{cur};
+	my $cn = $user_obj->{cn}->{cur};
 	$model->set($node, 0, $uid, 1, $cn);
 
-	my $ua = $edit_acc;
-	for my $e (@user_attr_entries) {
-		set_user_attr($ua, $e, $e->{cur_val});
-	}
-	my $old_dn = $ua->dn(unix_dn($ua));
+	$uo->{dn} = unix_user_dn($uo) unless $uo->{dn};
+	for my $ua (values %{$uo->{a}}) { set_ldap_attr($uo, $ua, $ua->{cur}); }
+	$uo->{ldap}->dn($uo->{dn});
 
-	my $res = ldap_update($srv, $ua);
+	my $res = ldap_update($srv, $uo->{ldap});
 	if ($res->code) {
-		message_box('error', 'close', _T('Error saving user "%s": %s', $uid, $res->error));
+		message_box('error', 'close',
+				_T('Error saving user "%s": %s', $uid, $res->error));
 		return;
 	}
 
-	massage_accounts($uid);
+	rework_accounts($uid);
 	user_select();
 	set_user_changed(0);
-	$btn_user_add->set_sensitive(1);
+	$btn_usr_add->set_sensitive(1);
 }
 
 
@@ -1132,7 +1285,7 @@ sub user_revert
 	my $resp = message_box('question', 'yes-no', _T('Really revert changes ?'));
 	return if $resp ne 'yes';
 	set_user_changed(0);
-	$btn_user_add->set_sensitive(1);
+	$btn_usr_add->set_sensitive(1);
 	user_select();
 }
 
@@ -1141,6 +1294,7 @@ sub user_add
 {
 	user_unselect();
 	my $model = $user_list->get_model;
+	my $uo = $user_obj;
 
 	my $node = $model->get_iter_first;
 	while (defined $node) {
@@ -1152,10 +1306,9 @@ sub user_add
 	$model->set($node, 0, '-', 1, '-');
 	my $path = $model->get_path($node);
 	$user_list->set_cursor($path);
-	my $first = $user_gui_attrs[0][1][1];
-	$user_attrs->{$first}->{entry}->grab_focus;
+	$uo->{a}->{$user_gui_attrs[0][1][1]}->{entry}->grab_focus;
 	set_user_changed(0);
-	$btn_user_add->set_sensitive(0);
+	$btn_usr_add->set_sensitive(0);
 	user_select($path, 0);
 }
 
@@ -1176,14 +1329,13 @@ sub user_delete
 		my $resp = message_box('question', 'yes-no', _T('Delete user "%s" ?', $uid));
 		return if $resp ne 'yes';
 
-		my $ua = $edit_acc;
-		my $res = ldap_delete($srv, $ua);
+		my $res = ldap_delete($srv, $user_obj->{ldap});
 		if ($res->code) {
 			message_box('error', 'close',
 					_T('Error deleting Unix-user "%s": %s', $uid, $res->error));
 			return;
 		}
-		$res = ldap_delete($win, windows_dn($ua));
+		$res = ldap_delete($win, windows_user_dn($user_obj->{ldap}));
 		if ($res->code) {
 			message_box('error', 'close',
 				_T('Error deleting Windows-user "%s": %s', $uid, $res->error));
@@ -1192,7 +1344,7 @@ sub user_delete
 
 	$model->remove($node);
 	set_user_changed(0);
-	$btn_user_add->set_sensitive(1);
+	$btn_usr_add->set_sensitive(1);
 
 	if ($path->prev || $path->next) {
 		$user_list->set_cursor($path);
@@ -1206,14 +1358,13 @@ sub user_delete
 sub users_refresh
 {
 	user_unselect();
-	massage_accounts();
+	rework_accounts();
 
 	my @attrs = ('uid', 'cn');
 	my $model = $user_list->get_model;
 	$model->clear;
 
-	my $user_class = $config{user_class};
-	my $res = ldap_search($srv, "(objectClass=$user_class)", \@attrs);
+	my $res = ldap_search($srv, "(objectClass=person)", \@attrs);
 	my @users = $res->entries;
 	@users = sort { $a->get_value('uid') cmp $b->get_value('uid') } @users;
 
@@ -1224,7 +1375,7 @@ sub users_refresh
 		}
 	}
 
-	$btn_user_add->set_sensitive(1) if defined $btn_user_add;
+	$btn_usr_add->set_sensitive(1) if defined $btn_usr_add;
 }
 
 
@@ -1235,7 +1386,7 @@ sub user_change
 	if (defined $path) {
 		my $node = $model->get_iter($path);
 		$model->remove($node) if is_new_user($node);
-		$btn_user_add->set_sensitive(1);
+		$btn_usr_add->set_sensitive(1);
 	}
 }
 
@@ -1244,27 +1395,26 @@ sub user_unselect
 {
 	# exit if interface is not built complete
 	return unless defined $user_name;
+	my $uo = $user_obj;
 
 	$user_name->set_text('');
 
-	@user_attr_entries = values %$user_attrs;
-	for my $e (@user_attr_entries) {
-		$e->{entry}->set_text('');
-		$e->{entry}->set_editable(0);
-		$e->{bulb}->set_from_pixbuf(create_pic('empty.png'));
+	for my $ua (values %{$user_obj->{a}}) {
+		next unless $ua->{visual};
+		$ua->{entry}->set_text('');
+		$ua->{entry}->set_editable(0);
+		$ua->{bulb}->set_from_pixbuf(create_pic('empty.png'));
 	}
 
-	$btn_user_apply->set_sensitive(0);
-	$btn_user_revert->set_sensitive(0);
-	$btn_user_delete->set_sensitive(0);
+	$btn_usr_apply->set_sensitive(0);
+	$btn_usr_revert->set_sensitive(0);
+	$btn_usr_delete->set_sensitive(0);
 
 	$user_attr_tabs->set_current_page(0);
 	$user_attr_frame->set_sensitive(0);
 
-	undef $orig_acc;
-	undef $edit_acc;
-
-	$user_changed = 0;
+	undef $uo->{ldap};
+	$uo->{changed} = 0;
 
 	return 0;
 }
@@ -1280,42 +1430,37 @@ sub user_select
 	my $cn = $model->get($node, 1);
 	return unless defined $uid;
 
-	$user_name->set_text("$uid ($cn)");
+	my $uo = $user_obj;
 
-	my ($ua, $e);
 	if (is_new_user($node)) {
-		$ua = Net::LDAP::Entry->new;
-		for $e (@user_attr_entries) {
-			set_user_attr($ua, $e, '');
+		$uo->{ldap} = Net::LDAP::Entry->new;
+		for my $ua (values %{$uo->{a}}) {
+			set_ldap_attr($uo, $ua, '');
 		}
 	} else {
-		my $user_class = $config{user_class};
-		my $res = ldap_search($srv, "(&(objectClass=$user_class)(uid=$uid))");
+		my $res = ldap_search($srv, "(&(objectClass=person)(uid=$uid))");
 		if ($res->code || scalar($res->entries) == 0) {
 			my $msg = _T('Cannot display user "%s"', $uid);
 			$msg .= ": ".$res->error if $res->code;
 			message_box('error', 'close', $msg);
 			return;
 		}
-		$ua = $res->pop_entry;
+		$uo->{ldap} = $res->pop_entry;
 	}
 
-	$orig_acc = $ua;
-	undef $edit_acc;
-	$edit_acc = $ua->clone;
-
-	for $e (@user_attr_entries) {
-		my $value = nvl($ua->get_value($e->{attr}));
-		$e->{entry}->set_text($value);
-		$e->{entry}->set_editable(1);
-		$e->{new_val} = $e->{cur_val} = $e->{old_val} = $value;
-		$e->{state} = $value eq '' ? 'empty' : 'orig'; 
-		my $pic =  $state2pic{$e->{state}};
+	for my $ua (values %{$uo->{a}}) {
+		my $val = get_ldap_attr($uo, $ua->{attr});
+		$ua->{entry}->set_text($val);
+		$ua->{entry}->set_editable(1);
+		$ua->{new} = $ua->{cur} = $ua->{old} = $ua->{usr} = $val;
+		$ua->{state} = $val eq '' ? 'empty' : 'orig'; 
+		my $pic =  $state2pic{$ua->{state}};
 		$pic = 'empty.png' unless defined $pic;
-		$e->{bulb}->set_from_pixbuf(create_pic($pic));
+		$ua->{bulb}->set_from_pixbuf(create_pic($pic));
 	}
 
-	$btn_user_delete->set_sensitive(1);
+	$user_name->set_text("$uid ($cn)");
+	$btn_usr_delete->set_sensitive(1);
 	$user_attr_tabs->set_current_page(0);
 	$user_attr_frame->set_sensitive(1);
 }
@@ -1323,66 +1468,60 @@ sub user_select
 
 sub user_entry_attr_changed
 {
-	my ($entry0, $event0) = @_;
-	my $e0 = $entry0->{user_attr};
-	return unless $e0;
-	return unless $edit_acc;
-	my $e;
+	my $entry1 = shift;
+	my $ua1 = $entry1->{friend};
+	return unless $ua1;
+	my $uo = $ua1->{parent};
+	return unless $uo;
 
-	$e0->{new_val} = nvl($e0->{entry}->get_text());
-	return if nvl($e0->{cur_val}) eq nvl($e0->{new_val});
-
-	# read values
-	for $e (@user_attr_entries) {
-		$e->{old_state} = $e->{state};
-		set_user_attr($edit_acc, $e, $e->{new_val});
-	}
+	$ua1->{new} = $ua1->{usr} = nvl($ua1->{entry}->get_text);
+	return if $ua1->{cur} eq $ua1->{new};
+	$ua1->{state} = 'user';
 
 	# calculate calculatable fields
-	$e0->{state} = 'user';
-	$edit_acc->{user_attr} = $user_attrs;
-	massage_unix_account_entry($edit_acc);
+	for my $ua (values %{$uo->{a}}) { $ua->{prev_state} = $ua->{state}; }
+	rework_unix_account_entry($uo);
 
 	# analyze results
 	my $chg = 0;
-	for $e (@user_attr_entries) {
-		my $val = get_user_attr($edit_acc, $e);
-		my $state = $e->{state};
+	for my $ua (values %{$uo->{a}}) {
+		my $val = nvl($ua->{new});
+		my $state = $ua->{state};
 		if ($val eq '') {
 			$state = 'empty';
-		} elsif ($val eq $e->{old_val}) {
+		} elsif ($val eq $ua->{old}) {
 			$state = 'orig';
-		} elsif ($val eq $e->{cur_val}) {
-			$state = $e->{old_state};
-		} elsif ($val eq $e->{new_val}) {
+		} elsif ($val eq $ua->{cur}) {
+			$state = $ua->{prev_state};
+		} elsif ($val eq $ua->{usr}) {
 			$state = 'user';
 		} else {
 			$state = 'calc';
 		}
-		$e->{cur_val} = $val;
-		if ($val ne $e->{new_val}) {
-			$e->{entry}->set_text($val);
+		$ua->{cur} = $val;
+		if ($val ne $ua->{new}) {
+			my $entry = $ua->{entry};
+			my $pos = $entry->get_position;
+			$entry->set_text($val);
+			$entry->set_position($pos);
 		}
-		$e->{state} = $state;
-		$chg = 1 if $val ne $e->{old_val};
+		$ua->{state} = $state;
+		$chg = 1 if $val ne $ua->{old};
 	}
 
 	# refresh bulbs
-	for $e (@user_attr_entries) {
-		if ($e->{state} ne $e->{old_state}) {
-			my $pic =  $state2pic{$e->{state}};
-			$pic = 'empty.png' unless defined $pic;
-			$e->{bulb}->set_from_pixbuf(create_pic($pic));			
-		}
+	for my $ua (values %{$uo->{a}}) {
+		next if $ua->{state} eq $ua->{old_state};
+		my $pic =  $state2pic{$ua->{state}};
+		$pic = 'empty.png' unless defined $pic;
+		$ua->{bulb}->set_from_pixbuf(create_pic($pic));			
 	}
 
 	# refresh top label
-	my $uid = nvl($user_attrs->{uid}->{cur_val});
-	my $cn = nvl($user_attrs->{cn}->{cur_val});
-	my $new_user_name = "$uid ($cn)";
-	if ($user_name->get_text() ne $new_user_name) {
-		$user_name->set_text("$uid ($cn)");
-	}
+	my $uid = nvl($uo->{a}->{uid}->{cur});
+	my $cn = nvl($uo->{a}->{cn}->{cur});
+	my $new_name = "$uid ($cn)";
+	$user_name->set_text($new_name) if $user_name->get_text ne $new_name;
 
 	# refresh buttons
 	set_user_changed($chg);
@@ -1392,14 +1531,84 @@ sub user_entry_attr_changed
 sub set_user_changed
 {
 	my $chg = shift;
-	return if $chg == $user_changed;
-	$user_changed = $chg;
-	$btn_user_apply->set_sensitive($chg);
-	$btn_user_revert->set_sensitive($chg);
-	$btn_users_refresh->set_sensitive(!$chg);
-	$btn_user_add->set_sensitive(!$chg);
-	$btn_user_delete->set_sensitive(!$chg);
+	my $uo = $user_obj;
+	return if $chg == $uo->{changed};
+	$uo->{changed} = $chg;
+	$btn_usr_apply->set_sensitive($chg);
+	$btn_usr_revert->set_sensitive($chg);
+	$btn_usr_refresh->set_sensitive(!$chg);
+	$btn_usr_add->set_sensitive(!$chg);
+	$btn_usr_delete->set_sensitive(!$chg);
 	$user_list->set_sensitive(!$chg);
+}
+
+
+sub user_group_toggled ($$)
+{
+	my ($btn, $ua) = @_;
+	my $uid = $btn->get_label;
+	my $active = $btn->get_active;
+	set_button_image($btn, $active ? 'green.png' : 'empty.png');
+
+	my @groups;
+	for (split_list $ua->{entry}->get_text) {
+		next unless $_;
+		push @groups, $_ if $_ ne $uid;	
+	}
+	push @groups, $uid if $active;
+	$ua->{cur} = join_list sort @groups;
+	set_user_changed(1) if $ua->{cur} ne $ua->{old};
+	$ua->{entry}->set_text($ua->{cur});
+}
+
+
+sub create_user_groups_editor ($)
+{
+	my $ua = shift;
+	my $popup_btn = $ua->{popup};
+
+	my $res = ldap_search($srv, "(objectClass=posixGroup)", ['cn']);
+	my @groups = $res->entries;
+	return if $#groups < 0;
+
+	my $win = Gtk2::Window->new("toplevel");
+	$win->set_title('---');
+	my $vbox = Gtk2::VBox->new(0, 0);
+	$win->add($vbox);
+	my $scroll = Gtk2::ScrolledWindow->new;
+	$vbox->pack_start($scroll, 1, 1, 1);
+	$scroll->set_policy("automatic", "automatic");
+	my $list = new Gtk2::VBox(0, 0);
+	$scroll->add_with_viewport($list);
+
+	my %groups0;
+	map { $groups0{$_} = 1 } split_list $ua->{entry}->get_text;	
+
+	for my $gid (sort {$a cmp $b} map {$_->get_value('cn')} @groups) {
+		my $btn = new Gtk2::ToggleButton($gid);
+		my $active = defined $groups0{$gid};
+		set_button_image($btn, $active ? 'green.png' : 'empty.png');
+		$btn->set_active($active);
+		$btn->signal_connect(toggled => sub { user_group_toggled($btn, $ua); });
+		$list->pack_start($btn, 0, 0, 0);
+	}
+
+	my $buttons = create_button_bar(
+		[],
+		[ _T('Close'), "apply.png", sub { destroy_popup($win, $popup_btn) } ],
+	);
+
+	$vbox->pack_end($buttons, 0, 0, 2);
+	$win->set_default_size(200, 200);
+	$win->set_transient_for($main_win);
+	$win->set_position('center_on_parent');
+	#$win->set_deletable(0); not available in GTK+ 2.8 on Windows
+	$win->set_modal(1);
+	$win->signal_connect(delete_event	=> sub { destroy_popup($win, $popup_btn) });
+	$win->signal_connect(destroy		=> sub { destroy_popup($win, $popup_btn) });
+	$popup_btn->set_sensitive(0);
+	$win->show_all;
+	set_window_icon($win, "popup.png");
 }
 
 
@@ -1422,6 +1631,9 @@ sub create_user_desc
 	$user_attr_frame = $frame;
 	$vbox->pack_start($frame, 1, 1, 0);
 
+	my $uo = $user_obj;
+	$uo->{a} = {};
+
 	for (@user_gui_attrs) {
 		my ($tab_name, @tab_attrs) = @$_;
 		my $scroll = Gtk2::ScrolledWindow->new(undef, undef);
@@ -1429,33 +1641,46 @@ sub create_user_desc
 		$scroll->set_policy('automatic', 'automatic');
 		$scroll->set_border_width(0);
 
-		my $abox = Gtk2::Table->new($#tab_attrs + 1, 3);
+		my $abox = Gtk2::Table->new($#tab_attrs + 1, 4);
 		$scroll->add_with_viewport($abox);
 
-		for my $row (0 .. $#tab_attrs) {
-			my $gui_attr = $tab_attrs[$row];
+		for my $r (0 .. $#tab_attrs) {
+			my $gui_attr = $tab_attrs[$r];
 			my ($type, $attr, $text) = @$gui_attr;
 			my $label = Gtk2::Label->new($text);
 			$label->set_justify('left');
 			my $entry = Gtk2::Entry->new;
 			my $bulb = Gtk2::Image->new;
-			$abox->attach($bulb, 0, 1, $row, $row+1, [], [], 1, 1);
-			$abox->attach($label, 1, 2, $row, $row+1, [], [], 1, 1);
-			$abox->attach($entry, 2, 3, $row, $row+1, [ 'fill', 'expand' ], [], 1, 1);
-			$user_attrs->{$attr} = $entry->{user_attr} = {
+			my $ua = {
+				parent => $uo,
+				visual => 1,
 				type => $type,
 				attr => $attr,
 				entry => $entry,
 				bulb => $bulb,
 			};
+			$uo->{a}->{$attr} = $entry->{friend} = $ua;
+			$abox->attach($bulb, 0, 1, $r, $r+1, [], [], 1, 1);
+			$abox->attach($label, 1, 2, $r, $r+1, [], [], 1, 1);
+			my $right = 4;
+			if ($type eq 'G') {
+				my $popup_btn = create_button(undef, 'popup.png');
+				$ua->{popup} = $popup_btn;
+				$popup_btn->signal_connect(clicked =>
+								sub { create_user_groups_editor($ua); });
+				$popup_btn->set_relief('none');
+				$abox->attach($popup_btn, 3, 4, $r, $r+1, [], [], 1, 1);
+				$right = 3;
+			}
+			$abox->attach($entry, 2, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
 			$entry->signal_connect(key_release_event => \&user_entry_attr_changed)
 		}
 	}
 
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Save'), "apply.png", \&user_save, \$btn_user_apply ],
-		[ _T('Revert'), "revert.png", \&user_revert,\$btn_user_revert ],
+		[ _T('Save'), "apply.png", \&user_save, \$btn_usr_apply ],
+		[ _T('Revert'), "revert.png", \&user_revert,\$btn_usr_revert ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
 
@@ -1513,44 +1738,49 @@ sub is_new_group ($)
 }
 
 
-sub set_group_attr ($$$)
-{
-	return set_user_attr($_[0], $_[1], $_[2]);
-}
-
-
-sub get_group_attr ($$)
-{
-	return get_user_attr($_[0], $_[1]);
-}
-
-
 sub group_save
 {
 	my ($path, $column) = $group_list->get_cursor;
 	return unless defined $path;
-	return unless $group_changed;
+	return unless $group_obj->{changed};
 
 	my $model = $group_list->get_model;
 	my $node = $model->get_iter($path);
-	my $gid = $group_attrs->{gid}->{cur_val};
+	my $gid = $group_obj->{cn}->{cur};
 	$model->set($node, 0, $gid);
 
-	my $ga = $edit_grp;
-	for my $e (@group_attr_entries) {
-		set_group_attr($ga, $e, $e->{cur_val});
-	}
-	my $old_dn = $ga->dn(unix_dn($ga));
+	my $go = $group_obj;
 
-	my $res = ldap_update($srv, $ga);
+	my $ga = $go->{a}->{description};
+	$ga->{cur} = $gid if nvl($ga->{cur}) eq '';
+
+	for $ga (values %{$go->{a}}) {
+		set_ldap_attr($go, $ga, $ga->{cur});
+	}
+
+	$go->{ldap}->dn($go->{dn}) if $go->{dn};
+
+	# add the required classes
+	my (%classes);
+	for ($go->{ldap}->get_value('objectClass')) {
+		$classes{$_} = $classes{lc} = 1;
+	}
+	for my $cl (@{$config{unix_group_classes}}) {
+		if (!defined($classes{$cl}) && !defined($classes{lc($cl)})) {
+			$go->{ldap}->add(objectClass => $cl);
+		}
+	}
+
+	my $res = ldap_update($srv, $go->{ldap});
 	if ($res->code) {
-		message_box('error', 'close', _T('Error saving group "%s": %s', $gid, $res->error));
+		message_box('error', 'close',
+			_T('Error saving group "%s": %s', $gid, $res->error));
 		return;
 	}
 
 	group_select();
 	set_group_changed(0);
-	$btn_group_add->set_sensitive(1);
+	$btn_grp_add->set_sensitive(1);
 }
 
 
@@ -1559,7 +1789,7 @@ sub group_revert
 	my $resp = message_box('question', 'yes-no', _T('Really revert changes ?'));
 	return if $resp ne 'yes';
 	set_group_changed(0);
-	$btn_group_add->set_sensitive(1);
+	$btn_grp_add->set_sensitive(1);
 	group_select();
 }
 
@@ -1568,6 +1798,7 @@ sub group_add
 {
 	group_unselect();
 	my $model = $group_list->get_model;
+	my $go = $group_obj;
 
 	my $node = $model->get_iter_first;
 	while (defined $node) {
@@ -1577,11 +1808,14 @@ sub group_add
 
 	$node = $model->append(undef);
 	$model->set($node, 0, '-');
-	$user_list->set_cursor($model->get_path($node));
-	my $first = $group_gui_attrs[0][1][1];
-	$group_attrs->{$first}->{entry}->grab_focus;
+
+	my $path = $model->get_path($node);
+	$group_list->set_cursor($path);
+
+	$go->{a}->{$group_gui_attrs[0][1][1]}->{entry}->grab_focus;
 	set_group_changed(0);
-	$btn_group_add->set_sensitive(0);
+	$btn_grp_add->set_sensitive(0);
+
 	group_select();
 }
 
@@ -1589,8 +1823,9 @@ sub group_add
 sub group_delete
 {
 	my ($path, $column) = $group_list->get_cursor;
-	my $model = $group_list->get_model;
 	return unless defined $path;
+	my $model = $group_list->get_model;
+	my $go = $group_obj;
 
 	my $node = $model->get_iter($path);
 	my $gid = $model->get($node, 0);
@@ -1602,8 +1837,7 @@ sub group_delete
 		my $resp = message_box('question', 'yes-no', _T('Delete group "%s" ?', $gid));
 		return if $resp ne 'yes';
 
-		my $ga = $edit_grp;
-		my $res = ldap_delete($srv, $ga);
+		my $res = ldap_delete($srv, $go->{ldap});
 		if ($res->code) {
 			message_box('error', 'close',
 					_T('Error deleting group "%s": %s', $gid, $res->error));
@@ -1613,7 +1847,7 @@ sub group_delete
 
 	$model->remove($node);
 	set_group_changed(0);
-	$btn_group_add->set_sensitive(1);
+	$btn_grp_add->set_sensitive(1);
 
 	if ($path->prev || $path->next) {
 		$group_list->set_cursor($path);
@@ -1640,7 +1874,7 @@ sub groups_refresh
 		$model->set($node, 0, $entry->get_value('cn'));
 	}
 
-	$btn_group_add->set_sensitive(1) if defined $btn_group_add;
+	$btn_grp_add->set_sensitive(1) if defined $btn_grp_add;
 }
 
 
@@ -1651,7 +1885,7 @@ sub group_change
 	if (defined $path) {
 		my $node = $model->get_iter($path);
 		$model->remove($node) if is_new_group($node);
-		$btn_group_add->set_sensitive(1);
+		$btn_grp_add->set_sensitive(1);
 	}
 }
 
@@ -1660,24 +1894,22 @@ sub group_unselect
 {
 	# exit if interface is not built complete
 	return unless defined $group_name;
+	my $go = $group_obj;
 
 	$group_name->set_text('');
 
-	@group_attr_entries = values %$group_attrs;
-	for my $e (@group_attr_entries) {
-		$e->{entry}->set_text('');
-		$e->{entry}->set_editable(0);
+	for my $ga (values %{$go->{a}}) {
+		$ga->{entry}->set_text('');
+		$ga->{entry}->set_editable(0);
 	}
 
-	$btn_group_apply->set_sensitive(0);
-	$btn_group_revert->set_sensitive(0);
-	$btn_group_delete->set_sensitive(0);
+	$btn_grp_apply->set_sensitive(0);
+	$btn_grp_revert->set_sensitive(0);
+	$btn_grp_delete->set_sensitive(0);
 	$group_attr_frame->set_sensitive(0);
 
-	undef $orig_grp;
-	undef $edit_grp;
-
-	$group_changed = 0;
+	undef $go->{ldap};
+	$go->{changed} = 0;
 
 	return 0;
 }
@@ -1687,19 +1919,14 @@ sub group_select
 {
 	my ($path, $column) = $group_list->get_cursor;
 	return unless defined $path;
+	my $go = $group_obj;
 	my $model = $group_list->get_model;
 	my $node = $model->get_iter($path);
 	my $gid = $model->get($node, 0);
-	return unless defined $gid;
 
-	$group_name->set_text($gid);
-
-	my ($ga, $e);
 	if (is_new_group($node)) {
-		$ga = Net::LDAP::Entry->new;
-		for $e (@group_attr_entries) {
-			set_group_attr($ga, $e, '');
-		}
+		$go->{ldap} = Net::LDAP::Entry->new;
+		for my $ga (values %{$go->{a}}) { set_ldap_attr($go, $ga, ''); }
 	} else {
 		my $res = ldap_search($srv, "(&(objectClass=posixGroup)(cn=$gid))");
 		if ($res->code || scalar($res->entries) == 0) {
@@ -1708,42 +1935,49 @@ sub group_select
 			message_box('error', 'close', $msg);
 			return;
 		}
-		$ga = $res->pop_entry;
+		$go->{ldap} = $res->pop_entry;
+		$go->{dn} = $go->{ldap}->dn;
 	}
 
-	$orig_grp = $ga;
-	undef $edit_grp;
-	$edit_grp = $ga->clone;
-
-	for $e (@group_attr_entries) {
-		my $value = nvl($ga->get_value($e->{attr}));
-		$e->{entry}->set_text($value);
-		$e->{entry}->set_editable(1);
-		$e->{new_val} = $e->{cur_val} = $e->{old_val} = $value;
+	for my $ga (values %{$go->{a}}) {
+		my $val = get_ldap_attr($go, $ga->{attr});
+		$ga->{new} = $ga->{cur} = $ga->{old} = $ga->{usr} = $val;
+		$ga->{entry}->set_text($val);
+		$ga->{entry}->set_editable(1);
 	}
 
-	$btn_group_delete->set_sensitive(1);
+	$group_name->set_text($gid);
+	$btn_grp_delete->set_sensitive(1);
 	$group_attr_frame->set_sensitive(1);
 }
 
 
 sub group_entry_attr_changed
 {
-	my ($entry0, $event0) = @_;
-	my $e0 = $entry0->{group_attr};
-	return unless $e0 && $edit_grp;
+	my $entry1 = shift;
+	my $ga1 = $entry1->{friend};
+	return unless $ga1;
+	my $go = $ga1->{parent};
+	return unless $go;
 
-	$e0->{new_val} = nvl($e0->{entry}->get_text());
-	return if nvl($e0->{cur_val}) eq nvl($e0->{new_val});
-	$e0->{cur_val} = $e0->{new_val};
+	$ga1->{new} = $ga1->{usr} = nvl($ga1->{entry}->get_text);
+	return if $ga1->{cur} eq $ga1->{new};
+	$ga1->{cur} = $ga1->{new};
+
+	rework_unix_group($go);
 
 	my $chg = 0;
-	for my $e (@group_attr_entries) {
-		$chg = 1 if $e->{new_val} ne $e->{old_val};
+	for my $ga (values %{$go->{a}}) {
+		$chg = 1 if $ga->{new} ne $ga->{old};
+		next if $ga->{new} eq $ga->{cur};
+		my $entry = $ga->{entry};
+		my $pos = $entry->get_position;
+		$ga->{cur} = $ga->{new};
+		$entry->set_text($ga->{new});
+		$entry->set_position($pos);
 	}
 
-	# refresh top label
-	$group_name->set_text(nvl($group_attrs->{cn}->{cur_val}));
+	$group_name->set_text(nvl($go->{a}->{cn}->{cur}));
 	set_group_changed($chg);
 }
 
@@ -1751,14 +1985,85 @@ sub group_entry_attr_changed
 sub set_group_changed
 {
 	my $chg = shift;
-	return if $chg == $group_changed;
-	$group_changed = $chg;
-	$btn_group_apply->set_sensitive($chg);
-	$btn_group_revert->set_sensitive($chg);
-	$btn_groups_refresh->set_sensitive(!$chg);
-	$btn_group_add->set_sensitive(!$chg);
-	$btn_group_delete->set_sensitive(!$chg);
+	my $go = $group_obj;
+	return if $chg == $go->{changed};
+	$go->{changed} = $chg;
+	$btn_grp_apply->set_sensitive($chg);
+	$btn_grp_revert->set_sensitive($chg);
+	$btn_grp_refresh->set_sensitive(!$chg);
+	$btn_grp_add->set_sensitive(!$chg);
+	$btn_grp_delete->set_sensitive(!$chg);
 	$group_list->set_sensitive(!$chg);
+}
+
+
+sub group_user_toggled ($$)
+{
+	my ($btn, $ga) = @_;
+	my $uid = $btn->get_label;
+	my $active = $btn->get_active;
+	set_button_image($btn, $active ? 'green.png' : 'empty.png');
+
+	my @users;
+	for (split_list $ga->{entry}->get_text) {
+		next unless $_;
+		push @users, $_ if $_ ne $uid;	
+	}
+	push @users, $uid if $active;
+	$ga->{new} = join_list sort @users;
+	set_group_changed(1) if $ga->{new} ne $ga->{old};
+	$ga->{entry}->set_text($ga->{new});
+}
+
+
+sub create_group_users_editor ($)
+{
+	my $ga = shift;
+	my $popup_btn = $ga->{popup};
+
+	my $res = ldap_search($srv, "(objectClass=person)", ['uid']);
+	my @users = $res->entries;
+	return if $#users < 0;
+
+	my $win = Gtk2::Window->new("toplevel");
+	$win->set_title('---');
+	my $vbox = Gtk2::VBox->new(0, 0);
+	$win->add($vbox);
+	my $scroll = Gtk2::ScrolledWindow->new;
+	$vbox->pack_start($scroll, 1, 1, 1);
+	$scroll->set_policy("automatic", "automatic");
+	my $list = new Gtk2::VBox(0, 0);
+	$scroll->add_with_viewport($list);
+
+	my %users0;
+	map { $users0{$_} = 1 } split_list $ga->{entry}->get_text;	
+
+	for my $uid (sort {$a cmp $b} map {$_->get_value('uid')} @users) {
+		my $btn = new Gtk2::ToggleButton($uid);
+		my $active = defined $users0{$uid};
+		set_button_image($btn, $active ? 'green.png' : 'empty.png');
+		$btn->set_active($active);
+		$btn->signal_connect(toggled => sub { group_user_toggled($btn, $ga); });
+		$list->pack_start($btn, 0, 0, 0);
+	}
+
+	my $buttons = create_button_bar(
+		[],
+		[ _T('Close'), "apply.png", sub { destroy_popup($win, $popup_btn) } ],
+	);
+
+	$vbox->pack_end($buttons, 0, 0, 2);
+	$win->set_default_size(200, 200);
+	$win->set_transient_for($main_win);
+	$win->set_position('center_on_parent');
+	# note: set_deletable is absent from Gtk+ 2.8 on Windows
+	#$win->set_deletable(0);
+	$win->set_modal(1);
+	$win->signal_connect(delete_event	=> sub { destroy_popup($win, $popup_btn) });
+	$win->signal_connect(destroy		=> sub { destroy_popup($win, $popup_btn) });
+	$popup_btn->set_sensitive(0);
+	$win->show_all;
+	set_window_icon($win, "popup.png");
 }
 
 
@@ -1774,12 +2079,14 @@ sub create_group_desc
 	$vbox->pack_start($bname, 0, 1, 4);
 
 	my $tabs = Gtk2::Notebook->new;
-	$group_attr_tabs = $tabs;
 	$tabs->set_tab_pos("top");
 	$frame = Gtk2::Frame->new(_T('Attributes'));
 	$frame->add($tabs);
 	$group_attr_frame = $frame;
 	$vbox->pack_start($frame, 1, 1, 0);
+
+	my $go = $group_obj;
+	$go->{a} = {};
 
 	for (@group_gui_attrs) {
 		my ($tab_name, @tab_attrs) = @$_;
@@ -1791,28 +2098,42 @@ sub create_group_desc
 		my $abox = Gtk2::Table->new($#tab_attrs + 1, 3);
 		$scroll->add_with_viewport($abox);
 
-		for my $row (0 .. $#tab_attrs) {
-			my $gui_attr = $tab_attrs[$row];
+		for my $r (0 .. $#tab_attrs) {
+			my $gui_attr = $tab_attrs[$r];
 			my ($type, $attr, $text) = @$gui_attr;
 			my $label = Gtk2::Label->new($text);
 			$label->set_justify('left');
 			my $entry = Gtk2::Entry->new;
-			my $bulb = Gtk2::Image->new;
-			$abox->attach($label, 1, 2, $row, $row+1, [], [], 1, 1);
-			$abox->attach($entry, 2, 3, $row, $row+1, [ 'fill', 'expand' ], [], 1, 1);
-			$group_attrs->{$attr} = $entry->{user_attr} = {
+
+			my $ga = {
+				parent => $go,
+				visual => 1,
 				type => $type,
 				attr => $attr,
 				entry => $entry,
 			};
+			$go->{a}->{$attr} = $entry->{friend} = $ga;
+
+			$abox->attach($label, 0, 1, $r, $r+1, [], [], 1, 1);
+			my $right = 3;
+			if ($type eq 'U') {
+				my $popup_btn = create_button(undef, 'popup.png');
+				$ga->{popup} = $popup_btn;
+				$popup_btn->signal_connect(clicked =>
+								sub { create_group_users_editor($ga); });
+				$popup_btn->set_relief('none');
+				$abox->attach($popup_btn, 2, 3, $r, $r+1, [], [], 1, 1);
+				$right = 2;
+			}
+			$abox->attach($entry, 1, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
 			$entry->signal_connect(key_release_event => \&group_entry_attr_changed)
 		}
 	}
 
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Save'), "apply.png", \&group_save, \$btn_group_apply ],
-		[ _T('Revert'), "revert.png", \&group_revert,\$btn_group_revert ],
+		[ _T('Save'), "apply.png", \&group_save, \$btn_grp_apply ],
+		[ _T('Revert'), "revert.png", \&group_revert,\$btn_grp_revert ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
 
@@ -1854,10 +2175,10 @@ sub create_group_list
 
 sub gui_exit
 {
-	if ($user_changed || $group_changed) {
+	if ($user_obj->{changed} || $group_obj->{changed}) {
 		my $resp = message_box('question', 'yes-no', _T('Exit and loose changes ?'));
 		return 1 if $resp ne 'yes';
-		$user_changed = $group_changed = 0;
+		$user_obj->{changed} = $group_obj->{changed} = 0;
 	}
 	user_unselect();
 	group_unselect();
@@ -1894,9 +2215,9 @@ sub gui_main
 	$hpane->add1(create_user_list());
 	$hpane->add2(create_user_desc());
 	my $buttons = create_button_bar (
-		[ _T('Create'), "add.png", \&user_add, \$btn_user_add ],
-		[ _T('Delete'), "delete.png", \&user_delete, \$btn_user_delete ],
-		[ _T('Refresh'), "refresh.png", \&users_refresh, \$btn_users_refresh ],
+		[ _T('Create'), "add.png", \&user_add, \$btn_usr_add ],
+		[ _T('Delete'), "delete.png", \&user_delete, \$btn_usr_delete ],
+		[ _T('Refresh'), "refresh.png", \&users_refresh, \$btn_usr_refresh ],
 		[],
 		[ _T('Exit'), "exit.png", \&gui_exit ],
 	);
@@ -1909,9 +2230,9 @@ sub gui_main
 	$hpane->add1(create_group_list());
 	$hpane->add2(create_group_desc());
 	$buttons = create_button_bar (
-		[ _T('Create'), "add.png", \&group_add, \$btn_group_add ],
-		[ _T('Delete'), "delete.png", \&group_delete, \$btn_group_delete ],
-		[ _T('Refresh'), "refresh.png", \&groups_refresh, \$btn_groups_refresh ],
+		[ _T('Create'), "add.png", \&group_add, \$btn_grp_add ],
+		[ _T('Delete'), "delete.png", \&group_delete, \$btn_grp_delete ],
+		[ _T('Refresh'), "refresh.png", \&groups_refresh, \$btn_grp_refresh ],
 		[],
 		[ _T('Exit'), "exit.png", \&gui_exit ],
 	);
@@ -1928,12 +2249,12 @@ sub gui_main
 
 	$main_win->set_default_size(900, 600);
 	$main_win->show_all;
-	$main_win->window->set_icon(undef,
-				create_pic("tree.png")->render_pixmap_and_mask(1));
+	set_window_icon($main_win, "tree.png");
 
 	Gtk2->main;
 
 	disconnect_all();
 }
+
 
 gui_main();
