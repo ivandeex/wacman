@@ -38,6 +38,7 @@ sub _T
 {
 	my ($fmt, @args) = @_;
 	$fmt = $translations{$fmt} if defined $translations{$fmt};
+	cluck "in";
 	my $ret = sprintf($fmt, @args);
 	return $ret;
 }
@@ -757,21 +758,19 @@ sub set_attr ($$$)
 
 	if (defined($obj->{a}) && defined($obj->{a}->{$attr})) {
 		my $a = $obj->{a}->{$attr};
-		$a->{new} = $val;
-		log_info('(%s): [%s] := (%s)', $sdn, $attr, $val)
-			if $a->{old} ne $a->{new};
+		$a->{val} = $val;
+		log_debug('(%s): [%s] := (%s)', $sdn, $attr, $val)
+			if $a->{orig} ne $a->{val};
 	} else {
 		my $a = {
 			parent => $obj,
 			attr => $attr,
 			visual => 0,
-			old => '',
-			cur => '',
-			new => $val,
-			usr => $val,
 		};
+		$a->{orig} = $a->{cur} = '';
+		$a->{val} = $a->{usr} = $val;
 		$obj->{a}->{$attr} = $a;
-		log_info('(%s): [%s] += (%s)', $sdn, $attr, $val)
+		log_debug('(%s): [%s] += (%s)', $sdn, $attr, $val)
 	}
 }
 
@@ -780,7 +779,7 @@ sub cond_set ($$$)
 {
 	my ($obj, $attr, $val) = @_;
 	my $has = has_attr($obj, $attr);
-	set_attr($obj,$attr,$val) unless $has;
+	set_attr($obj, $attr, $val) unless $has;
 	return $has;
 }
 
@@ -833,127 +832,125 @@ sub rework_accounts
 sub rework_unix_account
 {
 	my $id = shift;
-	my $uo = {};
+	my $usr = {};
 	my $res = ldap_search($srv, "(&(objectClass=person)(uid=$id))");
 	if ($res->code) {
 		message_box('error', 'close', _T('User "%s" not found: %s',$id,$res->error));
 		return undef;
 	}
-	$uo->{ldap} = $res->pop_entry;
-	unless (defined $uo->{ldap}) {
+	$usr->{ldap} = $res->pop_entry;
+	unless (defined $usr->{ldap}) {
 		message_box('error', 'close', _T('User "%s" not found',$id));
 		return undef;
 	}
-	$uo->{changed} = 0;
+	$usr->{changed} = 0;
 
-	$uo->{dn} = $uo->{ldap}->dn;
-	for my $attr ($uo->{ldap}->attributes(nooptions => 1)) {
+	$usr->{dn} = $usr->{ldap}->dn;
+	my $a;
+	for my $attr ($usr->{ldap}->attributes(nooptions => 1)) {
 		my $type = 's';
-		my $val = get_ldap_attr($uo, $attr);
-		my $a = {
-			parent => $uo,
+		my $val = get_ldap_attr($usr, $attr);
+		$a = {
+			parent => $usr,
 			visual => 0,
 			type => $type,
 			attr => $attr,
 		};
-		$a->{new} = $a->{cur} = $a->{old} = $a->{usr} = $val;
+		$a->{val} = $a->{cur} = $a->{orig} = $a->{usr} = $val;
 		$a->{state} = $val eq '' ? 'empty' : 'orig';
-		$uo->{a}->{$attr} = $a;
+		$usr->{a}->{$attr} = $a;
 	}
 
-	rework_unix_account_entry($uo);
+	rework_unix_account_entry($usr);
 
-	for my $a (values %{$uo->{a}}) {
-		$a->{cur} = $a->{new} if $a->{attr} !~ /telephone/;
-		$uo->{changed} = 1 if $a->{cur} ne $a->{old};
+	for $a (values %{$usr->{a}}) {
+		$a->{cur} = $a->{val};
+		find_nulls($a);
+		$usr->{changed} = 1 if $a->{cur} ne $a->{orig};
 	}
 
-	if ($uo->{changed}) {
-		$uo->{dn} = unix_user_dn($uo) unless $uo->{dn};
-		for my $a (values %{$uo->{a}}) { set_ldap_attr($uo, $a, $a->{cur}); }
-		$uo->{ldap}->dn($uo->{dn});
-		$res = ldap_update($srv, $uo->{ldap});
-		log_info('error updating user "%s": %s', get_attr($uo, 'uid'), $res->error)
+	if ($usr->{changed}) {
+		$usr->{dn} = unix_user_dn($usr) unless $usr->{dn};
+		for $a (values %{$usr->{a}}) { set_ldap_attr($usr, $a, $a->{cur}); }
+		$usr->{ldap}->dn($usr->{dn});
+		$res = ldap_update($srv, $usr->{ldap});
+		log_info('error updating user "%s": %s', get_attr($usr, 'uid'), $res->error)
 			if $res->code;
 	}
 
-	return $uo;
+	return $usr;
 }
 
 
 sub rework_unix_account_entry ($)
 {
-	my $uo = shift;
+	my $usr = shift;
 
 	# read all scalar attributes
-	my $uid = get_attr($uo, 'uid');
-	my $cn = get_attr($uo, 'cn');
-	my $gn = get_attr($uo, 'givenName');
-	my $sn = get_attr($uo, 'sn');
+	my $uid = get_attr($usr, 'uid');
+	my $cn = get_attr($usr, 'cn');
+	my $gn = get_attr($usr, 'givenName');
+	my $sn = get_attr($usr, 'sn');
 
-	# names
-	unless (has_attr($uo, 'cn')) {
-		my $bl = $sn && $gn ? ' ' : '';
-		$cn = "$gn$bl$sn";
-		cond_set($uo, 'cn', $cn);
-	}
+	# name
+	cond_set($usr, 'cn', $cn = $gn . ($sn && $gn ? ' ' : '') . $sn)
+		unless has_attr($usr, 'cn');
 
-	# user id
-	unless (has_attr($uo, 'uid')) {
-		$uid = string2id($sn eq '' ? $gn : substr($gn, 0, 1) . $sn);
-	}
-	$uid = string2id($uid);
-	set_attr($uo, 'uid', $uid);
+	# identifier
+	$uid = $sn eq '' ? $gn : substr($gn, 0, 1) . $sn
+		unless has_attr($usr, 'uid');
+	set_attr($usr, 'uid', $uid = string2id($uid));
 
 	# dn
-	if (nvl($uo->{dn}) eq '') {
-		$uo->{dn} = unix_user_dn($uo);
-	}
+	$usr->{dn} = unix_user_dn($usr)
+		if nvl($usr->{dn}) eq '';
 
 	# add the required classes (works directly on ldap entry !)
 	my %classes;
-	for ($uo->{ldap}->get_value('objectClass')) {
+	for ($usr->{ldap}->get_value('objectClass')) {
 		$classes{lc} = 1;
 	}
 	for my $cl (@{$config{unix_user_classes}}) {
 		next if defined $classes{lc($cl)};
-		$uo->{ldap}->add(objectClass => $cl);
-		$uo->{changed} = 1;
+		$usr->{ldap}->add(objectClass => $cl);
+		$usr->{changed} = 1;
 	}
 
 	# assign next available UID number
 	my $uidn;
-	if (has_attr($uo, 'uidNumber')) {
-		$uidn = get_attr($uo, 'uidNumber');
+	if (has_attr($usr, 'uidNumber')) {
+		$uidn = get_attr($usr, 'uidNumber');
 		$uidn =~ tr/0123456789//cd;
 	} else {
 		$uidn = next_unix_uidn();
 	}
-	set_attr($uo, 'uidNumber', $uidn);
+	set_attr($usr, 'uidNumber', $uidn);
 
 	# mail
-	cond_set($uo, 'mail', ifnull($uid, $uid.'@'.$config{unix_domain}));
+	cond_set($usr, 'mail', ifnull($uid, $uid.'@'.$config{unix_domain}));
 
 	# home directory
-	cond_set($uo, 'homeDirectory', ifnull($uid, "/home/$uid"));
+	cond_set($usr, 'homeDirectory', ifnull($uid, "/home/$uid"));
 
 	# constant fields
+	find_nulls($usr->{a}->{uid});
 	for my $attr (keys %unix_fields_const) {
-		cond_set($uo, $attr, $unix_fields_const{$attr});
+		cond_set($usr, $attr, $unix_fields_const{$attr});
 	}
+	find_nulls($usr->{a}->{telephoneNumber});
 
 	# fields for NT
 	my %path_subst = (
 		'SERVER'	=>	$config{home_server},
 		'USER'		=>	$uid,
 	);
-	cond_set($uo, 'ntUserHomeDir',
+	cond_set($usr, 'ntUserHomeDir',
 			ifnull($uid, subst_path($config{ad_home_dir}, %path_subst)));
-	cond_set($uo, 'ntUserProfile',
+	cond_set($usr, 'ntUserProfile',
 			ifnull($uid, subst_path($config{ad_profile_path}, %path_subst)));
-	cond_set($uo, 'ntUserScriptPath',
+	cond_set($usr, 'ntUserScriptPath',
 			ifnull($uid, subst_path($config{ad_script_path}, %path_subst)));
-	cond_set($uo, 'ntUserDomainId', $uid);
+	cond_set($usr, 'ntUserDomainId', $uid);
 }
 
 
@@ -1020,7 +1017,7 @@ sub rework_windows_account ($)
 			};
 			$wo->{a}->{$attr} = $wa;
 			my $val = get_ldap_attr($wo, $attr);
-			$wa->{new} = $wa->{cur} = $wa->{old} = $wa->{usr} = $val;
+			$wa->{val} = $wa->{cur} = $wa->{orig} = $wa->{usr} = $val;
 			$wa->{state} = $val eq '' ? 'empty' : 'orig';
 		}
 		$wo->{dn} = $uo->{ldap}->dn;
@@ -1072,8 +1069,8 @@ sub rework_windows_account ($)
 
 	# update on server
 	for my $wa (values %{$wo->{a}}) {
-		$wa->{cur} = $wa->{new};
-		$wo->{changed} = 1 if $wa->{cur} ne $wa->{old};
+		$wa->{cur} = $wa->{val};
+		$wo->{changed} = 1 if $wa->{cur} ne $wa->{orig};
 	}
 	if ($wo->{changed}) {
 		$wo->{dn} = windows_user_dn($uo) unless $wo->{dn};
@@ -1131,17 +1128,17 @@ sub rework_unix_group ($)
 {
 	my $go = shift;
 
-	$go->{a}->{cn}->{new} = string2id($go->{a}->{cn}->{cur});
+	$go->{a}->{cn}->{val} = string2id($go->{a}->{cn}->{cur});
 
 	my $gn0 = nvl($go->{a}->{gidNumber}->{cur});
 	my $gn = $gn0;
 	$gn = next_unix_gidn() unless $gn;
 	$gn =~ tr/0123456789//cd;
-	$go->{a}->{gidNumber}->{new} = $gn;
+	$go->{a}->{gidNumber}->{val} = $gn;
 
 	my $dn = $config{unix_group_dn};
 	for my $ga (values %{$go->{a}}) {
-		$dn =~ s/\[$ga->{attr}\]/$ga->{new}/g;
+		$dn =~ s/\[$ga->{attr}\]/$ga->{val}/g;
 		last if $dn !~ /\[\w+\]/;
 	}
 	$go->{dn} = $dn;
@@ -1238,6 +1235,17 @@ sub disconnect_all
 # ======== user gui =========
 
 
+sub find_nulls ($)
+{
+	my $a = shift;
+	my $attr = $a->{attr};
+	cluck "undefined val on $attr" unless defined $a->{val};
+	cluck "undefined cur on $attr" unless defined $a->{cur};
+	cluck "undefined usr on $attr" unless defined $a->{usr};
+	cluck "undefined orig on $attr" unless defined $a->{orig};
+}
+
+
 sub is_new_user ($)
 {
 	my $node = shift;
@@ -1254,20 +1262,20 @@ sub user_save
 {
 	my ($path, $column) = $user_list->get_cursor;
 	return unless defined $path;
-	my $uo = $user_obj;
-	return unless $uo->{changed};
+	my $usr = $user_obj;
+	return unless $usr->{changed};
 
 	my $model = $user_list->get_model;
 	my $node = $model->get_iter($path);
-	my $uid = $user_obj->{uid}->{cur};
-	my $cn = $user_obj->{cn}->{cur};
+	my $uid = get_attr($usr, 'uid');
+	my $cn = get_attr($usr, 'cn');
 	$model->set($node, 0, $uid, 1, $cn);
 
-	$uo->{dn} = unix_user_dn($uo) unless $uo->{dn};
-	for my $ua (values %{$uo->{a}}) { set_ldap_attr($uo, $ua, $ua->{cur}); }
-	$uo->{ldap}->dn($uo->{dn});
+	$usr->{dn} = unix_user_dn($usr) unless $usr->{dn};
+	for my $a (values %{$usr->{a}}) { set_ldap_attr($usr, $a, $a->{cur}); }
+	$usr->{ldap}->dn($usr->{dn});
 
-	my $res = ldap_update($srv, $uo->{ldap});
+	my $res = ldap_update($srv, $usr->{ldap});
 	if ($res->code) {
 		message_box('error', 'close',
 				_T('Error saving user "%s": %s', $uid, $res->error));
@@ -1431,13 +1439,12 @@ sub user_select
 	my $cn = $model->get($node, 1);
 	return unless defined $uid;
 
-	my $uo = $user_obj;
+	my $usr = $user_obj;
+	my $a;
 
 	if (is_new_user($node)) {
-		$uo->{ldap} = Net::LDAP::Entry->new;
-		for my $ua (values %{$uo->{a}}) {
-			set_ldap_attr($uo, $ua, '');
-		}
+		$usr->{ldap} = Net::LDAP::Entry->new;
+		for $a (values %{$usr->{a}}) { set_ldap_attr($usr, $a, ''); }
 	} else {
 		my $res = ldap_search($srv, "(&(objectClass=person)(uid=$uid))");
 		if ($res->code || scalar($res->entries) == 0) {
@@ -1446,18 +1453,19 @@ sub user_select
 			message_box('error', 'close', $msg);
 			return;
 		}
-		$uo->{ldap} = $res->pop_entry;
+		$usr->{ldap} = $res->pop_entry;
 	}
 
-	for my $ua (values %{$uo->{a}}) {
-		my $val = get_ldap_attr($uo, $ua->{attr});
-		$ua->{entry}->set_text($val);
-		$ua->{entry}->set_editable(1);
-		$ua->{new} = $ua->{cur} = $ua->{old} = $ua->{usr} = $val;
-		$ua->{state} = $val eq '' ? 'empty' : 'orig'; 
-		my $pic =  $state2pic{$ua->{state}};
+	for $a (values %{$usr->{a}}) {
+		next unless $a->{visual};
+		my $val = get_ldap_attr($usr, $a->{attr});
+		$a->{entry}->set_text($val);
+		$a->{entry}->set_editable(1);
+		$a->{val} = $a->{cur} = $a->{orig} = $a->{usr} = $val;
+		$a->{state} = $val eq '' ? 'empty' : 'orig'; 
+		my $pic =  $state2pic{$a->{state}};
 		$pic = 'empty.png' unless defined $pic;
-		$ua->{bulb}->set_from_pixbuf(create_pic($pic));
+		$a->{bulb}->set_from_pixbuf(create_pic($pic));
 	}
 
 	$user_name->set_text("$uid ($cn)");
@@ -1470,57 +1478,66 @@ sub user_select
 sub user_entry_attr_changed
 {
 	my $entry1 = shift;
-	my $ua1 = $entry1->{friend};
-	return unless $ua1;
-	my $uo = $ua1->{parent};
-	return unless $uo;
+	my $a1 = $entry1->{friend};
+	return unless $a1;
+	my $usr = $a1->{parent};
+	return unless $usr;
 
-	$ua1->{new} = $ua1->{usr} = nvl($ua1->{entry}->get_text);
-	return if $ua1->{cur} eq $ua1->{new};
-	$ua1->{state} = 'user';
+	$a1->{val} = $a1->{usr} = nvl($a1->{entry}->get_text);
+	return if $a1->{cur} eq $a1->{val};
 
 	# calculate calculatable fields
-	for my $ua (values %{$uo->{a}}) { $ua->{prev_state} = $ua->{state}; }
-	rework_unix_account_entry($uo);
+	my $a;
+	for $a (values %{$usr->{a}}) {
+		$a->{prev_state} = $a->{state};
+		$a->{prev} = $a->{cur};
+		$a->{cur} = $a->{val};
+	}
+	my $chg = $usr->{changed};
+	$a1->{state} = 'user';
+	rework_unix_account_entry($usr);
+	$usr->{changed} = $chg;
 
 	# analyze results
-	my $chg = 0;
-	for my $ua (values %{$uo->{a}}) {
-		my $val = nvl($ua->{new});
-		my $state = $ua->{state};
+	$chg = 0;
+	for $a (values %{$usr->{a}}) {
+		next unless $a->{visual};
+		my $val = nvl($a->{val});
+		$a->{cur} = $val;
+		my $state;
 		if ($val eq '') {
 			$state = 'empty';
-		} elsif ($val eq $ua->{old}) {
+		} elsif ($val eq $a->{orig}) {
 			$state = 'orig';
-		} elsif ($val eq $ua->{cur}) {
-			$state = $ua->{prev_state};
-		} elsif ($val eq $ua->{usr}) {
+		} elsif ($val eq $a->{prev}) {
+			$state = $a->{prev_state};
+		} elsif ($val eq $a->{usr}) {
 			$state = 'user';
 		} else {
 			$state = 'calc';
 		}
-		$ua->{cur} = $val;
-		if ($val ne $ua->{new}) {
-			my $entry = $ua->{entry};
+		$a->{state} = $state;
+		if ($val ne $a->{usr}) {
+			my $entry = $a->{entry};
 			my $pos = $entry->get_position;
 			$entry->set_text($val);
 			$entry->set_position($pos);
 		}
-		$ua->{state} = $state;
-		$chg = 1 if $val ne $ua->{old};
+		$chg = 1 if $val ne $a->{orig};
 	}
 
 	# refresh bulbs
-	for my $ua (values %{$uo->{a}}) {
-		next if $ua->{state} eq $ua->{old_state};
-		my $pic =  $state2pic{$ua->{state}};
+	for $a (values %{$usr->{a}}) {
+		next unless $a->{visual};
+		next if $a->{state} eq $a->{prev_state};
+		my $pic =  $state2pic{$a->{state}};
 		$pic = 'empty.png' unless defined $pic;
-		$ua->{bulb}->set_from_pixbuf(create_pic($pic));			
+		$a->{bulb}->set_from_pixbuf(create_pic($pic));			
 	}
 
 	# refresh top label
-	my $uid = nvl($uo->{a}->{uid}->{cur});
-	my $cn = nvl($uo->{a}->{cn}->{cur});
+	my $uid = get_attr($usr, 'uid');
+	my $cn = get_attr($usr, 'cn');
 	my $new_name = "$uid ($cn)";
 	$user_name->set_text($new_name) if $user_name->get_text ne $new_name;
 
@@ -1532,9 +1549,9 @@ sub user_entry_attr_changed
 sub set_user_changed
 {
 	my $chg = shift;
-	my $uo = $user_obj;
-	return if $chg == $uo->{changed};
-	$uo->{changed} = $chg;
+	my $usr = $user_obj;
+	return if $chg == $usr->{changed};
+	$usr->{changed} = $chg;
 	$btn_usr_apply->set_sensitive($chg);
 	$btn_usr_revert->set_sensitive($chg);
 	$btn_usr_refresh->set_sensitive(!$chg);
@@ -1546,20 +1563,20 @@ sub set_user_changed
 
 sub user_group_toggled ($$)
 {
-	my ($btn, $ua) = @_;
+	my ($btn, $a) = @_;
 	my $uid = $btn->get_label;
 	my $active = $btn->get_active;
 	set_button_image($btn, $active ? 'green.png' : 'empty.png');
 
 	my @groups;
-	for (split_list $ua->{entry}->get_text) {
+	for (split_list $a->{entry}->get_text) {
 		next unless $_;
 		push @groups, $_ if $_ ne $uid;	
 	}
 	push @groups, $uid if $active;
-	$ua->{cur} = join_list sort @groups;
-	set_user_changed(1) if $ua->{cur} ne $ua->{old};
-	$ua->{entry}->set_text($ua->{cur});
+	$a->{cur} = join_list sort @groups;
+	set_user_changed(1) if $a->{cur} ne $a->{orig};
+	$a->{entry}->set_text($a->{cur});
 }
 
 
@@ -1583,7 +1600,7 @@ sub create_user_groups_editor ($)
 	$scroll->add_with_viewport($list);
 
 	my %groups0;
-	map { $groups0{$_} = 1 } split_list $ua->{entry}->get_text;	
+	map { $groups0{$_} = 1 } split_list $a->{entry}->get_text;	
 
 	for my $gid (sort {$a cmp $b} map {$_->get_value('cn')} @groups) {
 		my $btn = new Gtk2::ToggleButton($gid);
@@ -1632,8 +1649,8 @@ sub create_user_desc
 	$user_attr_frame = $frame;
 	$vbox->pack_start($frame, 1, 1, 0);
 
-	my $uo = $user_obj;
-	$uo->{a} = {};
+	my $usr = $user_obj;
+	$usr->{a} = {};
 
 	for (@user_gui_attrs) {
 		my ($tab_name, @tab_attrs) = @$_;
@@ -1652,23 +1669,23 @@ sub create_user_desc
 			$label->set_justify('left');
 			my $entry = Gtk2::Entry->new;
 			my $bulb = Gtk2::Image->new;
-			my $ua = {
-				parent => $uo,
+			my $a = {
+				parent => $usr,
 				visual => 1,
 				type => $type,
 				attr => $attr,
 				entry => $entry,
 				bulb => $bulb,
 			};
-			$uo->{a}->{$attr} = $entry->{friend} = $ua;
+			$usr->{a}->{$attr} = $entry->{friend} = $a;
 			$abox->attach($bulb, 0, 1, $r, $r+1, [], [], 1, 1);
 			$abox->attach($label, 1, 2, $r, $r+1, [], [], 1, 1);
 			my $right = 4;
 			if ($type eq 'G') {
 				my $popup_btn = create_button(undef, 'popup.png');
-				$ua->{popup} = $popup_btn;
+				$a->{popup} = $popup_btn;
 				$popup_btn->signal_connect(clicked =>
-								sub { create_user_groups_editor($ua); });
+								sub { create_user_groups_editor($a); });
 				$popup_btn->set_relief('none');
 				$abox->attach($popup_btn, 3, 4, $r, $r+1, [], [], 1, 1);
 				$right = 3;
@@ -1942,7 +1959,7 @@ sub group_select
 
 	for my $ga (values %{$go->{a}}) {
 		my $val = get_ldap_attr($go, $ga->{attr});
-		$ga->{new} = $ga->{cur} = $ga->{old} = $ga->{usr} = $val;
+		$ga->{val} = $ga->{cur} = $ga->{orig} = $ga->{usr} = $val;
 		$ga->{entry}->set_text($val);
 		$ga->{entry}->set_editable(1);
 	}
@@ -1961,20 +1978,20 @@ sub group_entry_attr_changed
 	my $go = $ga1->{parent};
 	return unless $go;
 
-	$ga1->{new} = $ga1->{usr} = nvl($ga1->{entry}->get_text);
-	return if $ga1->{cur} eq $ga1->{new};
-	$ga1->{cur} = $ga1->{new};
+	$ga1->{val} = $ga1->{usr} = nvl($ga1->{entry}->get_text);
+	return if $ga1->{cur} eq $ga1->{val};
+	$ga1->{cur} = $ga1->{val};
 
 	rework_unix_group($go);
 
 	my $chg = 0;
 	for my $ga (values %{$go->{a}}) {
-		$chg = 1 if $ga->{new} ne $ga->{old};
-		next if $ga->{new} eq $ga->{cur};
+		$chg = 1 if $ga->{val} ne $ga->{orig};
+		next if $ga->{val} eq $ga->{cur};
 		my $entry = $ga->{entry};
 		my $pos = $entry->get_position;
-		$ga->{cur} = $ga->{new};
-		$entry->set_text($ga->{new});
+		$ga->{cur} = $ga->{val};
+		$entry->set_text($ga->{val});
 		$entry->set_position($pos);
 	}
 
@@ -2011,9 +2028,9 @@ sub group_user_toggled ($$)
 		push @users, $_ if $_ ne $uid;	
 	}
 	push @users, $uid if $active;
-	$ga->{new} = join_list sort @users;
-	set_group_changed(1) if $ga->{new} ne $ga->{old};
-	$ga->{entry}->set_text($ga->{new});
+	$ga->{val} = join_list sort @users;
+	set_group_changed(1) if $ga->{val} ne $ga->{orig};
+	$ga->{entry}->set_text($ga->{val});
 }
 
 
