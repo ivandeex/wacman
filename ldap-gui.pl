@@ -1,4 +1,3 @@
-#!/usr/bin/perl
 # vi: set ts=4 sw=4 :
 
 use strict;
@@ -38,7 +37,6 @@ sub _T
 {
 	my ($fmt, @args) = @_;
 	$fmt = $translations{$fmt} if defined $translations{$fmt};
-	cluck "in";
 	my $ret = sprintf($fmt, @args);
 	return $ret;
 }
@@ -745,6 +743,7 @@ sub get_attr ($$)
 	my ($obj, $attr) = @_;
 	$obj->{a} = {} unless defined $obj->{a};
 	my $a = $obj->{a}->{$attr};
+	cluck "wow" if defined($a) && $a eq 'winadmin';
 	return defined($a) ? nvl($a->{cur}) : '';
 }
 
@@ -784,25 +783,30 @@ sub cond_set ($$$)
 }
 
 
-sub set_ldap_attr ($$$)
+sub set_ldap_attr ($)
 {
-	my ($uo, $attr, $val) = @_;
-	my $ldap = $uo->{ldap};
-	if (nvl($val) eq '') {
+	my $a = shift;
+	my ($ldap, $attr) = ($a->{parent}->{ldap}, $a->{attr});
+	my $val = defined($a->{cur}) ? nvl($a->{cur}) : '';
+	if ($val eq '') {
 		$ldap->delete($attr);
 	} elsif ($ldap->exists($attr)) {
 		$ldap->replace($attr => $val);
 	} else {
 		$ldap->add($attr => $val);
 	}
+	return $a;
 }
 
 
-sub get_ldap_attr ($$)
+sub get_ldap_attr ($)
 {
-	my ($uo, $attr) = @_;
-	my $ldap = $uo->{ldap};
-	return nvl($ldap->get_value($attr));
+	my $a = shift;
+	my $ldap = $a->{parent}->{ldap};
+	my $val = nvl($ldap->get_value($a->{attr}));
+	$a->{val} = $a->{cur} = $a->{orig} = $a->{usr} = $val;
+	$a->{state} = $val eq '' ? 'empty' : 'orig';
+	return $a;
 }
 
 
@@ -849,15 +853,13 @@ sub rework_unix_account
 	my $a;
 	for my $attr ($usr->{ldap}->attributes(nooptions => 1)) {
 		my $type = 's';
-		my $val = get_ldap_attr($usr, $attr);
 		$a = {
 			parent => $usr,
 			visual => 0,
 			type => $type,
 			attr => $attr,
 		};
-		$a->{val} = $a->{cur} = $a->{orig} = $a->{usr} = $val;
-		$a->{state} = $val eq '' ? 'empty' : 'orig';
+		get_ldap_attr($a);
 		$usr->{a}->{$attr} = $a;
 	}
 
@@ -865,13 +867,12 @@ sub rework_unix_account
 
 	for $a (values %{$usr->{a}}) {
 		$a->{cur} = $a->{val};
-		find_nulls($a);
 		$usr->{changed} = 1 if $a->{cur} ne $a->{orig};
 	}
 
 	if ($usr->{changed}) {
 		$usr->{dn} = unix_user_dn($usr) unless $usr->{dn};
-		for $a (values %{$usr->{a}}) { set_ldap_attr($usr, $a, $a->{cur}); }
+		for $a (values %{$usr->{a}}) { set_ldap_attr($a); }
 		$usr->{ldap}->dn($usr->{dn});
 		$res = ldap_update($srv, $usr->{ldap});
 		log_info('error updating user "%s": %s', get_attr($usr, 'uid'), $res->error)
@@ -933,11 +934,9 @@ sub rework_unix_account_entry ($)
 	cond_set($usr, 'homeDirectory', ifnull($uid, "/home/$uid"));
 
 	# constant fields
-	find_nulls($usr->{a}->{uid});
 	for my $attr (keys %unix_fields_const) {
 		cond_set($usr, $attr, $unix_fields_const{$attr});
 	}
-	find_nulls($usr->{a}->{telephoneNumber});
 
 	# fields for NT
 	my %path_subst = (
@@ -1009,16 +1008,14 @@ sub rework_windows_account ($)
 	if (defined($wo->{ldap})) {
 		for my $attr ($wo->{ldap}->attributes(nooptions => 1)) {
 			my $type = 's';
-			my $wa = {
+			my $a = {
 				parent => $wo,
 				visual => 0,
 				type => $type,
 				attr => $attr,
 			};
-			$wo->{a}->{$attr} = $wa;
-			my $val = get_ldap_attr($wo, $attr);
-			$wa->{val} = $wa->{cur} = $wa->{orig} = $wa->{usr} = $val;
-			$wa->{state} = $val eq '' ? 'empty' : 'orig';
+			get_ldap_attr($a);
+			$wo->{a}->{$attr} = $a;
 		}
 		$wo->{dn} = $uo->{ldap}->dn;
 	}
@@ -1068,13 +1065,14 @@ sub rework_windows_account ($)
 	#cond_set($wo, 'PrimaryGroupID', $primary_group_id);
 
 	# update on server
-	for my $wa (values %{$wo->{a}}) {
-		$wa->{cur} = $wa->{val};
-		$wo->{changed} = 1 if $wa->{cur} ne $wa->{orig};
+	my $a;
+	for $a (values %{$wo->{a}}) {
+		$a->{cur} = $a->{val};
+		$wo->{changed} = 1 if $a->{cur} ne $a->{orig};
 	}
 	if ($wo->{changed}) {
 		$wo->{dn} = windows_user_dn($uo) unless $wo->{dn};
-		for my $wa (values %{$wo->{a}}) { set_ldap_attr($wo, $wa, $wa->{cur}); }
+		for $a (values %{$wo->{a}}) { set_ldap_attr($a); }
 		$wo->{ldap}->dn($wo->{dn});
 		$res = ldap_update($win, $wo->{ldap});
 		if ($res->code) {
@@ -1235,17 +1233,6 @@ sub disconnect_all
 # ======== user gui =========
 
 
-sub find_nulls ($)
-{
-	my $a = shift;
-	my $attr = $a->{attr};
-	cluck "undefined val on $attr" unless defined $a->{val};
-	cluck "undefined cur on $attr" unless defined $a->{cur};
-	cluck "undefined usr on $attr" unless defined $a->{usr};
-	cluck "undefined orig on $attr" unless defined $a->{orig};
-}
-
-
 sub is_new_user ($)
 {
 	my $node = shift;
@@ -1272,7 +1259,7 @@ sub user_save
 	$model->set($node, 0, $uid, 1, $cn);
 
 	$usr->{dn} = unix_user_dn($usr) unless $usr->{dn};
-	for my $a (values %{$usr->{a}}) { set_ldap_attr($usr, $a, $a->{cur}); }
+	for my $a (values %{$usr->{a}}) { set_ldap_attr($a); }
 	$usr->{ldap}->dn($usr->{dn});
 
 	my $res = ldap_update($srv, $usr->{ldap});
@@ -1444,7 +1431,7 @@ sub user_select
 
 	if (is_new_user($node)) {
 		$usr->{ldap} = Net::LDAP::Entry->new;
-		for $a (values %{$usr->{a}}) { set_ldap_attr($usr, $a, ''); }
+		for $a (values %{$usr->{a}}) { $a->{cur} = ''; set_ldap_attr($a); }
 	} else {
 		my $res = ldap_search($srv, "(&(objectClass=person)(uid=$uid))");
 		if ($res->code || scalar($res->entries) == 0) {
@@ -1458,11 +1445,9 @@ sub user_select
 
 	for $a (values %{$usr->{a}}) {
 		next unless $a->{visual};
-		my $val = get_ldap_attr($usr, $a->{attr});
-		$a->{entry}->set_text($val);
+		get_ldap_attr($a);
+		$a->{entry}->set_text($a->{val});
 		$a->{entry}->set_editable(1);
-		$a->{val} = $a->{cur} = $a->{orig} = $a->{usr} = $val;
-		$a->{state} = $val eq '' ? 'empty' : 'orig'; 
 		my $pic =  $state2pic{$a->{state}};
 		$pic = 'empty.png' unless defined $pic;
 		$a->{bulb}->set_from_pixbuf(create_pic($pic));
@@ -1767,29 +1752,23 @@ sub group_save
 	my $gid = $group_obj->{cn}->{cur};
 	$model->set($node, 0, $gid);
 
-	my $go = $group_obj;
+	my $grp = $group_obj;
 
-	my $ga = $go->{a}->{description};
-	$ga->{cur} = $gid if nvl($ga->{cur}) eq '';
+	my $a = $grp->{a}->{description};
+	$a->{cur} = $gid if nvl($a->{cur}) eq '';
 
-	for $ga (values %{$go->{a}}) {
-		set_ldap_attr($go, $ga, $ga->{cur});
-	}
+	for $a (values %{$grp->{a}}) { set_ldap_attr($a); }
 
-	$go->{ldap}->dn($go->{dn}) if $go->{dn};
+	$grp->{ldap}->dn($grp->{dn}) if $grp->{dn};
 
 	# add the required classes
 	my (%classes);
-	for ($go->{ldap}->get_value('objectClass')) {
-		$classes{$_} = $classes{lc} = 1;
-	}
+	for ($grp->{ldap}->get_value('objectClass')) { $classes{lc} = 1; }
 	for my $cl (@{$config{unix_group_classes}}) {
-		if (!defined($classes{$cl}) && !defined($classes{lc($cl)})) {
-			$go->{ldap}->add(objectClass => $cl);
-		}
+		$grp->{ldap}->add(objectClass => $cl) unless defined $classes{lc($cl)};
 	}
 
-	my $res = ldap_update($srv, $go->{ldap});
+	my $res = ldap_update($srv, $grp->{ldap});
 	if ($res->code) {
 		message_box('error', 'close',
 			_T('Error saving group "%s": %s', $gid, $res->error));
@@ -1937,14 +1916,15 @@ sub group_select
 {
 	my ($path, $column) = $group_list->get_cursor;
 	return unless defined $path;
-	my $go = $group_obj;
+	my $grp = $group_obj;
 	my $model = $group_list->get_model;
 	my $node = $model->get_iter($path);
 	my $gid = $model->get($node, 0);
+	my $a;
 
 	if (is_new_group($node)) {
-		$go->{ldap} = Net::LDAP::Entry->new;
-		for my $ga (values %{$go->{a}}) { set_ldap_attr($go, $ga, ''); }
+		$grp->{ldap} = Net::LDAP::Entry->new;
+		for $a (values %{$grp->{a}}) { $a->{cur} = ''; set_ldap_attr($a); }
 	} else {
 		my $res = ldap_search($srv, "(&(objectClass=posixGroup)(cn=$gid))");
 		if ($res->code || scalar($res->entries) == 0) {
@@ -1953,15 +1933,14 @@ sub group_select
 			message_box('error', 'close', $msg);
 			return;
 		}
-		$go->{ldap} = $res->pop_entry;
-		$go->{dn} = $go->{ldap}->dn;
+		$grp->{ldap} = $res->pop_entry;
+		$grp->{dn} = $grp->{ldap}->dn;
 	}
 
-	for my $ga (values %{$go->{a}}) {
-		my $val = get_ldap_attr($go, $ga->{attr});
-		$ga->{val} = $ga->{cur} = $ga->{orig} = $ga->{usr} = $val;
-		$ga->{entry}->set_text($val);
-		$ga->{entry}->set_editable(1);
+	for $a (values %{$grp->{a}}) {
+		get_ldap_attr($a);
+		$a->{entry}->set_text($a->{val});
+		$a->{entry}->set_editable(1);
 	}
 
 	$group_name->set_text($gid);
