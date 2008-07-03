@@ -757,7 +757,15 @@ sub set_attr ($$$)
 
 	if (defined($obj->{a}) && defined($obj->{a}->{$attr})) {
 		my $a = $obj->{a}->{$attr};
-		$a->{val} = $val;
+		if ($attr eq 'objectClass') {
+			my ($c, %ca);
+			my @ca = split_list(nvl($a->{cur}));
+			for $c (@ca) { $ca{lc($c)} = 1 }
+			for $c (split_list($val)) { push(@ca, $c) unless $ca{lc($c)} } 
+			$a->{val} = join_list(sort(@ca));
+		} else {
+			$a->{val} = $val;
+		}
 		log_debug('(%s): [%s] := (%s)', $sdn, $attr, $val)
 			if $a->{orig} ne $a->{val};
 	} else {
@@ -766,7 +774,7 @@ sub set_attr ($$$)
 			attr => $attr,
 			visual => 0,
 		};
-		$a->{orig} = $a->{cur} = '';
+ 		$a->{orig} = $a->{cur} = '';
 		$a->{val} = $a->{usr} = $val;
 		$obj->{a}->{$attr} = $a;
 		log_debug('(%s): [%s] += (%s)', $sdn, $attr, $val)
@@ -788,14 +796,33 @@ sub set_ldap_attr ($)
 	my $a = shift;
 	my ($ldap, $attr) = ($a->{parent}->{ldap}, $a->{attr});
 	my $val = defined($a->{cur}) ? nvl($a->{cur}) : '';
+	my $changed = 0;
+	if ($attr eq 'objectClass') {
+		my ($c, %ca);
+		for $c ($ldap->get_value('objectClass')) { $ca{lc($c)} = 1 }
+		for $c (split_list $val) {
+			next if defined $ca{lc($c)};
+			$ldap->add(objectClass => $c);
+			$changed = 1;
+		}
+		return $changed;
+	}
+	# simple attributes
 	if ($val eq '') {
-		$ldap->delete($attr);
+		if ($ldap->exists($attr)) {
+			$ldap->delete($attr);
+			$changed = 1;
+		}
 	} elsif ($ldap->exists($attr)) {
-		$ldap->replace($attr => $val);
+		if ($ldap->get_value($attr) ne $val) {
+			$ldap->replace($attr => $val);
+			$changed = 1;
+		}
 	} else {
 		$ldap->add($attr => $val);
+		$changed = 1;
 	}
-	return $a;
+	return $changed;
 }
 
 
@@ -803,7 +830,13 @@ sub get_ldap_attr ($)
 {
 	my $a = shift;
 	my $ldap = $a->{parent}->{ldap};
-	my $val = nvl($ldap->get_value($a->{attr}));
+	my $attr = $a->{attr};
+	my $val;
+	if ($attr eq 'objectClass') {
+		$val = join_list(sort($ldap->get_value('objectClass')));
+	} else {
+		$val = nvl($ldap->get_value($a->{attr}));
+	}
 	$a->{val} = $a->{cur} = $a->{orig} = $a->{usr} = $val;
 	$a->{state} = $val eq '' ? 'empty' : 'orig';
 	return $a;
@@ -823,11 +856,10 @@ sub rework_accounts
 	}
 	for my $id (@ids) {
 		log_debug("massage id %s ...", $id);
-		my $uo = rework_unix_account($id);
-		if ($uo) {
-			rework_home_dir($uo) unless $config{nodirs};
-			# at this point we need to tell FDS to synchronize...
-			rework_windows_account($uo) unless $win->{cfg}->{disabled};
+		my $usr = rework_unix_account($id);
+		if ($usr) {
+			rework_home_dir($usr) unless $config{nodirs};
+			rework_windows_account($usr) unless $win->{cfg}->{disabled};
 		}
 	}
 }
@@ -851,7 +883,7 @@ sub rework_unix_account
 
 	$usr->{dn} = $usr->{ldap}->dn;
 	my $a;
-	for my $attr ($usr->{ldap}->attributes(nooptions => 1)) {
+	for my $attr ($usr->{ldap}->attributes(nooptions => 1), 'objectClass') {
 		my $type = 's';
 		$a = {
 			parent => $usr,
@@ -907,15 +939,7 @@ sub rework_unix_account_entry ($)
 		if nvl($usr->{dn}) eq '';
 
 	# add the required classes (works directly on ldap entry !)
-	my %classes;
-	for ($usr->{ldap}->get_value('objectClass')) {
-		$classes{lc} = 1;
-	}
-	for my $cl (@{$config{unix_user_classes}}) {
-		next if defined $classes{lc($cl)};
-		$usr->{ldap}->add(objectClass => $cl);
-		$usr->{changed} = 1;
-	}
+	set_attr($usr, 'objectClass', join(';',@{$config{unix_user_classes}}));
 
 	# assign next available UID number
 	my $uidn;
@@ -1444,8 +1468,8 @@ sub user_select
 	}
 
 	for $a (values %{$usr->{a}}) {
-		next unless $a->{visual};
 		get_ldap_attr($a);
+		next unless $a->{visual};
 		$a->{entry}->set_text($a->{val});
 		$a->{entry}->set_editable(1);
 		my $pic =  $state2pic{$a->{state}};
@@ -1636,6 +1660,7 @@ sub create_user_desc
 
 	my $usr = $user_obj;
 	$usr->{a} = {};
+	$usr->{a}->{objectClass} = { parent => $usr, visual => 0, attr => 'objectClass', };
 
 	for (@user_gui_attrs) {
 		my ($tab_name, @tab_attrs) = @$_;
@@ -1891,13 +1916,14 @@ sub group_unselect
 {
 	# exit if interface is not built complete
 	return unless defined $group_name;
-	my $go = $group_obj;
+	my $grp = $group_obj;
 
 	$group_name->set_text('');
 
-	for my $ga (values %{$go->{a}}) {
-		$ga->{entry}->set_text('');
-		$ga->{entry}->set_editable(0);
+	for my $a (values %{$grp->{a}}) {
+		next unless $a->{visual};
+		$a->{entry}->set_text('');
+		$a->{entry}->set_editable(0);
 	}
 
 	$btn_grp_apply->set_sensitive(0);
@@ -1905,8 +1931,8 @@ sub group_unselect
 	$btn_grp_delete->set_sensitive(0);
 	$group_attr_frame->set_sensitive(0);
 
-	undef $go->{ldap};
-	$go->{changed} = 0;
+	undef $grp->{ldap};
+	$grp->{changed} = 0;
 
 	return 0;
 }
@@ -1939,6 +1965,7 @@ sub group_select
 
 	for $a (values %{$grp->{a}}) {
 		get_ldap_attr($a);
+		next unless $a->{visual};
 		$a->{entry}->set_text($a->{val});
 		$a->{entry}->set_editable(1);
 	}
@@ -1952,29 +1979,30 @@ sub group_select
 sub group_entry_attr_changed
 {
 	my $entry1 = shift;
-	my $ga1 = $entry1->{friend};
-	return unless $ga1;
-	my $go = $ga1->{parent};
-	return unless $go;
+	my $a1 = $entry1->{friend};
+	return unless $a1;
+	my $grp = $a1->{parent};
+	return unless $grp;
 
-	$ga1->{val} = $ga1->{usr} = nvl($ga1->{entry}->get_text);
-	return if $ga1->{cur} eq $ga1->{val};
-	$ga1->{cur} = $ga1->{val};
+	$a1->{val} = $a1->{usr} = nvl($a1->{entry}->get_text);
+	return if $a1->{cur} eq $a1->{val};
+	$a1->{cur} = $a1->{val};
 
-	rework_unix_group($go);
+	rework_unix_group($grp);
 
 	my $chg = 0;
-	for my $ga (values %{$go->{a}}) {
-		$chg = 1 if $ga->{val} ne $ga->{orig};
-		next if $ga->{val} eq $ga->{cur};
-		my $entry = $ga->{entry};
+	for my $a (values %{$grp->{a}}) {
+		$chg = 1 if $a->{val} ne $a->{orig};
+		next if $a->{val} eq $a->{cur};
+		$a->{cur} = $a->{val};
+		next unless $a->{visual};
+		my $entry = $a->{entry};
 		my $pos = $entry->get_position;
-		$ga->{cur} = $ga->{val};
-		$entry->set_text($ga->{val});
+		$entry->set_text($a->{val});
 		$entry->set_position($pos);
 	}
 
-	$group_name->set_text(nvl($go->{a}->{cn}->{cur}));
+	$group_name->set_text(get_attr($grp, 'cn'));
 	set_group_changed($chg);
 }
 
@@ -1982,9 +2010,9 @@ sub group_entry_attr_changed
 sub set_group_changed
 {
 	my $chg = shift;
-	my $go = $group_obj;
-	return if $chg == $go->{changed};
-	$go->{changed} = $chg;
+	my $grp = $group_obj;
+	return if $chg == $grp->{changed};
+	$grp->{changed} = $chg;
 	$btn_grp_apply->set_sensitive($chg);
 	$btn_grp_revert->set_sensitive($chg);
 	$btn_grp_refresh->set_sensitive(!$chg);
@@ -2082,8 +2110,9 @@ sub create_group_desc
 	$group_attr_frame = $frame;
 	$vbox->pack_start($frame, 1, 1, 0);
 
-	my $go = $group_obj;
-	$go->{a} = {};
+	my $grp = $group_obj;
+	$grp->{a} = {};
+	$grp->{a}->{objectClass} = { parent => $grp, visual => 0, attr => 'objectClass', };
 
 	for (@group_gui_attrs) {
 		my ($tab_name, @tab_attrs) = @$_;
@@ -2102,22 +2131,22 @@ sub create_group_desc
 			$label->set_justify('left');
 			my $entry = Gtk2::Entry->new;
 
-			my $ga = {
-				parent => $go,
+			my $a = {
+				parent => $grp,
 				visual => 1,
 				type => $type,
 				attr => $attr,
 				entry => $entry,
 			};
-			$go->{a}->{$attr} = $entry->{friend} = $ga;
+			$grp->{a}->{$attr} = $entry->{friend} = $a;
 
 			$abox->attach($label, 0, 1, $r, $r+1, [], [], 1, 1);
 			my $right = 3;
 			if ($type eq 'U') {
 				my $popup_btn = create_button(undef, 'popup.png');
-				$ga->{popup} = $popup_btn;
+				$a->{popup} = $popup_btn;
 				$popup_btn->signal_connect(clicked =>
-								sub { create_group_users_editor($ga); });
+								sub { create_group_users_editor($a); });
 				$popup_btn->set_relief('none');
 				$abox->attach($popup_btn, 2, 3, $r, $r+1, [], [], 1, 1);
 				$right = 2;
