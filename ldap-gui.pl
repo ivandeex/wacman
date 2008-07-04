@@ -1148,22 +1148,24 @@ sub rework_home_dir ($)
 #       user massage routines shouls work the same way
 sub rework_unix_group ($)
 {
-	my $go = shift;
+	my $grp = shift;
 
-	$go->{a}->{cn}->{val} = string2id($go->{a}->{cn}->{cur});
+	set_attr($grp, 'objectClass', join_list(@{$config{unix_group_classes}}));
 
-	my $gn0 = nvl($go->{a}->{gidNumber}->{cur});
-	my $gn = $gn0;
-	$gn = next_unix_gidn() unless $gn;
-	$gn =~ tr/0123456789//cd;
-	$go->{a}->{gidNumber}->{val} = $gn;
+	my $a = get_attr($grp, 'cn');
+	set_attr($grp, 'cn', string2id($a));
+
+	$a = get_attr($grp, 'gidNumber');
+	$a = next_unix_gidn() unless $a;
+	$a =~ tr/0123456789//cd;
+	set_attr($grp, 'gidNumber', $a);
 
 	my $dn = $config{unix_group_dn};
-	for my $ga (values %{$go->{a}}) {
-		$dn =~ s/\[$ga->{attr}\]/$ga->{val}/g;
+	for $a (values %{$grp->{a}}) {
+		$dn =~ s/\[$a->{attr}\]/$a->{val}/g;
 		last if $dn !~ /\[\w+\]/;
 	}
-	$go->{dn} = $dn;
+	$grp->{dn} = $dn;
 }
 
 
@@ -1391,7 +1393,7 @@ sub users_refresh
 	for my $entry (@users) {
 		my $node = $model->append(undef);
 		for my $i (0 .. $#attrs) {
-			$model->set($node, $i, $entry->get_value($attrs[$i]));
+			$model->set($node, $i, nvl($entry->get_value($attrs[$i])));
 		}
 	}
 
@@ -1609,7 +1611,7 @@ sub create_user_groups_editor ($)
 	$scroll->add_with_viewport($list);
 
 	my %groups0;
-	map { $groups0{$_} = 1 } split_list $a->{entry}->get_text;	
+	map { $groups0{$_} = 1 } split_list $ua->{entry}->get_text;	
 
 	for my $gid (sort {$a cmp $b} map {$_->get_value('cn')} @groups) {
 		my $btn = new Gtk2::ToggleButton($gid);
@@ -1659,8 +1661,7 @@ sub create_user_desc
 	$vbox->pack_start($frame, 1, 1, 0);
 
 	my $usr = $user_obj;
-	$usr->{a} = {};
-	$usr->{a}->{objectClass} = { parent => $usr, visual => 0, attr => 'objectClass', };
+	set_attr($usr, 'objectClass', '');
 
 	for (@user_gui_attrs) {
 		my ($tab_name, @tab_attrs) = @$_;
@@ -1770,28 +1771,19 @@ sub group_save
 {
 	my ($path, $column) = $group_list->get_cursor;
 	return unless defined $path;
-	return unless $group_obj->{changed};
+	my $grp = $group_obj;
+	return unless $grp->{changed};
 
 	my $model = $group_list->get_model;
 	my $node = $model->get_iter($path);
-	my $gid = $group_obj->{cn}->{cur};
+	my $gid = get_attr($grp, 'cn');
 	$model->set($node, 0, $gid);
-
-	my $grp = $group_obj;
 
 	my $a = $grp->{a}->{description};
 	$a->{cur} = $gid if nvl($a->{cur}) eq '';
 
 	for $a (values %{$grp->{a}}) { set_ldap_attr($a); }
-
 	$grp->{ldap}->dn($grp->{dn}) if $grp->{dn};
-
-	# add the required classes
-	my (%classes);
-	for ($grp->{ldap}->get_value('objectClass')) { $classes{lc} = 1; }
-	for my $cl (@{$config{unix_group_classes}}) {
-		$grp->{ldap}->add(objectClass => $cl) unless defined $classes{lc($cl)};
-	}
 
 	my $res = ldap_update($srv, $grp->{ldap});
 	if ($res->code) {
@@ -1893,7 +1885,7 @@ sub groups_refresh
 
 	for my $entry (@groups) {
 		my $node = $model->append(undef);
-		$model->set($node, 0, $entry->get_value('cn'));
+		$model->set($node, 0, nvl($entry->get_value('cn')));
 	}
 
 	$btn_grp_add->set_sensitive(1) if defined $btn_grp_add;
@@ -2111,8 +2103,7 @@ sub create_group_desc
 	$vbox->pack_start($frame, 1, 1, 0);
 
 	my $grp = $group_obj;
-	$grp->{a} = {};
-	$grp->{a}->{objectClass} = { parent => $grp, visual => 0, attr => 'objectClass', };
+	set_attr($grp, 'objectClass', '');
 
 	for (@group_gui_attrs) {
 		my ($tab_name, @tab_attrs) = @$_;
