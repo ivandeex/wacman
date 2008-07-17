@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 # vi: set ts=4 sw=4 :
 
 use strict;
@@ -520,7 +521,16 @@ sub create_button
 {
 	my ($text, $pic, $action, $owner_box) = @_;
 	my $button = Gtk2::Button->new;
-	$button->set_label($text) if $text;
+	my $hbox = Gtk2::HBox->new;
+	$hbox->set_name('hbox');
+	$button->add($hbox);
+	my $image = Gtk2::Image->new;
+	$image->set_name('image');
+	$hbox->pack_start($image, 0, 0, 1);
+	my $label = Gtk2::Label->new;
+	$label->set_name('text');
+	$hbox->pack_end($label, 0, 0, 1);
+	$label->set_text($text) if $text;
 	set_button_image($button, $pic) if $pic;		
 	$button->signal_connect("clicked" => $action) if $action;
 	$owner_box->pack_start($button, 0, 0, 1) if $owner_box;
@@ -531,11 +541,19 @@ sub create_button
 sub set_button_image ($$)
 {
 	my ($button, $pic) = @_;
-	if ($pic) {
-		$button->set_image(Gtk2::Image->new_from_pixbuf(create_pic($pic)));
-	} else {
-		$button->set_image(undef);		
-	}		
+	$button->foreach(sub {
+		my $hb = shift;
+		return if $hb->get_name ne 'hbox';
+		$hb->foreach(sub {
+			my $im = shift;
+			return if $im->get_name ne 'image';
+			if ($pic) {
+				$im->set_from_pixbuf(create_pic($pic));
+			} else {
+				$im->clear;
+			}
+		});
+	});
 }
 
 
