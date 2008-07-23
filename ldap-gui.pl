@@ -16,7 +16,7 @@ use Net::LDAP::Entry;
 use FindBin qw[$Bin];
 use Cwd 'abs_path';
 
-my ($srv, $win, $pname, $main_win);
+my ($srv, $win, $pname, $main_wnd);
 
 my ($btn_usr_apply, $btn_usr_revert, $btn_usr_add, $btn_usr_delete, $btn_usr_refresh);
 my ($user_list, $user_attr_frame, $user_attr_tabs, $user_name);
@@ -585,7 +585,7 @@ sub create_button_bar
 sub message_box ($$$)
 {
 	my ($type, $buttons, $message) = @_;
-	my $dia = Gtk2::MessageDialog->new ($main_win, 'destroy-with-parent',
+	my $dia = Gtk2::MessageDialog->new ($main_wnd, 'destroy-with-parent',
 										$type, $buttons, $message);
 	my $ret = $dia->run;
 	$dia->destroy;
@@ -595,16 +595,16 @@ sub message_box ($$$)
 
 sub set_window_icon ($$)
 {
-	my ($win, $pic) = @_;
-	$win->window->set_icon(undef, create_pic($pic)->render_pixmap_and_mask(1));
+	my ($wnd, $pic) = @_;
+	$wnd->window->set_icon(undef, create_pic($pic)->render_pixmap_and_mask(1));
 }
 
 
 sub destroy_popup ($$)
 {
-	my ($win, $btn) = @_;
+	my ($wnd, $btn) = @_;
 	$btn->set_sensitive(1) if defined $btn;
-	$win->destroy;
+	$wnd->destroy;
 }
 
 
@@ -723,8 +723,9 @@ sub unix_user_dn ($)
 {
 	my $uo = shift;
 	my $dn = $config{unix_user_dn};
-	my $uid = $uo->{a}->{uid}->{cur};
-	my $cn = $uo->{a}->{uid}->{cur};
+	my $uid = get_attr($uo, 'uid');
+	return undef unless $uid;
+	my $cn = get_attr($uo, 'cn');
 	$dn =~ s/\[uid\]/$uid/g;
 	$dn =~ s/\[cn\]/$uid/g;
 	return $dn;
@@ -920,13 +921,17 @@ sub rework_unix_account
 		$usr->{changed} = 1 if $a->{cur} ne $a->{orig};
 	}
 
+	# dn
+	$usr->{dn} = unix_user_dn($usr)
+		if nvl($usr->{dn}) eq '';
+
 	if ($usr->{changed}) {
 		$usr->{dn} = unix_user_dn($usr) unless $usr->{dn};
 		for $a (values %{$usr->{a}}) { set_ldap_attr($a); }
 		$usr->{ldap}->dn($usr->{dn});
 		$res = ldap_update($srv, $usr->{ldap});
-		log_info('error updating user "%s": %s', get_attr($usr, 'uid'), $res->error)
-			if $res->code;
+		log_info('error updating user "%s" (%s): %s',
+				get_attr($usr, 'uid'), $usr->{ldap}->dn, $res->error) if $res->code;
 	}
 
 	return $usr;
@@ -951,10 +956,6 @@ sub rework_unix_account_entry ($)
 	$uid = $sn eq '' ? $gn : substr($gn, 0, 1) . $sn
 		unless has_attr($usr, 'uid');
 	set_attr($usr, 'uid', $uid = string2id($uid));
-
-	# dn
-	$usr->{dn} = unix_user_dn($usr)
-		if nvl($usr->{dn}) eq '';
 
 	# add the required classes (works directly on ldap entry !)
 	set_attr($usr, 'objectClass', join(';',@{$config{unix_user_classes}}));
@@ -1033,7 +1034,7 @@ sub windows_user_dn ($)
 
 sub rework_windows_account ($)
 {
-	my $uo = @_;
+	my $uo = shift;
 
 	my $uid = get_attr($uo, 'uid');
 	my $cn = get_attr($uo, 'cn');
@@ -1119,7 +1120,8 @@ sub rework_windows_account ($)
 		$res = ldap_update($win, $wo->{ldap});
 		if ($res->code) {
 			message_box('error', 'close',
-				_T('Error updating Windows-user "%s": %s', $cn, $res->error));
+				_T('Error updating Windows-user "%s" (%s): %s',
+				$cn, $wo->{ldap}->dn, $res->error));
 		}
 	}
 
@@ -1302,14 +1304,16 @@ sub user_save
 	my $cn = get_attr($usr, 'cn');
 	$model->set($node, 0, $uid, 1, $cn);
 
+	log_info("before dn=(%s)", $usr->{dn});
 	$usr->{dn} = unix_user_dn($usr) unless $usr->{dn};
+	log_info("after dn=(%s)", $usr->{dn});
 	for my $a (values %{$usr->{a}}) { set_ldap_attr($a); }
 	$usr->{ldap}->dn($usr->{dn});
 
 	my $res = ldap_update($srv, $usr->{ldap});
 	if ($res->code) {
 		message_box('error', 'close',
-				_T('Error saving user "%s": %s', $uid, $res->error));
+				_T('Error saving user "%s" (%s): %s', $uid, $usr->{ldap}->dn, $res->error));
 		return;
 	}
 
@@ -1361,6 +1365,7 @@ sub user_delete
 
 	my $node = $model->get_iter($path);
 	my $uid = $model->get($node, 0);
+	my $uo = $user_obj;
 
 	if (is_new_user($node)) {
 		my $resp = message_box('question', 'yes-no', _T('Cancel new user ?', $uid));
@@ -1369,16 +1374,19 @@ sub user_delete
 		my $resp = message_box('question', 'yes-no', _T('Delete user "%s" ?', $uid));
 		return if $resp ne 'yes';
 
-		my $res = ldap_delete($srv, $user_obj->{ldap});
+		my $res = ldap_delete($srv, $uo->{ldap});
 		if ($res->code) {
 			message_box('error', 'close',
 					_T('Error deleting Unix-user "%s": %s', $uid, $res->error));
 			return;
 		}
-		$res = ldap_delete($win, windows_user_dn($user_obj->{ldap}));
-		if ($res->code) {
-			message_box('error', 'close',
-				_T('Error deleting Windows-user "%s": %s', $uid, $res->error));
+		unless ($win->{cfg}->{disabled}) {
+			my $win_dn = windows_user_dn($uo);
+			$res = ldap_delete($win, $win_dn);
+			if ($res->code) {
+				message_box('error', 'close',
+					_T('Error deleting Windows-user "%s": %s', $uid, $res->error));
+			}
 		}
 	}
 
@@ -1618,10 +1626,10 @@ sub create_user_groups_editor ($)
 	my @groups = $res->entries;
 	return if $#groups < 0;
 
-	my $win = Gtk2::Window->new("toplevel");
-	$win->set_title('---');
+	my $wnd = Gtk2::Window->new("toplevel");
+	$wnd->set_title('---');
 	my $vbox = Gtk2::VBox->new(0, 0);
-	$win->add($vbox);
+	$wnd->add($vbox);
 	my $scroll = Gtk2::ScrolledWindow->new;
 	$vbox->pack_start($scroll, 1, 1, 1);
 	$scroll->set_policy("automatic", "automatic");
@@ -1642,20 +1650,20 @@ sub create_user_groups_editor ($)
 
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Close'), "apply.png", sub { destroy_popup($win, $popup_btn) } ],
+		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) } ],
 	);
 
 	$vbox->pack_end($buttons, 0, 0, 2);
-	$win->set_default_size(200, 200);
-	$win->set_transient_for($main_win);
-	$win->set_position('center_on_parent');
-	#$win->set_deletable(0); not available in GTK+ 2.8 on Windows
-	$win->set_modal(1);
-	$win->signal_connect(delete_event	=> sub { destroy_popup($win, $popup_btn) });
-	$win->signal_connect(destroy		=> sub { destroy_popup($win, $popup_btn) });
+	$wnd->set_default_size(200, 200);
+	$wnd->set_transient_for($main_wnd);
+	$wnd->set_position('center_on_parent');
+	#$wnd->set_deletable(0); not available in GTK+ 2.8 on Windows
+	$wnd->set_modal(1);
+	$wnd->signal_connect(delete_event	=> sub { destroy_popup($wnd, $popup_btn) });
+	$wnd->signal_connect(destroy		=> sub { destroy_popup($wnd, $popup_btn) });
 	$popup_btn->set_sensitive(0);
-	$win->show_all;
-	set_window_icon($win, "popup.png");
+	$wnd->show_all;
+	set_window_icon($wnd, "popup.png");
 }
 
 
@@ -2060,10 +2068,10 @@ sub create_group_users_editor ($)
 	my @users = $res->entries;
 	return if $#users < 0;
 
-	my $win = Gtk2::Window->new("toplevel");
-	$win->set_title('---');
+	my $wnd = Gtk2::Window->new("toplevel");
+	$wnd->set_title('---');
 	my $vbox = Gtk2::VBox->new(0, 0);
-	$win->add($vbox);
+	$wnd->add($vbox);
 	my $scroll = Gtk2::ScrolledWindow->new;
 	$vbox->pack_start($scroll, 1, 1, 1);
 	$scroll->set_policy("automatic", "automatic");
@@ -2084,21 +2092,21 @@ sub create_group_users_editor ($)
 
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Close'), "apply.png", sub { destroy_popup($win, $popup_btn) } ],
+		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) } ],
 	);
 
 	$vbox->pack_end($buttons, 0, 0, 2);
-	$win->set_default_size(200, 200);
-	$win->set_transient_for($main_win);
-	$win->set_position('center_on_parent');
+	$wnd->set_default_size(200, 200);
+	$wnd->set_transient_for($main_wnd);
+	$wnd->set_position('center_on_parent');
 	# note: set_deletable is absent from Gtk+ 2.8 on Windows
-	#$win->set_deletable(0);
-	$win->set_modal(1);
-	$win->signal_connect(delete_event	=> sub { destroy_popup($win, $popup_btn) });
-	$win->signal_connect(destroy		=> sub { destroy_popup($win, $popup_btn) });
+	#$wnd->set_deletable(0);
+	$wnd->set_modal(1);
+	$wnd->signal_connect(delete_event	=> sub { destroy_popup($wnd, $popup_btn) });
+	$wnd->signal_connect(destroy		=> sub { destroy_popup($wnd, $popup_btn) });
 	$popup_btn->set_sensitive(0);
-	$win->show_all;
-	set_window_icon($win, "popup.png");
+	$wnd->show_all;
+	set_window_icon($wnd, "popup.png");
 }
 
 
@@ -2239,7 +2247,7 @@ sub gui_main
 	Gtk2->init;
 	my $gtkrc;
 	Gtk2::Rc->parse($gtkrc) if defined $gtkrc;
-	$main_win = Gtk2::Window->new("toplevel");
+	$main_wnd = Gtk2::Window->new("toplevel");
 
 	my $tabs = Gtk2::Notebook->new;
 	$tabs->set_tab_pos("top");
@@ -2274,17 +2282,17 @@ sub gui_main
 	$vbox->pack_start($hpane, 1, 1, 1);
 	$vbox->pack_end($buttons, 0, 0, 1);
 
-	$main_win->add($tabs);
+	$main_wnd->add($tabs);
 	user_unselect();
 	group_unselect();
 
-	$main_win->signal_connect(delete_event	=> \&gui_exit);
-	$main_win->signal_connect(destroy		=> \&gui_exit);
-	$main_win->signal_connect(map	=> sub { users_refresh(); groups_refresh(); });
+	$main_wnd->signal_connect(delete_event	=> \&gui_exit);
+	$main_wnd->signal_connect(destroy		=> \&gui_exit);
+	$main_wnd->signal_connect(map	=> sub { users_refresh(); groups_refresh(); });
 
-	$main_win->set_default_size(900, 600);
-	$main_win->show_all;
-	set_window_icon($main_win, "tree.png");
+	$main_wnd->set_default_size(900, 600);
+	$main_wnd->show_all;
+	set_window_icon($main_wnd, "tree.png");
 
 	Gtk2->main;
 
