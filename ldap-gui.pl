@@ -1,4 +1,3 @@
-#!/usr/bin/perl
 # vi: set ts=4 sw=4 :
 
 use strict;
@@ -12,11 +11,13 @@ use Encode;
 use Time::HiRes 'gettimeofday';
 use Net::LDAP;
 use Net::LDAP::Entry;
+use File::Find;
+use File::Copy::Recursive;
 
 use FindBin qw[$Bin];
 use Cwd 'abs_path';
 
-my ($srv, $win, $pname, $main_wnd);
+my ($srv, $win, $pname, $main_wnd, %install);
 
 my ($btn_usr_apply, $btn_usr_revert, $btn_usr_add, $btn_usr_delete, $btn_usr_refresh);
 my ($user_list, $user_attr_frame, $user_attr_tabs, $user_name);
@@ -96,16 +97,16 @@ my %servers = (
 	'Error reading list of Windows groups: %s'	=>	'Ошибка чтения списка Windows-групп: %s',
 	'Error reading Windows group "%s" (%s): %s'	=>	'Ошибка чтения Windows-группы "%s" (%s): %s',
 	'Error updating Windows-user "%s": %s'	=>	'Ошибка обновления Windows-пользьвателя "%s": %s',
-	'Error re-updating Unix-user "%s": %s'	=>	'Ошибка пере-обновления Unix-пользьвателя "%s": %s',
+	'Error re-updating Unix-user "%s" (%s): %s'	=>	'Ошибка пере-обновления Unix-пользьвателя "%s" (%s): %s',
 	'Error adding "%s" to Windows-group "%s": %s'	=>	'Ошибка добавления "%s" в Windows-группу "%s": %s',
-	'Error saving user "%s": %s'	=>	'Ошибка сохранения пользователя "%s": %s',
+	'Error saving user "%s" (%s): %s'	=>	'Ошибка сохранения пользователя "%s" (%s): %s',
 	'Really revert changes ?'	=>	'Действительно откатить модификации ?',
 	'Delete user "%s" ?'	=>	'Удалить пользователя "%s" ?',
 	'Cancel new user ?'		=>	'Отменить добавление пользователя ?',
-	'Error deleting Unix-user "%s": %s'	=>	'Ошибка удаления Unix-пользователя "%s": %s',
+	'Error deleting Unix-user "%s" (%s): %s'	=>	'Ошибка удаления Unix-пользователя "%s" (%s): %s',
 	'Error deleting Windows-user "%s": %s'	=>	'Ошибка удаления Windows-пользователя "%s": %s',
 	'Cannot display user "%s"'	=>	'Не могу вывести пользователя "%s"',
-	'Exit and loose changes ?'	=>	'Выйти и потерять изменения ',
+	'Exit and loose changes ?'	=>	'Выйти и потерять изменения ?',
 	'Attributes'	=>	'Атрибуты',
 	'Save'	=>	'Сохранить',
 	'Revert'	=>	'Отменить',
@@ -225,7 +226,7 @@ my @user_gui_attrs = (
 		[ 's', 'mail', _T('Mail') ],
 		[ 's', 'uidNumber', _T('User#') ],
 		[ 'g', 'gidNumber', _T('Group#') ],
-		[ 'G', '', _T('Other groups') ],
+		[ 'G', 'other groups', _T('Other groups') ],
 		[ 's', 'homeDirectory', _T('Home directory') ],
 		[ 's', 'loginShell', _T('Login shell') ],
 	],
@@ -247,7 +248,7 @@ my @group_gui_attrs = (
 		[ 's', 'cn', _T('Group name') ],
 		[ 's', 'gidNumber', _T('Group number') ],
 		[ 's', 'description', _T('Description') ],
-		[ 'U', '', _T('Members') ],
+		[ 'U', 'members', _T('Members') ],
 	],
 );
 
@@ -493,7 +494,7 @@ sub log_msg
 	my $ms = int($usecs / 1000);
 	my $str = sprintf("%02d:%02d:%02d.%03d [%5s] %s\n", $h,$mi,$s,$ms, $level, $msg);
 	croak($str) if $level eq 'error';
-	print STDOUT $str if $level ne 'debug' || $config{debug};
+	print STDERR $str if $level ne 'debug' || $config{debug};
 	return $str;
 }
 
@@ -792,6 +793,7 @@ sub set_attr ($$$)
 			parent => $obj,
 			attr => $attr,
 			visual => 0,
+			type => 's',
 		};
  		$a->{orig} = $a->{cur} = '';
 		$a->{val} = $a->{usr} = $val;
@@ -813,7 +815,7 @@ sub cond_set ($$$)
 sub set_ldap_attr ($)
 {
 	my $a = shift;
-	my ($ldap, $attr) = ($a->{parent}->{ldap}, $a->{attr});
+	my ($ldap, $attr, $type) = ($a->{parent}->{ldap}, $a->{attr}, $a->{type});
 	my $val = defined($a->{cur}) ? nvl($a->{cur}) : '';
 	my $changed = 0;
 	if ($attr eq 'objectClass') {
@@ -825,6 +827,24 @@ sub set_ldap_attr ($)
 			$changed = 1;
 		}
 		return $changed;
+	}
+	if ($type eq 'U') {
+		# list of users
+		my @uidns = ();
+		for my $uid (split_list $val) {
+			my $res = ldap_search($srv, "(&(objectClass=person)(uid=$uid))", [ 'uidNumber' ]);
+			next if $res->code;
+			my $ue = $res->pop_entry;
+			next unless $ue;
+			my $uidn = $ue->get_value('uidNumber');
+			push @uidns, $uidn;
+		}
+		$ldap->replace($attr => \@uidns);
+		return 1;
+	}
+	if ($type ne 's' && $type ne 'g' && $type ne 'd') {
+		log_debug('set_ldap_attr: "%s" is a special attr of type "%s"...', $attr, $type);
+		return 0;
 	}
 	# simple attributes
 	if ($val eq '') {
@@ -848,17 +868,46 @@ sub set_ldap_attr ($)
 sub get_ldap_attr ($)
 {
 	my $a = shift;
-	my $ldap = $a->{parent}->{ldap};
-	my $attr = $a->{attr};
+	my ($ldap, $attr, $type) = ($a->{parent}->{ldap}, $a->{attr}, $a->{type});
 	my $val;
 	if ($attr eq 'objectClass') {
 		$val = join_list(sort($ldap->get_value('objectClass')));
-	} else {
+	} elsif ($type eq 's' || $type eq 'g' || $type eq 'd') {
 		$val = nvl($ldap->get_value($a->{attr}));
+	} elsif ($type eq 'U') {
+		# list of users
+		my @uidns = $ldap->get_value($a->{attr});
+		log_debug('get_ldap_attr: "%s"/%s is (%s)', $attr, $type, join(',', @uidns));
+		my @uids = ();
+		for my $uidn (@uidns) {
+			my $res = ldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", [ 'uid' ]);
+			next if $res->code;
+			my $ue = $res->pop_entry;
+			next unless $ue;
+			my $uid = $ue->get_value('uid');
+			push @uids, $uid;
+		}
+		$val = join_list @uids;
+		log_debug('get_ldap_attr: "%s"/%s returns "%s"...', $attr, $type, $val);
+	} else {
+		log_debug('get_ldap_attr: "%s" is a special attr of type "%s"...', $attr, $type);
+		$val = '';
 	}
 	$a->{val} = $a->{cur} = $a->{orig} = $a->{usr} = $val;
 	$a->{state} = $val eq '' ? 'empty' : 'orig';
 	return $a;
+}
+
+
+sub set_ldap_attr_final ($)
+{
+	my $a = shift;
+	my ($attr, $type) = ($a->{attr}, $a->{type});
+	my $val = defined($a->{cur}) ? nvl($a->{cur}) : '';
+	log_debug('attr "%s" is undefined type', $attr) unless defined $type;
+	return if $type eq 's' || $type eq 'g' || $type eq 'd';
+	log_debug('set_ldap_attr_final: "%s" is a special attr of type "%s"...', $attr, $a->{type});
+	return 0;
 }
 
 
@@ -868,15 +917,17 @@ sub get_ldap_attr ($)
 sub rework_accounts
 {
 	my @ids = @_;
+	log_debug('rework ids: %s', join(',', @ids));
 	if ($#ids < 0) {
 		my $res = ldap_search($srv, "(objectClass=person)", [ 'uid' ]);
 		# get all users
 		@ids = map { $_->get_value('uid') } $res->entries;
 	}
 	for my $id (@ids) {
-		log_debug("massage id %s ...", $id);
+		log_debug('rework id %s ...', $id);
 		my $usr = rework_unix_account($id);
 		if ($usr) {
+			log_debug('continue reworking (nodirs=%s)', $config{nodirs});
 			rework_home_dir($usr) unless $config{nodirs};
 			rework_windows_account($usr) unless $win->{cfg}->{disabled};
 		}
@@ -1146,21 +1197,24 @@ sub rework_windows_account ($)
 
 sub rework_home_dir ($)
 {
-	my $uo = shift;
-	my $home = get_attr($uo, 'homeDirectory');
-	return 0 if $home eq '' || -d $home;
+	my $usr = shift;
+	my $home = get_attr($usr, 'homeDirectory');
+	log_info('probably creating home directory "%s"', $home);
+	return 0 if $home eq '';
+	return 2 if -d $home;
 
 	log_info('creating home directory "%s"', $home);
-	my $skel = $config{skel_dir};
-	my $xinstall = $config{xinstall_command};
-	my $uid = get_attr($uo, 'uidNumber');
-	my $gid = get_attr($uo, 'gidNumber');
-	# FIXME: get rid of external script
-	my $stdall = `$xinstall "$uid" "$gid" "$skel" "$home" 2>&1`;
-	chomp $stdall;
-	log_debug('xinstall: [%s]', $stdall);
+	$install{src} = $config{skel_dir};
+	$install{dst} = $home;
+	$install{uid} = get_attr($usr, 'uidNumber');
+	$install{gid} = get_attr($usr, 'gidNumber');
 
-	return 1;
+	my $ret = File::Copy::Recursive::rcopy($install{src}, $install{dst});
+	find(sub {
+			# FIXME: is behaviour `lchown'-compatible ?
+			chown $install{uid}, $install{gid}, $File::Find::name;
+		}, $install{dst});
+	return $ret > 0 ? 1 : -1;
 }
 
 
@@ -1304,18 +1358,19 @@ sub user_save
 	my $cn = get_attr($usr, 'cn');
 	$model->set($node, 0, $uid, 1, $cn);
 
-	log_info("before dn=(%s)", $usr->{dn});
 	$usr->{dn} = unix_user_dn($usr) unless $usr->{dn};
-	log_info("after dn=(%s)", $usr->{dn});
 	for my $a (values %{$usr->{a}}) { set_ldap_attr($a); }
 	$usr->{ldap}->dn($usr->{dn});
 
 	my $res = ldap_update($srv, $usr->{ldap});
-	if ($res->code) {
+	if ($res->code && $res->code != 82) {
+		# Note: code 82 = `no values to update'
 		message_box('error', 'close',
 				_T('Error saving user "%s" (%s): %s', $uid, $usr->{ldap}->dn, $res->error));
 		return;
 	}
+	log_info("saved unix user (%s)", $usr->{dn});
+	for my $a (values %{$usr->{a}}) { set_ldap_attr_final($a); }
 
 	rework_accounts($uid);
 	user_select();
@@ -1462,6 +1517,7 @@ sub user_unselect
 	$user_attr_frame->set_sensitive(0);
 
 	undef $uo->{ldap};
+	undef $uo->{dn};
 	$uo->{changed} = 0;
 
 	return 0;
@@ -1812,11 +1868,13 @@ sub group_save
 	$grp->{ldap}->dn($grp->{dn}) if $grp->{dn};
 
 	my $res = ldap_update($srv, $grp->{ldap});
-	if ($res->code) {
+	if ($res->code && $res->code != 82) {
+		# Note: code 82 = `no values to update'
 		message_box('error', 'close',
 			_T('Error saving group "%s": %s', $gid, $res->error));
 		return;
 	}
+	for $a (values %{$grp->{a}}) { set_ldap_attr_final($a); }
 
 	group_select();
 	set_group_changed(0);
@@ -1838,7 +1896,7 @@ sub group_add
 {
 	group_unselect();
 	my $model = $group_list->get_model;
-	my $go = $group_obj;
+	my $grp = $group_obj;
 
 	my $node = $model->get_iter_first;
 	while (defined $node) {
@@ -1852,7 +1910,7 @@ sub group_add
 	my $path = $model->get_path($node);
 	$group_list->set_cursor($path);
 
-	$go->{a}->{$group_gui_attrs[0][1][1]}->{entry}->grab_focus;
+	$grp->{a}->{$group_gui_attrs[0][1][1]}->{entry}->grab_focus;
 	set_group_changed(0);
 	$btn_grp_add->set_sensitive(0);
 
@@ -1950,6 +2008,7 @@ sub group_unselect
 	$group_attr_frame->set_sensitive(0);
 
 	undef $grp->{ldap};
+	undef $grp->{dn};
 	$grp->{changed} = 0;
 
 	return 0;
@@ -2298,6 +2357,5 @@ sub gui_main
 
 	disconnect_all();
 }
-
 
 gui_main();
