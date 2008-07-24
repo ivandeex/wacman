@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 # vi: set ts=4 sw=4 :
 
 use strict;
