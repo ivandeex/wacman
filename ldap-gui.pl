@@ -249,7 +249,7 @@ my @group_gui_attrs = (
 		[ 's', 'cn', _T('Group name') ],
 		[ 's', 'gidNumber', _T('Group number') ],
 		[ 's', 'description', _T('Description') ],
-		[ 'U', 'members', _T('Members') ],
+		[ 'U', 'memberUid', _T('Members') ],
 	],
 );
 
@@ -833,21 +833,53 @@ sub set_ldap_attr ($)
 		# list of users
 		my @uidns = ();
 		for my $uid (split_list $val) {
+			if ($uid =~ /^\d+/) {
+				push(@uidns, $uid);
+				next;
+			}
 			my $res = ldap_search($srv, "(&(objectClass=person)(uid=$uid))", [ 'uidNumber' ]);
-			next if $res->code;
 			my $ue = $res->pop_entry;
-			next unless $ue;
-			my $uidn = $ue->get_value('uidNumber');
-			push @uidns, $uidn;
+			my $uidn = $ue ? $ue->get_value('uidNumber') : -1;
+			log_debug('search for uid="%s" returns uidn=%d (code=%d)',
+					$uid, $uidn, $res->code);
+			if ($uidn != -1) {
+				push(@uidns, $uidn);
+			} else {
+				log_info('did not find user uid "%s"', $uid);
+			}
 		}
-		$ldap->replace($attr => \@uidns);
+		log_debug('set_ldap_attr: uidns "%s"; "%s" => [%s]',
+				$attr, $val, join(',', @uidns));
+		if ($#uidns < 0) {
+			$ldap->delete($attr);
+		} elsif ($ldap->exists($attr)) {
+			$ldap->replace($attr => \@uidns);
+		} else {
+			$ldap->add($attr => \@uidns);			
+		}
 		return 1;
 	}
-	if ($type ne 's' && $type ne 'g' && $type ne 'd') {
+	if ($type eq 'g') {
+		# group ID
+		if ($val !~ /^\d*$/) {
+			my $cn = $val;
+			$val = 0;
+			my $res = ldap_search($srv, '(&(objectClass=posixGroup)(cn=$cn))', ['gidNumber']);
+			my $grp = $res->pop_entry;
+			if ($grp) {
+				my $gidn = $grp->get_value('gidNumber');
+				$val = $gidn if $gidn;
+			}
+			unless ($val) {
+				log_info('set_ldap_attr: group "%s" not found', $cn);
+			}
+		}
+	}
+	if ($type ne 's' && $type ne 'd') {
 		log_debug('set_ldap_attr: "%s" is a special attr of type "%s"...', $attr, $type);
 		return 0;
 	}
-	# simple attributes
+	# simple attributes: 's' and 'd
 	if ($val eq '') {
 		if ($ldap->exists($attr)) {
 			$ldap->delete($attr);
@@ -873,8 +905,23 @@ sub get_ldap_attr ($)
 	my $val;
 	if ($attr eq 'objectClass') {
 		$val = join_list(sort($ldap->get_value('objectClass')));
-	} elsif ($type eq 's' || $type eq 'g' || $type eq 'd') {
+	} elsif ($type eq 's' || $type eq 'd') {
+		# normal string or number
 		$val = nvl($ldap->get_value($a->{attr}));
+	} elsif ($type eq 'g') {
+		# group ID
+		$val = nvl($ldap->get_value($a->{attr}));
+		if ($val =~ /^\d+$/) {
+			log_debug('search for group id %d', $val);
+			my $res = ldap_search($srv, "(&(objectClass=posixGroup)(gidNumber=$val))");
+			my $grp = $res->pop_entry;
+			if ($grp) {
+				my $cn = $grp->get_value('cn');
+				$val = $cn if $cn;
+			} else {
+				log_debug('cannot find group id %d (error: %s)', $val, $res->error);
+			}
+		}
 	} elsif ($type eq 'U') {
 		# list of users
 		my @uidns = $ldap->get_value($a->{attr});
@@ -882,15 +929,18 @@ sub get_ldap_attr ($)
 		my @uids = ();
 		for my $uidn (@uidns) {
 			my $res = ldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", [ 'uid' ]);
-			next if $res->code;
 			my $ue = $res->pop_entry;
-			next unless $ue;
-			my $uid = $ue->get_value('uid');
-			push @uids, $uid;
+			my $uid = $ue ? nvl($ue->get_value('uid')) : '';
+			if ($uid ne '') {
+				push @uids, $uid;
+			} else {
+				push @uids, $uidn;
+			}
 		}
 		$val = join_list @uids;
 		log_debug('get_ldap_attr: "%s"/%s returns "%s"...', $attr, $type, $val);
 	} else {
+		# special attributes
 		log_debug('get_ldap_attr: "%s" is a special attr of type "%s"...', $attr, $type);
 		$val = '';
 	}
@@ -1724,6 +1774,17 @@ sub create_user_groups_editor ($)
 }
 
 
+sub create_group_chooser ($)
+{
+	my $ua = shift;
+	my $popup_btn = $ua->{popup};
+
+	my $res = ldap_search($srv, "(objectClass=posixGroup)", ['cn']);
+	my @groups = $res->entries;
+	return if $#groups < 0;
+}
+
+
 sub create_user_desc
 {
 	my $vbox = Gtk2::VBox->new(0, 0);
@@ -1780,6 +1841,14 @@ sub create_user_desc
 				$a->{popup} = $popup_btn;
 				$popup_btn->signal_connect(clicked =>
 								sub { create_user_groups_editor($a); });
+				$popup_btn->set_relief('none');
+				$abox->attach($popup_btn, 3, 4, $r, $r+1, [], [], 1, 1);
+				$right = 3;
+			} elsif ($type eq 'g') {
+				my $popup_btn = create_button(undef, 'popup.png');
+				$a->{popup} = $popup_btn;
+				$popup_btn->signal_connect(clicked =>
+								sub { create_group_chooser($a); });
 				$popup_btn->set_relief('none');
 				$abox->attach($popup_btn, 3, 4, $r, $r+1, [], [], 1, 1);
 				$right = 3;
@@ -2113,7 +2182,7 @@ sub group_user_toggled ($$)
 		push @users, $_ if $_ ne $uid;	
 	}
 	push @users, $uid if $active;
-	$ga->{val} = join_list sort @users;
+	$ga->{val} = $ga->{cur} = join_list sort @users;
 	set_group_changed(1) if $ga->{val} ne $ga->{orig};
 	$ga->{entry}->set_text($ga->{val});
 }
