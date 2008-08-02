@@ -1,0 +1,9 @@
+[Desktop Entry]
+Encoding=UTF-8
+Terminal=false
+Type=Application
+Categories=Application;System;
+Exec=/etc/init.d/ctl-winsrv.sh view
+Name=Windows Console
+Comment=Shows Windows Console
+Icon=/usr/share/icons/Bluecurve/48x48/apps/display-capplet.png
