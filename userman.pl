@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 # vi: set ts=4 sw=4 :
 
 use strict;
@@ -33,8 +34,6 @@ my ($next_uidn, $next_gidn);
 my $pic_home = abs_path("$Bin/images");
 my %pic_cache;
 
-my %translations;
-
 my %ldap_rw_subs;
 
 use constant NO_EXPIRE => '9223372036854775807';
@@ -49,119 +48,85 @@ sub _T($@);
 
 
 my %servers = (
-	ads => {
-		uri		=>	'ldaps://xxx.winsrv.vpn',
-		user	=>	'cn=dirman,dc=gclimate,dc=local',
-		passfile=>	'/etc/userman.secret',
-		base	=>	'dc=gclimate,dc=local',
-		debug	=>	0,
-		convert	=>	0,
-		disable =>	0,
-	},
-	uni => {
-		uri		=>	'ldaps://xxx.el4.vihens.ru',
-		user	=>	'cn=dirman,dc=vihens,dc=ru',
-		passfile=>	'/etc/userman.secret',
-		base	=>	'dc=vihens,dc=ru',
-		debug	=>	0,
-		convert	=>	1,
-		disable =>	0,
-	}
-);
-
-
-%translations = (
-	'Domain Users'	=>	'Пользователи домена',
-	'Remote Users'	=>	'Пользователи удаленного рабочего стола',
-	'Name'			=>	'Имя',
-	'Second name'	=>	'Фамилия',
-	'Full name'		=>	'Полное имя',
-	'Identifier'	=>	'Идентификатор',
-	'Password'		=>	'Пароль',
-	'Mail'			=>	'Почта',
-	'User#'			=>	'# Пользователя',
-	'Group'			=>	'Группа',
-	'Other groups'	=>	'Прочие группы',
-	'Home directory'=>	'Домашний каталог',
-	'Login shell'	=>	'Интерпретатор команд',
-	'Drive'			=>	'Диск',
-	'Profile'		=>	'Профиль',
-	'Logon script'	=>	'Сценарий входа',
-	'Telephone'		=>	'Телефон',
-	'Fax number'	=>	'Номер факса',
-	'Extended'		=>	'Дополнительно',
-	'User "%s" not found'	=>	'Не найден пользователь "%s"',
-	'User "%s" not found: %s'	=>	'Пользователь "%s" не найден: %s',
-	'Error reading list of Windows groups: %s'	=>	'Ошибка чтения списка Windows-групп: %s',
-	'Error reading Windows group "%s" (%s): %s'	=>	'Ошибка чтения Windows-группы "%s" (%s): %s',
-	'Error updating Windows-user "%s": %s'	=>	'Ошибка обновления Windows-пользьвателя "%s": %s',
-	'Error re-updating Unix-user "%s" (%s): %s'	=>	'Ошибка пере-обновления Unix-пользьвателя "%s" (%s): %s',
-	'Error adding "%s" to Windows-group "%s": %s'	=>	'Ошибка добавления "%s" в Windows-группу "%s": %s',
-	'Error saving user "%s" (%s): %s'	=>	'Ошибка сохранения пользователя "%s" (%s): %s',
-	'Really revert changes ?'	=>	'Действительно откатить модификации ?',
-	'Delete user "%s" ?'	=>	'Удалить пользователя "%s" ?',
-	'Cancel new user ?'		=>	'Отменить добавление пользователя ?',
-	'Error deleting Unix-user "%s" (%s): %s'	=>	'Ошибка удаления Unix-пользователя "%s" (%s): %s',
-	'Error deleting Windows-user "%s": %s'	=>	'Ошибка удаления Windows-пользователя "%s": %s',
-	'Cannot display user "%s"'	=>	'Не могу вывести пользователя "%s"',
-	'Exit and loose changes ?'	=>	'Выйти и потерять изменения ?',
-	'Attributes'	=>	'Атрибуты',
-	'Save'	=>	'Сохранить',
-	'Revert'	=>	'Отменить',
-	'Identifier'	=>	'Идентификатор',
-	'Full name'	=>	'Полное имя',
-	'Create'	=>	'Добавить',
-	'Delete'	=>	'Удалить',
-	'Refresh'	=>	'Обновить',
-	'Exit'	=>	'Выйти',
-	'Close'	=>	'Закрыть',
-	' Users '	=>	' Пользователи ',
-	' Groups '	=>	' Группы ',
-	'Group name'	=>	'Название группы',
-	'Group number'	=>	'Номер группы',
-	'Description'	=>	'Описание',
-	'Members'		=>	'Члены группы',
-	'Error saving group "%s": %s'	=>	'Ошибка сохранения группы "%s": %s',
-	'Cancel new group ?'	=>	'Отменить добавление группы ?',
-	'Delete group "%s" ?'	=>	'Удалить группу "%s"',
-	'Error deleting group "%s": %s'	=> 'Ошибка удаления группы "%s": %s',
-	'Cannot display group "%s"'	=>	'Не могу отобразить группу "%s"',
-	'Groups not found: %s' => 'Группы не найдены: %s',
+	uni => { disable => 1 },	# Unix LDAP Server
+	ads => { disable => 1 },	# Windows Active Directory
 );
 
 
 my %config = (
-	debug				=>	0,
-	nodirs				=>	0,
-	ntuser_support		=>	0,
 	config_files		=>	[
-			'/etc/userman.conf',
-			'~/.userman.conf',
-			'./userman.conf'
-		],
-	skel_dir			=>	'/etc/skel',
-	unix_user_dn		=>	'uid=[uid],ou=People,dc=vihens,dc=ru',
-	unix_group_dn		=>	'cn=[cn],ou=Groups,dc=vihens,dc=ru',
-
+		'/etc/userman.conf',
+		'~/.userman.conf',
+		'./userman.conf'
+	],
 	unix_user_classes	=>	'top,person,organizationalPerson,inetOrgPerson,posixAccount,shadowAccount',
 							# 'ntUser',
 	unix_group_classes	=>	'top,posixGroup',	
 	ad_user_classes		=>	'top,user,person,organizationalPerson',	
 	ad_user_category	=>	'Person.Schema.Configuration',
+	language			=>	'ru',
+);
 
-	ad_initial_pass		=>	'123qweASD',
-	ad_primary_group	=>	_T('Domain Users'),
-	ad_user_groups		=>	[ _T('Remote Users') ],
-	ad_user_container	=>	'Users',
 
-	unix_gids			=>	[ 100 ],
-	unix_domain			=>	'gclimate.com',
-	ad_domain			=>	'gclimate.local',
-	home_server			=>	'el.vpn',
-	home_drive			=>	'H',
-	ad_home_dir			=>	'//[SERVER]/[USER]$/Home',
-	ad_script_path		=>	'//[SERVER]/[USER]$/Netlogon/logon.cmd',
-	ad_profile_path		=>	'//[SERVER]/[USER]$/Profile',
+my %translations = (
+	ru => {
+		'Domain Users'	=>	'Пользователи домена',
+		'Remote Users'	=>	'Пользователи удаленного рабочего стола',
+		'Name'			=>	'Имя',
+		'Second name'	=>	'Фамилия',
+		'Full name'		=>	'Полное имя',
+		'Identifier'	=>	'Идентификатор',
+		'Password'		=>	'Пароль',
+		'Mail'			=>	'Почта',
+		'User#'			=>	'# Пользователя',
+		'Group'			=>	'Группа',
+		'Other groups'	=>	'Прочие группы',
+		'Home directory'=>	'Домашний каталог',
+		'Login shell'	=>	'Интерпретатор команд',
+		'Drive'			=>	'Диск',
+		'Profile'		=>	'Профиль',
+		'Logon script'	=>	'Сценарий входа',
+		'Telephone'		=>	'Телефон',
+		'Fax number'	=>	'Номер факса',
+		'Extended'		=>	'Дополнительно',
+		'User "%s" not found'	=>	'Не найден пользователь "%s"',
+		'User "%s" not found: %s'	=>	'Пользователь "%s" не найден: %s',
+		'Error reading list of Windows groups: %s'	=>	'Ошибка чтения списка Windows-групп: %s',
+		'Error reading Windows group "%s" (%s): %s'	=>	'Ошибка чтения Windows-группы "%s" (%s): %s',
+		'Error updating Windows-user "%s": %s'	=>	'Ошибка обновления Windows-пользьвателя "%s": %s',
+		'Error re-updating Unix-user "%s" (%s): %s'	=>	'Ошибка пере-обновления Unix-пользьвателя "%s" (%s): %s',
+		'Error adding "%s" to Windows-group "%s": %s'	=>	'Ошибка добавления "%s" в Windows-группу "%s": %s',
+		'Error saving user "%s" (%s): %s'	=>	'Ошибка сохранения пользователя "%s" (%s): %s',
+		'Really revert changes ?'	=>	'Действительно откатить модификации ?',
+		'Delete user "%s" ?'	=>	'Удалить пользователя "%s" ?',
+		'Cancel new user ?'		=>	'Отменить добавление пользователя ?',
+		'Error deleting Unix-user "%s" (%s): %s'	=>	'Ошибка удаления Unix-пользователя "%s" (%s): %s',
+		'Error deleting Windows-user "%s": %s'	=>	'Ошибка удаления Windows-пользователя "%s": %s',
+		'Cannot display user "%s"'	=>	'Не могу вывести пользователя "%s"',
+		'Exit and loose changes ?'	=>	'Выйти и потерять изменения ?',
+		'Attributes'	=>	'Атрибуты',
+		'Save'	=>	'Сохранить',
+		'Revert'	=>	'Отменить',
+		'Identifier'	=>	'Идентификатор',
+		'Full name'	=>	'Полное имя',
+		'Create'	=>	'Добавить',
+		'Delete'	=>	'Удалить',
+		'Refresh'	=>	'Обновить',
+		'Exit'	=>	'Выйти',
+		'Close'	=>	'Закрыть',
+		' Users '	=>	' Пользователи ',
+		' Groups '	=>	' Группы ',
+		'Group name'	=>	'Название группы',
+		'Group number'	=>	'Номер группы',
+		'Description'	=>	'Описание',
+		'Members'		=>	'Члены группы',
+		'Error saving group "%s": %s'	=>	'Ошибка сохранения группы "%s": %s',
+		'Cancel new group ?'	=>	'Отменить добавление группы ?',
+		'Delete group "%s" ?'	=>	'Удалить группу "%s"',
+		'Error deleting group "%s": %s'	=> 'Ошибка удаления группы "%s": %s',
+		'Cannot display group "%s"'	=>	'Не могу отобразить группу "%s"',
+		'Groups not found: %s' => 'Группы не найдены: %s',
+	},
 );
 
 
@@ -171,10 +136,14 @@ my %all_attrs = (
 		dn => {
 			type => 'D',
 			ldap => 'uni',
+			label => 'UNIX DN',
+			readonly => 1,
 		},
 		ntDn => {
 			type => 'D',
 			ldap => 'ads',
+			label => 'Windows DN',
+			readonly => 1,
 		},
 		objectClass => {
 			type => 'c',
@@ -195,7 +164,7 @@ my %all_attrs = (
 		},
 		cn => {
 			label => 'Full name',
-			ldap => { uni => '', ads => 'displayName', },
+			ldap => 'uni,ads',
 		},
 		uid => {
 			type => 'd',
@@ -306,6 +275,7 @@ my %all_attrs = (
 		},
 		ntUserDomainId => {
 			ldap => 'ntuser',
+			copyfrom => 'uid',
 			disable => 1,
 		},
 		# Active Directory disabled...
@@ -360,6 +330,7 @@ my %all_attrs = (
 		dn => {
 			type => 'D',
 			ldap => 'uni',
+			label => 'DN'
 		},
 		cn => {
 			label => 'Group name',
@@ -388,13 +359,16 @@ my %all_lc_attrs;
 my %gui_attrs = (
 	user => [
 		[ 'UNIX', qw(givenName sn cn uid password mail uidNumber
+						dn ntDn
 						gidNumber moreGroups homeDirectory loginShell) ],
-		[ 'Windows', qw(ntUserHomeDir ntUserHomeDirDrive ntUserProfile ntUserScriptPath) ],
+		[ 'Windows', qw(ntUserHomeDir ntUserHomeDirDrive
+						ntUserProfile ntUserScriptPath) ],
 		[ 'Communigate', ],
 		[ 'Extended', qw(telephoneNumber facsimileTelephoneNumber) ],
 	],
 	group => [
-		[ 'UNIX', qw(cn gidNumber description memberUid) ],
+		[ 'UNIX', qw(cn gidNumber description memberUid
+					dn) ],
 	],
 );
 
@@ -501,6 +475,7 @@ sub setup_attrs ()
 			$desc->{type} = 's' unless $desc->{type};
 			$desc->{visual} = $desc->{label} ? 1 : 0;
 			$desc->{label} = _T($desc->{label}) if $desc->{label};
+			$desc->{readonly} = 0 unless $desc->{readonly};
 			
 			$desc->{conv} = 'none' unless $desc->{conv};
 			for my $dir (0, 1) {
@@ -511,7 +486,8 @@ sub setup_attrs ()
 				$desc->{$dir ? 'disp2attr' : 'attr2disp'} = $sub;
 			}
 
-			log_error('%s attribute "%s" is copy-from unknown "%s"', $objtype, $name, $desc->{copyfrom})
+			log_error('%s attribute "%s" is copy-from unknown "%s"',
+						$objtype, $name, $desc->{copyfrom})
 				if $desc->{copyfrom} && !$descs->{$desc->{copyfrom}};
 
 			$desc->{disable} = 0 unless $desc->{disable};
@@ -707,16 +683,17 @@ sub ldap_print_entry ($$$)
 
 sub _T ($@) {
 	my $fmt = shift;
-	return sprintf(defined($translations{$fmt}) ? $translations{$fmt} : $fmt,
-					map { defined($_) ? $_ : '<undef>' } @_);
+	my $tr = $translations{$config{language}};
+	$fmt = $tr->{$fmt} if defined $tr->{$fmt};
+	return sprintf($fmt, map { defined($_) ? $_ : '<undef>' } @_);
 }
 
 
 sub log_msg ($$@)
 {
-	my ($level, $fmt, @args) = @_;
-	$fmt = $translations{$fmt} if defined $translations{$fmt};
-	my $msg = sprintf $fmt, map { defined($_) ? $_ : '' } @args;
+	my $level = shift;
+	my $fmt = shift;
+	my $msg = _T($fmt, @_);
 	my ($s,$mi,$h,$d,$mo,$y) = localtime(time);
 	my ($secs, $usecs) = gettimeofday;
 	my $ms = int($usecs / 1000);
@@ -779,8 +756,10 @@ sub set_button_image ($$)
 	return unless $image;
 	if ($pic) {
 		$image->set_from_pixbuf(create_pic($pic));
-	} else {
+	} elsif (Gtk2->CHECK_VERSION(2, 9, 0)) {
 		$image->clear;
+	} else {
+		$image->set_from_pixbuf(undef);
 	}
 }
 
@@ -826,6 +805,7 @@ sub create_button_bar (@)
 sub message_box ($$$)
 {
 	my ($type, $buttons, $message) = @_;
+	log_debug($message);
 	my $dia = Gtk2::MessageDialog->new ($main_wnd, 'destroy-with-parent',
 										$type, $buttons, $message);
 	my $ret = $dia->run;
@@ -854,12 +834,8 @@ sub show_popup ($$)
 	my ($wnd, $popup_btn) = @_;
 	$wnd->set_transient_for($main_wnd);
 	$wnd->set_position('center_on_parent');
-	my $deletable_supported = 1;
-	if ($^O eq 'MSWin32') {
-		# set_deletable() is not available in GTK+ 2.8 and older on Windows
-		$deletable_supported = Gtk2->CHECK_VERSION(2, 9, 0);
-	}
-	$wnd->set_deletable(0) if $deletable_supported;
+	# set_deletable() is not available in GTK+ 2.8 and older on Windows
+	$wnd->set_deletable(0) if Gtk2->CHECK_VERSION(2, 9, 0);
 	$wnd->set_modal(1);
 	$wnd->signal_connect(delete_event	=> sub { destroy_popup($wnd, $popup_btn) });
 	$wnd->signal_connect(destroy		=> sub { destroy_popup($wnd, $popup_btn) });
@@ -936,7 +912,7 @@ sub split_list ($)
 
 sub join_list (@)
 {
-	return join ',', sort @_;
+	return nvl(join ',', sort @_);
 }
 
 
@@ -957,11 +933,26 @@ sub remove_list ($$)
 	my ($a, $b) = @_;
 	$a = [ split_list $a ] unless ref $a;
 	$b = [ split_list $b ] unless ref $b;
-	log_error('invalid append_list arguments') if ref($a) ne 'ARRAY' || ref($b) ne 'ARRAY';
+	log_error('invalid remove_list arguments') if ref($a) ne 'ARRAY' || ref($b) ne 'ARRAY';
 	my (%r, $x);
 	for $x (@$a) { $r{$x} = 1 if nvl($x) ne ''; }
 	for $x (@$b) { delete $r{$x} }
 	return wantarray ? sort(keys %r) : join_list(keys %r);
+}
+
+
+sub compare_lists ($$)
+{
+	my ($a, $b) = @_;
+	$a = [ split_list $a ] unless ref $a;
+	$b = [ split_list $b ] unless ref $b;
+	log_error('invalid compare_lists arguments') if ref($a) ne 'ARRAY' || ref($b) ne 'ARRAY';
+	my (%a, %b, %onlya, %onlyb, %common);
+	for (@$a) { $a{$_} = 1 }
+	for (@$b) { $b{$_} = 1 }
+	for (@$a) { $b{$_} ? ($common{$_} = 1) : ($onlya{$_} = 1) }
+	for (@$b) { $a{$_} ? ($common{$_} = 1) : ($onlyb{$_} = 1) }
+	return (join_list(keys %onlya), join_list(keys %onlyb), join_list(keys %common));
 }
 
 
@@ -1010,10 +1001,7 @@ sub clear_obj ($)
 	my $obj = shift;
 	for my $at (@{$obj->{attrs}}) {
 		$at->{val} = $at->{cur} = $at->{orig} = $at->{usr} = '';
-		if ($at->{entry}) {
-			$at->{entry}->set_text('');		
-			$at->{entry}->set_editable(! $at->{desc}{disable});
-		}
+		$at->{entry}->set_text('') if $at->{entry};
 		$at->{state} = 'empty';
 		set_attr_state($at, 'refresh') if $at->{bulb};
 	}
@@ -1037,15 +1025,16 @@ sub init_attr ($$$)
 	my ($obj, $name, $visual) = @_;
 	my $at = get_attr_node($obj, $name);
 	$at->{label} = $at->{entry} = $at->{bulb} = $at->{popup} = undef;
+	my $desc = $at->{desc};
 	$at->{visual} = $visual;
 	if ($visual) {
 		log_error('%s attribute "%s" cannot be visual', $obj->{type}, $name)
-			unless $at->{desc}{visual};
-		$at->{label} = Gtk2::Label->new($at->{desc}{label});
+			unless $desc->{visual};
+		$at->{label} = Gtk2::Label->new($desc->{label});
 		$at->{label}->set_justify('left');
 		$at->{entry} = Gtk2::Entry->new;
 		$at->{entry}->{friend} = $at;
-		$at->{bulb} = Gtk2::Image->new if $visual & 2;
+		$at->{entry}->set_editable(!$desc->{disable} && !$desc->{readonly});
 		if ($at->{type} eq 'p') {
 			#FIXME
 			#$at->{entry}->set_visibility(0);
@@ -1055,6 +1044,7 @@ sub init_attr ($$$)
 			$at->{popup} = create_button(undef, 'popup.png');
 			$at->{popup}->set_relief('none');
 		}
+		$at->{bulb} = Gtk2::Image->new if $visual & 2;
 	}
 	$at->{val} = $at->{cur} = $at->{orig} = $at->{usr} = '';
 	$at->{state} = 'empty';
@@ -1099,7 +1089,7 @@ sub set_attr ($$$)
 	my $at = get_attr_node($obj, $name);
 	$at->{val} = $val;
 	if ($at->{orig} ne $at->{val}) {
-		my $sdn = nvl(get_attr($obj, 'dn'));
+		my $sdn = nvl(get_attr($obj, 'dn', which => 'val'));
 		$sdn = ($sdn =~ /^\s*(.*?)\s*,/) ? $1 : '???';
 		log_debug('(%s): [%s] := (%s)', $sdn, $name, $val);
 	}
@@ -1195,6 +1185,7 @@ sub ldap_write_dn ($$$$$)
 	my ($at, $srv, $ldap, $name, $val) = @_;
 	my $prev = nvl($ldap->dn);
 	$val = nvl($val);
+	log_debug('ldap_write_dn(%s): attr="%s" dn="%s", prev="%s"', $srv, $at->{name}, $val, $prev);
 	return 0 if $val eq $prev || $val eq '';
 	$ldap->dn($val);
 	return 1;
@@ -1351,7 +1342,7 @@ sub ldap_get_unix_group_ids ($$$)
 	}
 	@gidns = sort {$a cmp $b} @gidns;
 	log_debug('group list for "%s" is "%s"', $val, join_list @gidns);
-	return wantarray ? @gidns : join ',', @gidns;
+	return wantarray ? @gidns : join(',', @gidns);
 }
 
 
@@ -1372,7 +1363,7 @@ sub ldap_modify_unix_group ($$$$)
 	for (@old) { push @cur, $_ if $_ != $uidn }
 	push @cur, $uidn if $action eq 'add';
 	@cur = sort {$a cmp $b} @cur;
-	if (0 && $#old == $#cur) {
+	if (0 && $#old == $#cur) { # FIXME!
 		log_info('unix group %d will not change with user %d: (%s) == (%s)',
 				$gidn, $uidn, join_list(@old), join_list(@cur));
 		return 'SAME';
@@ -1405,23 +1396,20 @@ sub ldap_modify_unix_group ($$$$)
 sub ldap_write_unix_groups_final ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	my (%old, %cur);
 	return 0 if $at->{orig} eq $at->{cur};
-	for (ldap_get_unix_group_ids($srv, $at->{orig}, 'nowarn')) { $old{$_} = $_ }
-	for (ldap_get_unix_group_ids($srv, $at->{cur}, 'warn')) { $cur{$_} = $_ }
 	my $uidn = get_attr($at->{obj}, $name);
-	my $changed = 0;
-	for my $gidn (sort {$a cmp $b} keys %old) {
-		next if $cur{$gidn};
+	my $old = ldap_get_unix_group_ids($srv, $at->{orig}, 'nowarn');
+	my $new = ldap_get_unix_group_ids($srv, $at->{cur}, 'warn');
+	log_info('write_unix_groups(1): old=(%s) new=(%s)', $old, $new);
+	($old, $new) = compare_lists($old, $new);
+	log_info('write_unix_groups(2): old=(%s) new=(%s)', $old, $new);
+	for my $gidn (split_list $old) {
 		ldap_modify_unix_group($srv, $gidn, $uidn, 'remove');
-		$changed = 1;
 	}
-	for my $gidn (sort {$a cmp $b} keys %cur) {
-		next if $old{$gidn};
+	for my $gidn (split_list $new) {
 		ldap_modify_unix_group($srv, $gidn, $uidn, 'add');
-		$changed = 1;
 	}
-	return $changed;
+	return $old ne '' || $new ne '';
 }
 
 
@@ -1560,16 +1548,20 @@ sub ldap_write_ad_sec_groups_final ($$$$$)
 	# add to required groups
 	for my $grp ($res->entries) {
 		my $gname = $grp->get_value('name');
-		my %members;
-		for ($grp->get_value('member')) { $members{$_} = 1; }
-		unless (defined $members{$dn}) {
-			$grp->add( member => $dn );
-			my $res = ldap_update('ads', $grp);
-			if ($res->code) {
-				message_box('error', 'close',
+		my $found = 0;
+		for ($grp->get_value('member')) {
+			if ($_ eq $dn) {
+				$found = 1;
+				last;
+			}
+		}
+		next if $found;
+		$grp->add( member => $dn );
+		my $res = ldap_update('ads', $grp);
+		if ($res->code) {
+			message_box('error', 'close',
 					_T('Error adding "%s" to Windows-group "%s": %s',
 						get_attr($at->{obj}, 'cn'), $gname, $res->error));
-			}
 		}
 	}
 	return 0;
@@ -1577,28 +1569,6 @@ sub ldap_write_ad_sec_groups_final ($$$$$)
 
 
 # ======== read / write ========
-
-
-sub unix_user_dn ($)
-{
-	my $usr = shift;
-	my $dn = $config{unix_user_dn};
-	my $uid = get_attr($usr, 'uid');
-	return undef unless $uid;
-	my $cn = get_attr($usr, 'cn');
-	$dn =~ s/\[uid\]/$uid/g;
-	$dn =~ s/\[cn\]/$uid/g;
-	return $dn;
-}
-
-
-sub windows_user_dn ($)
-{
-	my $usr = shift;
-	my $cn = get_attr($usr, 'cn');
-	return sprintf('cn=%s,%s,%s', $cn,
-					path2dn($config{ad_user_container}), path2dn($config{ad_domain},'dc'));
-}
 
 
 sub user_read ($$)
@@ -1631,19 +1601,34 @@ sub user_write ($)
 	return unless $usr->{changed};
 	my $msg;
 
-	cond_set($usr, 'dn', unix_user_dn($usr));
 	$msg = write_ldap_obj_at($usr, 'uni');
 	if ($msg) {
 		message_box('error', 'close', _T('Error saving user "%s" (%s): %s',
 					get_attr($usr, 'uid'), get_attr($usr, 'dn'), $msg));
 	}
 
-	cond_set($usr, 'ntDn', windows_user_dn($usr));
 	$msg = write_ldap_obj_at($usr, 'ads');
 	if ($msg) {
 		message_box('error', 'close',
 				_T('Error updating Windows-user "%s" (%s): %s',
 					get_attr($usr, 'cn'), get_attr($usr, 'ntDn'), $msg));
+	}
+
+	my $home = get_attr($usr, 'homeDirectory');
+	if ($config{create_homes} && $home ne '' && !(-d $home)) {
+		log_info('creating home directory "%s"', $home);
+		$install{src} = $config{skel_dir};
+		$install{dst} = $home;
+		$install{uidn} = get_attr($usr, 'uidNumber');
+		$install{gidn} = ldap_get_unix_group_ids('uni',
+											get_attr($usr, 'gidNumber'), 'warn');
+
+		my $ret = File::Copy::Recursive::rcopy($install{src}, $install{dst});
+		find(sub {
+				# FIXME: is behaviour `lchown'-compatible ?
+				chown $install{uidn}, $install{gidn}, $File::Find::name;
+			}, $install{dst}
+		);
 	}
 
 	return $usr;
@@ -1673,10 +1658,7 @@ sub read_ldap_obj_at ($$$)
 		my $val = nvl( &{$at->{desc}{ldap_read}} ($at, $srv, $ldap, $name) );
 		$at->{val} = $at->{cur} = $at->{orig} = $at->{usr} = $val;
 		$at->{state} = $val eq '' ? 'empty' : 'orig';
-		if ($at->{entry}) {
-			$at->{entry}->set_text($at->{val});
-			$at->{entry}->set_editable(! $at->{desc}{disable});
-		}
+		$at->{entry}->set_text($at->{val}) if $at->{entry};
 		set_attr_state($at, 'refresh') if $at->{bulb};
 	}
 
@@ -1745,6 +1727,23 @@ sub next_unix_gidn ()
 }
 
 
+sub make_dn ($$)
+{
+	my ($obj, $what) = @_;
+	my $dn = $config{$what};
+	while ($dn =~ /\$\((\w+)\)/) {
+		my $name = $1;
+		my $val = get_attr($obj, $name, which => 'val');
+		if ($val eq '') {
+			$dn = '';
+			last;
+		}
+		$dn =~ s/\$\($name\)/$val/g;
+	}
+	return $dn;
+}
+
+
 sub rework_accounts (@)
 {
 	my @ids = @_;
@@ -1759,7 +1758,6 @@ sub rework_accounts (@)
 			rework_user($usr);
 			commit_attrs($usr);
 			user_write($usr);
-			rework_home_dir($usr) unless $config{nodirs};
 		}
 	}
 }
@@ -1789,6 +1787,9 @@ sub rework_user ($)
 	set_attr($usr, 'objectClass', append_list(get_attr($usr, 'objectClass'),
 											$config{unix_user_classes}));
 
+	cond_set($usr, 'dn', make_dn($usr, 'unix_user_dn'));
+	cond_set($usr, 'ntDn', make_dn($usr, 'ad_user_dn'));
+
 	# assign next available UID number
 	my $uidn;
 	if (has_attr($usr, 'uidNumber')) {
@@ -1804,20 +1805,6 @@ sub rework_user ($)
 
 	# home directory
 	cond_set($usr, 'homeDirectory', ifnull($uid, "/home/$uid"));
-
-	# constant and copy-from fields
-	for my $at (values %{$usr->{a}}) {
-		my $desc = $at->{desc};
-		if ($desc->{default}) {
-			cond_set($usr, $at->{name}, $desc->{default});
-		}
-		if ($desc->{copyfrom}) {
-			my $val = get_attr($usr, $desc->{copyfrom});
-			if ($val ne '') {
-				cond_set($usr, $at->{name}, $val);
-			}
-		}
-	}
 
 	############# Active Directory ############
 
@@ -1838,8 +1825,6 @@ sub rework_user ($)
 	cond_set($usr, 'ntUserScriptPath',
 			ifnull($uid, subst_path($config{ad_script_path}, %path_subst)));
 
-	cond_set($usr, 'ntUserDomainId', $uid);
-
 	cond_set($usr, 'userPrincipalName', $uid.'@'.$config{ad_domain});	
 
 	# FIXME! passwords...
@@ -1849,35 +1834,15 @@ sub rework_user ($)
 		cond_set($usr, 'unicodePwd', $unipwd);
 	}
 
-	# constant and copy-from fields
+	###### constant and copy-from fields ########
 	for my $at (@{$usr->{attrs}}) {
 		my $desc = $at->{desc};
-		cond_set($usr, $at->{name}, $desc->{default}) if defined $desc->{default};
-		cond_set($usr, $at->{name}, get_attr($usr, $desc->{copyfrom}))
+		cond_set($usr, $at->{name}, $desc->{default})
+			if defined $desc->{default};
+		cond_set($usr, $at->{name},
+				get_attr($usr, $desc->{copyfrom}, which => 'val'))
 			if $desc->{copyfrom};
 	}
-}
-
-
-sub rework_home_dir ($)
-{
-	my $usr = shift;
-	my $home = get_attr($usr, 'homeDirectory');
-	return 0 if $home eq '';
-	return 2 if -d $home;
-
-	log_info('creating home directory "%s"', $home);
-	$install{src} = $config{skel_dir};
-	$install{dst} = $home;
-	$install{uidn} = get_attr($usr, 'uidNumber');
-	$install{gidn} = ldap_get_unix_group_ids('uni', get_attr($usr, 'gidNumber'), 'warn');
-
-	my $ret = File::Copy::Recursive::rcopy($install{src}, $install{dst});
-	find(sub {
-			# FIXME: is behaviour `lchown'-compatible ?
-			chown $install{uidn}, $install{gidn}, $File::Find::name;
-		}, $install{dst});
-	return $ret > 0 ? 1 : -1;
 }
 
 
@@ -1897,12 +1862,7 @@ sub rework_group ($)
 	$val =~ tr/0123456789//cd;
 	set_attr($grp, 'gidNumber', $val);
 
-	my $dn = $config{unix_group_dn};
-	for my $at (@{$grp->{attrs}}) {
-		$dn =~ s/\[$at->{name}\]/$at->{val}/g;
-		last if $dn !~ /\[\w+\]/;
-	}
-	set_attr($grp, 'dn', $dn);
+	set_attr($grp, 'dn', make_dn($grp, 'unix_group_dn'));
 }
 
 
@@ -2129,6 +2089,11 @@ sub user_delete ()
 					_T('Error deleting Windows-user "%s": %s', $uid, $res->error));
 			}
 		}
+
+		my $home = get_attr($usr, 'homeDirectory');
+		if ($config{remove_homes} && $home ne '') {
+			system "/bin/rm -rf \"$home\"";
+		}
 	}
 
 	$model->remove($node);
@@ -2240,16 +2205,14 @@ sub user_entry_attr_changed ($)
 	# analyze results
 	$chg = 0;
 	for my $at (@{$usr->{attrs}}) {
-		next unless $at->{visual};
 		my $val = $at->{cur} = nvl($at->{val});
-		set_attr_state($at, 'auto');
-		if ($val ne $at->{usr}) {
-			my $entry = $at->{entry};
-			my $pos = $entry->get_position;
-			$entry->set_text($val);
-			$entry->set_position($pos);
-		}
 		$chg = 1 if $val ne $at->{orig};
+		set_attr_state($at, 'auto');
+		if ($val ne $at->{usr} && $at->{entry}) {
+			my $pos = $at->{entry}->get_position;
+			$at->{entry}->set_text($val);
+			$at->{entry}->set_position($pos);
+		}
 	}
 
 	# refresh top label
@@ -2709,11 +2672,10 @@ sub group_entry_attr_changed ($)
 		$chg = 1 if $at->{val} ne $at->{orig};
 		next if $at->{val} eq $at->{cur};
 		$at->{cur} = $at->{val};
-		my $entry = $at->{entry};		
-		if ($entry) {
-			my $pos = $entry->get_position;
-			$entry->set_text($at->{val});
-			$entry->set_position($pos);
+		if ($at->{entry}) {
+			my $pos = $at->{entry}->get_position;
+			$at->{entry}->set_text($at->{val});
+			$at->{entry}->set_position($pos);
 		}
 	}
 
