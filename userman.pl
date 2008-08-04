@@ -39,6 +39,7 @@ my %ldap_rw_subs;
 use constant NO_EXPIRE => '9223372036854775807';
 use constant SAM_USER_OBJECT => hex('0x30000000');
 use constant SECS1610TO1970 => 11644473600;
+use constant OLD_PASS => '~~~Q@#Rt==%%%&//z!!!';
 
 use constant ADS_UF_ACCOUNT_DISABLE => 0x2; 	  
 use constant ADS_UF_PASSWD_NOT_REQUIRED => 0x20;
@@ -1050,7 +1051,7 @@ sub init_attr ($$$)
 		$at->{entry}->set_editable(!$desc->{disable} && !$desc->{readonly});
 		if ($at->{type} eq 'p') {
 			#FIXME
-			#$at->{entry}->set_visibility(0);
+			$at->{entry}->set_visibility(0);
 			$at->{entry}->set_invisible_char('*');
 		}
 		if ($at->{type} =~ m/^(g|G|U)$/) {
@@ -1278,34 +1279,43 @@ sub ldap_write_unix_gidn ($$$$$)
 }
 
 
+sub encode_ad_pass ($)
+{
+    my $pass = shift;
+    my $encoded = '';
+    map { $encoded .= "$_\000" } split( //, "\"$pass\"" );
+    return $encoded;
+}
+
+
+sub decode_ad_pass ($)
+{
+    my $pass = shift;
+    my $decoded = '';
+    for my $char ( split( //, $pass ) ) {
+        $char =~ s/\000$//;
+        $decoded .= $char;
+    }
+    $decoded =~ s/^"|"$//g;
+    return $decoded;
+}
+
+
 sub ldap_read_pass ($$$$)
 {
 	my ($at, $srv, $ldap, $name) = @_;
-	if ($srv eq 'ads') {
-		my $val = nvl($ldap->get_value($name));
-		while ($val =~ /\000/) {
-			$val =~ s/\000//g;
-		}
-		return $val;
-	}
-	return '';
+	return OLD_PASS;
 }
 
 
 sub ldap_write_pass ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	return 0;
-	if ($srv eq 'ads' && $val ne '') {
-		my $charmap = Unicode::Map8->new('latin1');
-		my $uval = $charmap->tou('"'.$val.'"')->byteswap()->utf16();
-		my $msg;
-		$uval = '';
-		for (split(//, "\"$val\"")) { $uval .= "$_\000" }
-		$msg = $ldap->replace($name => $uval);
-		if (defined($msg) && $msg->code) {
-			log_info('changed ad pass failure: %s', $msg->error);
-		}
+	return 0 if $val eq OLD_PASS;
+	if ($srv eq 'ads') {
+		# the following line works only for administrator
+		$ldap->replace($name => encode_ad_pass($val));
+		return 1;
 	}
 	return 0;
 }
@@ -1873,12 +1883,17 @@ sub rework_user ($)
 
 	cond_set($usr, 'userPrincipalName', $uid.'@'.$config{ad_domain});	
 
-	my $uac = get_attr($usr, 'userAccountControl');
 	my $pass = get_attr($usr, 'password');
-	$uac = ADS_UF_NORMAL_ACCOUNT unless $uac;
-	$uac &= ~(ADS_UF_PASSWD_NOT_REQUIRED | ADS_UF_DONT_EXPIRE_PASSWD);
-	$uac |= $pass eq '' ? ADS_UF_PASSWD_NOT_REQUIRED : ADS_UF_DONT_EXPIRE_PASSWD;
-	set_attr($usr, 'userAccountControl', $uac);
+	if ($pass eq OLD_PASS) {
+		set_attr($usr, 'userAccountControl',
+				get_attr($usr, 'userAccountControl', orig => 1));
+	} else {
+		my $uac = get_attr($usr, 'userAccountControl');
+		$uac = ADS_UF_NORMAL_ACCOUNT unless $uac;
+		$uac &= ~(ADS_UF_PASSWD_NOT_REQUIRED | ADS_UF_DONT_EXPIRE_PASSWD);
+		$uac |= $pass eq '' ? ADS_UF_PASSWD_NOT_REQUIRED : ADS_UF_DONT_EXPIRE_PASSWD;
+		set_attr($usr, 'userAccountControl', $uac);
+	}
 
 	###### constant and copy-from fields ########
 	for my $at (@{$usr->{attrs}}) {
@@ -2936,5 +2951,6 @@ sub gui_main ()
 
 	Gtk2->main;
 }
+
 
 gui_main();
