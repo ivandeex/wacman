@@ -83,17 +83,19 @@ my %translations = (
 		'Full name'		=>	'Полное имя',
 		'Identifier'	=>	'Идентификатор',
 		'Password'		=>	'Пароль',
+		'Again password'=>	'Еще раз...',
 		'Mail'			=>	'Почта',
-		'User#'			=>	'# Пользователя',
+		'User#'			=>	'Числовой ид.',
 		'Group'			=>	'Группа',
 		'Other groups'	=>	'Прочие группы',
 		'Home directory'=>	'Домашний каталог',
-		'Login shell'	=>	'Интерпретатор команд',
+		'Login shell'	=>	'Интерпретатор',
 		'Drive'			=>	'Диск',
 		'Profile'		=>	'Профиль',
 		'Logon script'	=>	'Сценарий входа',
 		'Telephone'		=>	'Телефон',
 		'Fax number'	=>	'Номер факса',
+		'Common'		=>	'Основные',
 		'Extended'		=>	'Дополнительно',
 		'User "%s" not found'	=>	'Не найден пользователь "%s"',
 		'User "%s" not found: %s'	=>	'Пользователь "%s" не найден: %s',
@@ -109,10 +111,13 @@ my %translations = (
 		'Error deleting Unix-user "%s" (%s): %s'	=>	'Ошибка удаления Unix-пользователя "%s" (%s): %s',
 		'Error deleting Windows-user "%s" (%s): %s'	=>	'Ошибка удаления Windows-пользователя "%s" (%s): %s',
 		'Cannot display user "%s"'	=>	'Не могу вывести пользователя "%s"',
+		'Cannot change password for "%s" on "%s": %s' => 'Не могу изменить пароль для "%s" на "%s": %s',
 		'Exit and loose changes ?'	=>	'Выйти и потерять изменения ?',
+		'Passwords dont match' => 'Введенные пароли не совпадают',
+		'Password contains non-basic characters. Are you sure ?' => 'Пароль содержит символы из расширенного набора. Вы уверены ?',
 		'Attributes'	=>	'Атрибуты',
-		'Save'	=>	'Сохранить',
-		'Revert'	=>	'Отменить',
+		'Save'			=>	'Сохранить',
+		'Revert'		=>	'Отменить',
 		'Identifier'	=>	'Идентификатор',
 		'Full name'	=>	'Полное имя',
 		'Create'	=>	'Добавить',
@@ -126,6 +131,7 @@ my %translations = (
 		'Group number'	=>	'Номер группы',
 		'Description'	=>	'Описание',
 		'Members'		=>	'Члены группы',
+		'Principal name'=>	'Принципал',
 		'Error saving group "%s": %s'	=>	'Ошибка сохранения группы "%s": %s',
 		'Cancel new group ?'	=>	'Отменить добавление группы ?',
 		'Delete group "%s" ?'	=>	'Удалить группу "%s"',
@@ -181,6 +187,12 @@ my %all_attrs = (
 			type => 'p',
 			label => 'Password',
 			ldap => { uni => 'userPassword', ads => 'unicodePwd' },
+		},
+		password2 => {
+			type => 'p',
+			label => 'Again password',
+			ldap => { uni => 'userPassword', ads => 'unicodePwd' },
+			verify => 1,
 		},
 		mail => {
 			label => 'Mail',
@@ -367,21 +379,22 @@ my %all_lc_attrs;
 
 my %gui_attrs = (
 	user => [
-		[ 'UNIX', qw(givenName sn cn uid mail uidNumber
-					gidNumber moreGroups homeDirectory loginShell
+		[ 'Common',
+			qw(	givenName sn cn uid mail password password2
+				uidNumber gidNumber moreGroups homeDirectory loginShell
 		) ],
-		[ 'Windows', qw(ntUserHomeDir ntUserHomeDirDrive
-						ntUserProfile ntUserScriptPath
-						accountExpires userAccountControl userPrincipalName
-						password dn ntDn
+		[ 'Windows',
+			qw(	ntUserHomeDir ntUserHomeDirDrive
+				ntUserProfile ntUserScriptPath
+				userPrincipalName
 		) ],
-		[ 'Communigate', ],
-		[ 'Extended', qw(telephoneNumber facsimileTelephoneNumber
+		[ 'Extended',
+			qw(	telephoneNumber facsimileTelephoneNumber
 		) ],
 	],
 	group => [
-		[ 'UNIX', qw(cn gidNumber description memberUid
-					dn
+		[ 'Common',
+			qw( cn gidNumber description memberUid
 		) ],
 	],
 );
@@ -421,10 +434,8 @@ sub configure (@)
 		my $mode = "config";
 		my %modes = ( ads => 1, uni => 1, config => 1 );
 		while (<CONFIG>) {
-			chop;
-			chomp;
-			next if /^\s*$/;
-			next if /^\s*\#/;
+			chop; chomp;
+			next if /^\s*$/ || /^\s*\#/;
 			if (/^\s*\[\s*(\S+)\s*\]\s*$/) {
 				$mode = $1;
 				log_error('incorrect section "%s" in %s: %s', $mode, $file, $_)
@@ -432,9 +443,7 @@ sub configure (@)
 				next;
 			} elsif (/^\s*(\S+)\s*=\s*(.*?)\s*$/) {
 				my ($name, $val) = ($1, $2);
-				if ($val =~ /^\'(.*?)\'$/) {
-					$val = $1;
-				} elsif ($val =~ /^\"(.*?)\"$/) {
+				if ($val =~ /^\'(.*?)\'$/ || $val =~ /^\"(.*?)\"$/) {
 					$val = $1;
 				} elsif ($val =~ /^\[\s*(.*?)\s*\]$/) {
 					my @val = split(/\s*,\s*/,$1);
@@ -445,9 +454,9 @@ sub configure (@)
 					} @val;
 					$val = \@val;
 				}
-				if ($mode eq 'ads' || $mode eq 'uni') {
+				if ($mode =~ /^(ads|uni)$/) {
 					$servers{$mode}{$name} = $val;
-				} elsif ($mode eq "config") {
+				} elsif ($mode eq 'config') {
 					$config{$name} = $val;				
 				}
 			} else {
@@ -490,6 +499,7 @@ sub setup_attrs ()
 			$desc->{visual} = $desc->{label} ? 1 : 0;
 			$desc->{label} = _T($desc->{label}) if $desc->{label};
 			$desc->{readonly} = 0 unless $desc->{readonly};
+			$desc->{verify} = 0 unless $desc->{verify};
 			
 			$desc->{conv} = 'none' unless $desc->{conv};
 			for my $dir (0, 1) {
@@ -1047,18 +1057,19 @@ sub init_attr ($$$)
 		$at->{label} = Gtk2::Label->new($desc->{label});
 		$at->{label}->set_justify('left');
 		$at->{entry} = Gtk2::Entry->new;
-		$at->{entry}->{friend} = $at;
 		$at->{entry}->set_editable(!$desc->{disable} && !$desc->{readonly});
 		if ($at->{type} eq 'p') {
-			#FIXME
 			$at->{entry}->set_visibility(0);
 			$at->{entry}->set_invisible_char('*');
 		}
 		if ($at->{type} =~ m/^(g|G|U)$/) {
 			$at->{popup} = create_button(undef, 'popup.png');
 			$at->{popup}->set_relief('none');
+			$at->{popup}->can_focus(0);
 		}
-		$at->{bulb} = Gtk2::Image->new if $visual & 2;
+		if ($config{show_bulbs}) {
+			$at->{bulb} = Gtk2::Image->new;
+		}
 	}
 	$at->{val} = $at->{old} = '';
 	$at->{state} = 'empty';
@@ -1311,9 +1322,10 @@ sub ldap_read_pass ($$$$)
 sub ldap_write_pass ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	return 0 if $val eq OLD_PASS;
+	return 0 if $val eq OLD_PASS || $at->{desc}->{verify};
 	if ($srv eq 'ads') {
-		# the following line works only for administrator
+		# 'replace' works only for administrator.
+		# unprivileged users need to use change(delete=old,add=new)
 		$ldap->replace($name => encode_ad_pass($val));
 		return 1;
 	}
@@ -1324,31 +1336,31 @@ sub ldap_write_pass ($$$$$)
 sub ldap_write_pass_final ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	my $obj = $at->{obj};
-	return 0;
-	if ($at->{state} ne 'user') {
-		log_debug('no need to change password for %s', get_attr($obj, 'dn'));
-		return 0;
-	}
-	$ldap = get_server($srv, 1)->{ldap};
-	my $old = $at->{old};
-	my ($dn, $msg);
+	return 0 if $val eq OLD_PASS || $at->{desc}->{verify};
 	if ($srv eq 'uni') {
-		$dn = get_attr($obj, 'dn');
-		my $extpwd ='1.3.6.1.4.1.4203.1.11.1'; 
-		if ($ldap->root_dse->supported_extension($extpwd)) {
-			$msg = $ldap->set_password(user => $dn,
-								oldpasswd => $old, newpasswd => $val);
+		$ldap = get_server($srv, 1)->{ldap};
+		my $obj = $at->{obj};
+		my $dn = get_attr($obj, 'dn');
+		my $extop = $ldap->root_dse->supported_extension('1.3.6.1.4.1.4203.1.11.1') ? 1 : 0;
+		my $res;
+		if ($extop) {
+			# set_password() without 'oldpasswd' works only for administrator
+			# ordinary users need to supply 'oldpasswd'
+			$res = $ldap->set_password(user => $dn, newpasswd => $val);
 		} else {
-			$msg = $ldap->modify($dn, changes => [
-										delete	=> [ userPassword => $old ],
-										add		=> [ userPassword => $val ]
-									] );
+			# 'replace' works only for administrator.
+			# unprivileged users need to use change(delete=old,add=new)
+			$res = $ldap->modify($dn, replace => { $name => $val });
 		}
-	}
-	if ($msg->code) {
-		message_box('error', 'close', _T('Cannot change passowrd for "%s" on "%s": %s',
-					$dn, $srv, $msg->error));
+		log_debug('change password on "%s": dn="%s" extop=%d attr=%s code=%d',
+					$srv, $dn, $extop, $name, $res->code);
+		if ($res->code) {
+			message_box('error', 'close',
+						_T('Cannot change password for "%s" on "%s": %s',
+							$dn, $srv, $res->error));
+			return 0;
+		}
+		return 1;
 	}
 	return 0;
 }
@@ -1965,43 +1977,57 @@ sub ldap_delete ($$)
 }
 
 
+sub get_credentials ($)
+{
+	my $srv = shift;
+	my $cfg = get_server($srv);
+	my $user = nvl($cfg->{user});
+	my $pass = $user eq '' ? '' : nvl($cfg->{pass});
+	if ($pass eq '') {
+		my $secret = nvl($cfg->{passfile});
+		$secret = nvl($config{passfile}) if $secret eq '';
+		open (SECRET, $secret)
+			or log_error('cannot open passfile "%s"', $secret);
+		while (<SECRET>) {
+			next if /^\s*$/ || /^\s*#$/;
+			/^\s*([^\s'"]+|'[^']*'|"[^"]*")\s+([^\s'"]+|'[^']*'|"[^"]*")\s+([^\s'"]+|'[^']*'|"[^"]*")\s*$/
+				or log_error('syntax error in line %d of "%s"', $., $secret);
+			my ($iserv, $iuser, $ipass) = ($1, $2, $3);
+			$iserv = nvl($1) if $iserv =~ /^'(.*?)'$/ || $iserv =~ /^"(.*?)"$/;
+			$iuser = nvl($1) if $iuser =~ /^'(.*?)'$/ || $iuser =~ /^"(.*?)"$/;
+			$ipass = nvl($1) if $ipass =~ /^'(.*?)'$/ || $ipass =~ /^"(.*?)"$/;
+			#log_debug('secret: srv="%s" user="%s" pass="%s"', $iserv, $iuser, $ipass);
+			next if $iserv ne $srv;
+			if ( ($user ne '' && ($iuser eq $user || $iuser eq '*'))
+					|| ($user eq '' && $iuser ne '*') ) {
+				$user = $iuser if $user eq '';
+				$pass = $ipass;
+				last;
+			}
+		}
+		close SECRET;
+		log_error('cannot find credentials for server "%s"', $srv)
+			if $user eq '' || $pass eq '';
+	}
+	return ($user, $pass);
+}
+
+
 sub ldap_connect_all ()
 {
 	for my $srv (keys %servers) {
 		my $cfg = $servers{$srv};
-		my ($ldap, $mesg, $entry);
 		$cfg->{name} = $srv;
-
 		if ($cfg->{disable}) {
 			$cfg->{ldap} = Net::LDAP->new;
 			next;
 		}
-
-		my ($uri, $user) = ($cfg->{uri}, $cfg->{user});
-		my ($pass, $pfile) = ($cfg->{pass}, $cfg->{passfile});
-
-		if (!$pass && $pfile) {
-			open (PFILE, $pfile) or log_error('cannot open passfile "%s"', $pfile);
-			$pass = "";
-			while (<PFILE>) {
-				chomp;
-				next if /^\s*$/;
-				s/^\s*//; s/\s*$//;
-				$pass = $_;
-				last;
-			}
-			close PFILE;
-		}
-
-		log_error('invalid credentials for ldap server "%s"', $srv)
-			unless $uri && $user && $pass;
- 
-		$ldap = Net::LDAP->new($uri, debug => $cfg->{debug})
-			or log_error('cannot connect to %s: %s', $uri, $@);
-		$mesg = $ldap->bind($user, password => $pass);
-		log_error('cannot bind to ldap server "%s": %s', $srv, $mesg->error)
-			if $mesg->code;
-		$cfg->{ldap} = $ldap;
+		my $uri = nvl($cfg->{uri});
+		log_error('invalid uri for server "%s"', $srv) if $uri eq '';
+		($cfg->{user}, $cfg->{pass}) = get_credentials($srv);
+		$cfg->{ldap} = Net::LDAP->new($uri, debug => $cfg->{debug});
+		my $res = $cfg->{ldap}->bind($cfg->{user}, password => $cfg->{pass});
+		log_error('cannot bind to server "%s": %s', $srv, $res->error) if $res->code;
 	}
 }
 
@@ -2055,6 +2081,21 @@ sub user_save ()
 	return unless defined $path;
 	my $usr = $user_obj;
 	return unless $usr->{changed};
+
+	my $pass = get_attr($usr, 'password');
+	if ($pass ne get_attr($usr, 'password2')) {
+		message_box('error', 'close', _T('Passwords dont match'));
+		get_attr_node($usr, 'password')->{entry}->grab_focus;
+		return;
+	}
+	for (map { ord } split //, $pass) {
+		next if $_ > 32 && $_ < 127;
+		my $resp = message_box('question', 'yes-no',
+							_T('Password contains non-basic characters. Are you sure ?'));
+		last if $resp eq 'yes';
+		get_attr_node($usr, 'password')->{entry}->grab_focus;
+		return;
+	}
 
 	my $model = $user_list->get_model;
 	my $node = $model->get_iter($path);
@@ -2314,13 +2355,16 @@ sub create_user_groups_editor ($)
 		$list->pack_start(Gtk2::HSeparator->new, 0, 0, 0);
 	}
 
+	my $btn_close;
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) } ],
+		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) }, \$btn_close ],
 	);
 
 	$vbox->pack_end($buttons, 0, 0, 2);
 	$wnd->set_default_size(150, 200);
+	$btn_close->can_default(1);
+	$wnd->set_default($btn_close);
 	show_popup($wnd, $popup_btn);
 }
 
@@ -2378,9 +2422,10 @@ sub create_group_chooser ($)
 	$frame->add($scroll);
 	$vbox->pack_start($frame, 1, 1, 1);
 
+	my $btn_close;
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) } ],
+		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) }, \$btn_close ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
 
@@ -2397,6 +2442,8 @@ sub create_group_chooser ($)
 	}
 
 	$wnd->set_default_size(150, 200);
+	$btn_close->can_default(1);
+	$wnd->set_default($btn_close);
 	show_popup($wnd, $popup_btn);
 }
 
@@ -2434,8 +2481,8 @@ sub create_user_desc ()
 		$scroll->add_with_viewport($abox);
 
 		for my $r (0 .. $#tab_attrs) {
-			my $at = init_attr($usr, $tab_attrs[$r], 2);
-			$abox->attach($at->{bulb}, 0, 1, $r, $r+1, [], [], 1, 1);
+			my $at = init_attr($usr, $tab_attrs[$r], 1);
+			$abox->attach($at->{bulb}, 0, 1, $r, $r+1, [], [], 1, 1) if $at->{bulb};
 			$abox->attach($at->{label}, 1, 2, $r, $r+1, [], [], 1, 1);
 			my $right = 4;
 			if ($at->{popup}) {
@@ -2457,6 +2504,8 @@ sub create_user_desc ()
 		[ _T('Revert'), "revert.png", \&user_revert,\$btn_usr_revert ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
+
+	$btn_usr_apply->can_default(1);
 
 	return $vbox;
 }
@@ -2692,6 +2741,7 @@ sub group_entry_edited ($)
 
 	set_attr($grp, $at->{name}, $val);
 	rework_group($grp);
+	update_obj_gui($grp);
 	$group_name->set_text(get_attr($grp, 'cn'));
 	set_group_changed(obj_changed($grp));
 }
@@ -2760,13 +2810,16 @@ sub create_group_users_editor ($)
 		$list->pack_start(Gtk2::HSeparator->new, 0, 0, 0);
 	}
 
+	my $btn_close;
 	my $buttons = create_button_bar(
 		[],
-		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) } ],
+		[ _T('Close'), "apply.png", sub { destroy_popup($wnd, $popup_btn) }, \$btn_close ],
 	);
 
 	$vbox->pack_end($buttons, 0, 0, 2);
 	$wnd->set_default_size(150, 200);
+	$btn_close->can_default(1);
+	$wnd->set_default($btn_close);
 	show_popup($wnd, $popup_btn);
 }
 
@@ -2804,18 +2857,15 @@ sub create_group_desc ()
 
 		for my $r (0 .. $#tab_attrs) {
 			my $at = init_attr($grp, $tab_attrs[$r], 1);
-			$abox->attach($at->{label}, 0, 1, $r, $r+1, [], [], 1, 1);
-			my $right = 3;
+			$abox->attach($at->{bulb}, 0, 1, $r, $r+1, [], [], 1, 1) if $at->{bulb};
+			$abox->attach($at->{label}, 1, 2, $r, $r+1, [], [], 1, 1);
+			my $right = 4;
 			if ($at->{popup}) {
-				my $popup_btn = create_button(undef, 'popup.png');
-				$at->{popup} = $popup_btn;
-				$popup_btn->signal_connect(clicked =>
-								sub { create_group_users_editor($at); });
-				$popup_btn->set_relief('none');
-				$abox->attach($popup_btn, 2, 3, $r, $r+1, [], [], 1, 1);
-				$right = 2;
+				$at->{popup}->signal_connect(clicked => sub { create_group_users_editor($at); });
+				$abox->attach($at->{popup}, 3, 4, $r, $r+1, [], [], 1, 1);
+				$right = 3;
 			}
-			$abox->attach($at->{entry}, 1, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
+			$abox->attach($at->{entry}, 2, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
 			$at->{entry}->signal_connect(key_release_event => sub { group_entry_edited($at) });
 		}
 	}
@@ -2826,6 +2876,8 @@ sub create_group_desc ()
 		[ _T('Revert'), "revert.png", \&group_revert,\$btn_grp_revert ],
 	);
 	$vbox->pack_end($buttons, 0, 0, 2);
+
+	$btn_grp_apply->can_default(1);
 
 	return $vbox;
 }
