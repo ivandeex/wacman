@@ -20,6 +20,8 @@ use Unicode::String qw(utf16);
 use Digest::MD5;
 use Digest::SHA1;
 use Net::Telnet ();
+use threads;
+use threads::shared;
 
 use FindBin qw[$Bin];
 use Cwd 'abs_path';
@@ -2537,7 +2539,6 @@ sub rework_group ($)
 sub cli_connect ()
 {
 	my $cfg = get_server('cli');
-	$cfg->{connected} = 0;
 	my $uri = nvl($cfg->{uri});
 	$uri =~ /^\s*(?:\w+\:\/\/)?([\w\.\-]+)(?:\s*\:\s*(\d+))[\s\/]*$/
 		or log_error('invalid uri for server CLI');
@@ -2565,23 +2566,21 @@ sub cli_connect ()
 	}
 	if ($res->{code}) {
 		log_error('cannot connect to CLI: %s', $res->{msg}) if $res->{code};
-	} else {
-		log_debug('successfully connected to CLI');
-		$cfg->{connected} = 1;
-		$cfg->{timer_id} = Glib::Timeout->add($config{cli_idle_interval} * 1000, \&cli_idle);
+		return -1;
 	}
+	log_debug('successfully connected to CLI');
+	$cfg->{connected} = 1;
+	$cfg->{timer_id} = Glib::Timeout->add($config{cli_idle_interval} * 1000, \&cli_idle);
+	return 0;
 }
 
 
 sub cli_disconnect ()
 {
 	my $cfg = get_server('cli');
-	if ($cfg->{connected}) {
-		cli_cmd('QUIT');
-		Glib::Source->remove($cfg->{timer_id}) if defined $cfg->{timer_id};
-		undef $cfg->{timer_id};
-		$cfg->{connected} = 0;
-	}
+	cli_cmd('QUIT');
+	Glib::Source->remove($cfg->{timer_id}) if defined $cfg->{timer_id};
+	undef $cfg->{timer_id};
 }
 
 
@@ -2841,30 +2840,41 @@ sub get_credentials ($)
 }
 
 
+sub ldap_connect_to ($)
+{
+	my $srv = shift;
+	my $cfg = $servers{$srv};
+	$cfg->{name} = $srv;
+	$cfg->{connected} = 0;
+	if ($srv eq 'cli') {
+		return cli_connect();
+	}
+	if ($cfg->{disable}) {
+		$cfg->{ldap} = Net::LDAP->new;
+		return 0;
+	}
+	my $uri = nvl($cfg->{uri});
+	log_error('invalid uri for server "%s"', $srv) if $uri eq '';
+	($cfg->{user}, $cfg->{pass}) = get_credentials($srv);
+	$cfg->{ldap} = Net::LDAP->new($uri, debug => $cfg->{debug});
+	log_debug('connecting to server "%s"...', $srv);			
+	my $res = $cfg->{ldap}->bind($cfg->{user}, password => $cfg->{pass});
+	if ($res->code) {
+		log_error('cannot bind to server "%s": %s', $srv, $res->error);
+		return -1;
+	}
+	$cfg->{connected} = 1;
+	log_debug('successfully connected to server "%s"', $srv);			
+	return 0;	
+}
+
+
+
 sub ldap_connect_all ()
 {
 	for my $srv (keys %servers) {
-		my $cfg = $servers{$srv};
-		$cfg->{name} = $srv;
-		if ($srv eq 'cli') {
-			cli_connect();
-			next;
-		}
-		if ($cfg->{disable}) {
-			$cfg->{ldap} = Net::LDAP->new;
-			next;
-		}
-		my $uri = nvl($cfg->{uri});
-		log_error('invalid uri for server "%s"', $srv) if $uri eq '';
-		($cfg->{user}, $cfg->{pass}) = get_credentials($srv);
-		$cfg->{ldap} = Net::LDAP->new($uri, debug => $cfg->{debug});
-		log_debug('connecting to server "%s"...', $srv);			
-		my $res = $cfg->{ldap}->bind($cfg->{user}, password => $cfg->{pass});
-		if ($res->code) {
-			log_error('cannot bind to server "%s": %s', $srv, $res->error);
-		} else {
-			log_debug('successfully connected to server "%s"', $srv);			
-		}
+		log_info('connecting to "%s"', $srv);
+		ldap_connect_to($srv);
 	}
 }
 
@@ -2873,11 +2883,13 @@ sub ldap_disconnect_all ()
 {
 	for my $cfg (values %servers) {
 		next if $cfg->{disable};
+		next unless $cfg->{connected};
 		if ($cfg->{name} eq 'cli') {
 			cli_disconnect();
 		} else {
 			$cfg->{ldap}->disconnect;
 		}
+		$cfg->{connected} = 0;
 	}
 }
 
@@ -4335,6 +4347,7 @@ sub gui_exit ()
 	mailgroup_unselect();
 	ldap_disconnect_all();
 	Gtk2->main_quit;
+	exit;
 }
 
 
