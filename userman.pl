@@ -162,6 +162,8 @@ my %translations = (
 		'Mail groups'	=>	'Почтовые группы',
 		'Domain Intercept'	=>	'Слеж. за доменом',
 		'User Intercept'	=>	'Слеж. за пользователем',
+		'Real user id'	=>	'Реальный ид. пользователя',
+		'Real group id'	=>	'Реальный ид. группы',
 		'Error saving group "%s": %s'	=>	'Ошибка сохранения группы "%s": %s',
 		'Cancel new group ?'	=>	'Отменить добавление группы ?',
 		'Delete group "%s" ?'	=>	'Удалить группу "%s"',
@@ -420,6 +422,18 @@ my %all_attrs = (
 		o => { ldap => 'uni,ads', },
 		ou => { ldap => 'uni,ads', },
 		label => { ldap => 'uni,ads', },
+		real_uidn => {
+			ldap => { uni => 'uidNumber' },
+			type => 'real_uidn',
+			label => 'Real user id',
+			readonly => 1,
+		},
+		real_gidn => {
+			ldap => { uni => 'gidNumber' },
+			type => 'real_gidn',
+			label => 'Real group id',
+			readonly => 1,
+		},
 	},
 	########## group ##########
 	group => {
@@ -517,6 +531,7 @@ my %gui_attrs = (
 			qw(	telephoneNumber facsimileTelephoneNumber
 				telnum aliases mailgroups
 				domainIntercept userIntercept
+				real_uidn real_gidn
 		) ],
 	],
 	group => [
@@ -1399,6 +1414,8 @@ sub init_attr ($$$)
 	domainIntercept => [ \&cgp_read_domain_intercept, \&ldap_write_none, \&cgp_write_domain_intercept ],
 	userIntercept => [ \&cgp_read_user_intercept, \&ldap_write_none, \&cgp_write_user_intercept ],
 	mailgroup => [ \&ldap_read_none, \&ldap_write_none, \&ldap_write_none ],
+	real_uidn => [ \&ldap_read_real_uidn, \&ldap_write_none, \&ldap_write_none ],
+	real_gidn => [ \&ldap_read_real_gidn, \&ldap_write_none, \&ldap_write_none ],
 );
 
 
@@ -1512,6 +1529,22 @@ sub ldap_read_unix_gidn ($$$$)
 		}
 	}
 	return $val;
+}
+
+
+sub ldap_read_real_uidn ($$$$)
+{
+	my ($at, $srv, $ldap, $name) = @_;
+	my @pwent = getpwnam(nvl($ldap->get_value('uid')));
+	return nvl($pwent[2]);
+}
+
+
+sub ldap_read_real_gidn ($$$$)
+{
+	my ($at, $srv, $ldap, $name) = @_;
+	my @pwent = getpwnam(nvl($ldap->get_value('uid')));
+	return nvl($pwent[3]);
 }
 
 
@@ -2239,9 +2272,14 @@ sub user_write ($)
 		log_info('creating home directory "%s"', $home);
 		$install{src} = $config{skel_dir};
 		$install{dst} = $home;
-		$install{uidn} = get_attr($usr, 'uidNumber');
-		$install{gidn} = ldap_get_unix_group_ids('uni',
-											get_attr($usr, 'gidNumber'), 'warn');
+		$install{uidn} = $install{gidn} = 0;
+		if ($config{prefer_nss_ids}) {
+			my @pwent = getpwnam(get_attr($usr, 'uid'));
+			$install{uidn} = $pwent[2] if $pwent[2];
+			$install{gidn} = $pwent[3] if $pwent[3];
+		}
+		$install{uidn} = get_attr($usr, 'uidNumber') unless $install{uidn};
+		$install{gidn} = ldap_get_unix_group_ids('uni', get_attr($usr, 'gidNumber'), 'warn') unless $install{gidn};
 
 		my $ret = File::Copy::Recursive::rcopy($install{src}, $install{dst});
 		find(sub {
