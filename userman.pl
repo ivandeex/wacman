@@ -177,6 +177,7 @@ my %translations = (
 		'Cannot display mail group "%s"' => 'Не могу отобразить почтовую группу "%s"',
 		'This object name is reserved' => 'Этот идентификатор зарезервирован. Используйте другой.',
 		'Cannot delete reserved object' => 'Этот объект нельзя удалить. Он зарезервирован.',
+		'Connecting to "%s" ...' => 'Подключаюсь к "%s" ...',
 	},
 );
 
@@ -2625,6 +2626,7 @@ sub cli_disconnect ()
 sub cli_idle ()
 {
 	cli_cmd('NOOP') if get_server('cli')->{connected};
+	return 1;
 }
 
 
@@ -2907,13 +2909,39 @@ sub ldap_connect_to ($)
 }
 
 
+my $connect_done :shared;
+
+sub background_dialog ($)
+{
+	my $srv = shift;
+	my $info = Gtk2::MessageDialog->new(
+				undef, 'modal', 'info', 'close',
+				_T('Connecting to "%s" ...', $srv)
+			);
+	my $timer_id = Glib::Timeout->add(100, sub {
+		if ($connect_done) {
+			$info->response(1);
+			return 0;
+		}
+		return 1;
+	});
+	$info->run;
+	Glib::Source->remove($timer_id);
+	$info->hide;
+	exit() unless $connect_done;
+}
+
 
 sub ldap_connect_all ()
 {
+	$connect_done = 0;
+	#my $thr = threads->create(sub { background_dialog('server') });
 	for my $srv (keys %servers) {
 		log_info('connecting to "%s"', $srv);
 		ldap_connect_to($srv);
 	}
+	$connect_done = 1;
+	#$thr->join;
 }
 
 
