@@ -638,6 +638,11 @@ sub configure (@)
 		}
 		close(CONFIG);
 	}
+	my $alg = $config{cgp_password};
+	$alg = $alg ? lc(nvl($alg)) : 'cli';
+	log_error("CGP password type \"$alg\" is not one of: cli, sha, clear")
+		if $alg !~ /^(cli|sha|clear)$/;
+	$config{cgp_password} = $alg;
 }
 
 
@@ -657,7 +662,10 @@ sub dump_config ()
 sub attribute_enabled ($$)
 {
 	my ($objtype, $name) = @_;
-	return 0 if $objtype eq 'user' && $name eq 'domainIntercept';
+	if ($objtype eq 'user') {
+		return 0 if $name eq 'domainIntercept';
+		return 0 if $name eq 'password2' && $config{show_password};
+	}
 	return 1;
 }
 
@@ -1284,7 +1292,7 @@ sub setup_attr ($$$)
 		$at->{label}->set_justify('left');
 		$at->{entry} = Gtk2::Entry->new;
 		$at->{entry}->set_editable(!$desc->{disable} && !$desc->{readonly});
-		if ($at->{type} eq 'pass') {
+		if ($at->{type} eq 'pass' && !$config{show_password}) {
 			$at->{entry}->set_visibility(0);
 			$at->{entry}->set_invisible_char('*');
 		}
@@ -1594,14 +1602,20 @@ sub decode_ad_pass ($)
 sub ldap_read_pass ($$$$)
 {
 	my ($at, $srv, $ldap, $name) = @_;
-	return OLD_PASS;
+	my $val = '';
+	if (!$config{show_password} || $servers{cgp}{disable}) {
+		$val = OLD_PASS;
+	} elsif ($srv eq 'cgp') {
+		$val = ldap_read_string($at, $srv, $ldap, $name);
+	}
+	return ($at->{oldpass} = nvl($val));
 }
 
 
 sub ldap_write_pass ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	return 0 if $val eq OLD_PASS || $at->{desc}->{verify};
+	return 0 if $at->{desc}->{verify} || $val eq $at->{oldpass};
 	if ($srv eq 'ads') {
 		# 'replace' works only for administrator.
 		# unprivileged users need to use change(delete=old,add=new)
@@ -1615,7 +1629,7 @@ sub ldap_write_pass ($$$$$)
 sub ldap_write_pass_final ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	return 0 if $val eq OLD_PASS || $at->{desc}->{verify};
+	return 0 if $at->{desc}->{verify} || $val eq $at->{oldpass};
 	if ($srv eq 'uni') {
 		my $conf = get_server($srv, 1);
 		$ldap = $conf->{ldap};
@@ -1651,11 +1665,32 @@ sub ldap_write_pass_final ($$$$$)
 		$ldap = get_server($srv, 1)->{ldap};
 		my $obj = $at->{obj};
 		my $dn = get_attr($obj, 'cgpDn');
-		my $digest = "\x{02}{SHA}".Digest::SHA1::sha1_base64($val);
-		log_debug('digest=%s', $digest);
+
+		my $alg = $config{cgp_password};
+		my $cgpass = nvl($val);
+		if ($cgpass =~ /^\{\w{2,5}\}\w+$/ && $config{show_password}) {
+			$cgpass = "\x{02}" . $cgpass;
+			$alg = 'clear' if $alg ne 'cli';
+		}
+		if ($alg eq 'cli') {
+			my $mail = get_attr($obj, 'mail');
+			my $res = cli_cmd('SetAccountPassword %s PASSWORD %s', $mail, $cgpass);
+			return 1 if $res->{code} == 0;
+			message_box('error', 'close',
+					_T('Cannot change password for "%s" on "%s": %s',
+						$mail, $srv, $res->{msg}));
+			return 0;
+		} 
+		if ($alg eq 'sha') {
+			$cgpass = "\x{02}{SHA}".Digest::SHA1::sha1_base64($val);
+		} else {
+			$cgpass = nvl($val);
+		}
+		log_debug('cgpass=%s', $cgpass);
+
 		# 'replace' works only for administrator.
 		# unprivileged users need to use change(delete=old,add=new)
-		my $res = $ldap->modify($dn, replace => { $name => $digest });
+		my $res = $ldap->modify($dn, replace => { $name => $cgpass });
 		log_debug('change password on "%s": dn="%s" attr=%s code=%d',
 					$srv, $dn, $name, $res->code);
 		if ($res->code) {
@@ -3003,12 +3038,13 @@ sub user_save ()
 	return unless $usr->{changed};
 
 	my $pass = get_attr($usr, 'password');
-	if ($pass ne get_attr($usr, 'password2')) {
+	if (attribute_enabled('user', 'password2') && $pass ne get_attr($usr, 'password2')) {
 		message_box('error', 'close', _T('Passwords dont match'));
 		focus_attr($usr, 'password');
 		return;
 	}
-	unless (isascii $pass) {
+	(my $nofirst02 = $pass) =~ s/^\x{02}//;
+	unless (isascii $nofirst02) {
 		my $resp = message_box('question', 'yes-no',
 							_T('Password contains non-basic characters. Are you sure ?'));
 		if ($resp ne 'yes') {
