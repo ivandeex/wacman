@@ -6,7 +6,6 @@ use warnings;
 use utf8;
 use Carp qw(cluck croak);
 use Getopt::Std;
-use Gtk2 -init;
 use POSIX;
 use Encode;
 use Time::HiRes 'gettimeofday';
@@ -22,9 +21,13 @@ use Digest::SHA1;
 use Net::Telnet ();
 use threads;
 use threads::shared;
+use Glib qw(TRUE FALSE);
+use Gtk2 qw(-init -threads-init);
 
 use FindBin qw[$Bin];
 use Cwd 'abs_path';
+
+Glib::Object->set_threadsafe(TRUE);
 
 my ($pname, $main_wnd, %install);
 
@@ -89,6 +92,7 @@ my %config = (
 	cli_timeout			=>	3,
 	cli_idle_interval	=>	30,
 	language			=>	'ru',
+	show_splash			=>	0,
 );
 
 
@@ -177,7 +181,8 @@ my %translations = (
 		'Cannot display mail group "%s"' => 'Не могу отобразить почтовую группу "%s"',
 		'This object name is reserved' => 'Этот идентификатор зарезервирован. Используйте другой.',
 		'Cannot delete reserved object' => 'Этот объект нельзя удалить. Он зарезервирован.',
-		'Connecting to "%s" ...' => 'Подключаюсь к "%s" ...',
+		'Connection in progress ...' => 'Идет подключение ...',
+		'Connection to "%s" failed' => 'Ошибка подключения к серверу "%s"',
 	},
 );
 
@@ -323,6 +328,13 @@ my %all_attrs = (
 		SecondaryGroups => {
 			type => 'ntsecg',
 			ldap => 'ads',
+		},
+		sfuDomain => {
+			ldap => { ads => 'msSFU30NisDomain' },
+		},
+		sfuName => {
+			ldap => { ads => 'msSFU30Name' },
+			copyfrom => 'uid',
 		},
 		# ntUser...
 		ntUserCreateNewAccount => {
@@ -2883,7 +2895,7 @@ sub get_credentials ($)
 sub ldap_connect_to ($)
 {
 	my $srv = shift;
-	my $cfg = $servers{$srv};
+	my $cfg = get_server($srv);
 	$cfg->{name} = $srv;
 	$cfg->{connected} = 0;
 	if ($srv eq 'cli') {
@@ -2897,10 +2909,14 @@ sub ldap_connect_to ($)
 	log_error('invalid uri for server "%s"', $srv) if $uri eq '';
 	($cfg->{user}, $cfg->{pass}) = get_credentials($srv);
 	$cfg->{ldap} = Net::LDAP->new($uri, debug => $cfg->{debug});
+	unless (defined $cfg->{ldap}) {
+		log_info('error binding to server "%s"', $srv);
+		return -1;
+	}
 	log_debug('connecting to server "%s"...', $srv);			
 	my $res = $cfg->{ldap}->bind($cfg->{user}, password => $cfg->{pass});
 	if ($res->code) {
-		log_error('cannot bind to server "%s": %s', $srv, $res->error);
+		log_info('cannot bind to server "%s": %s', $srv, $res->error);
 		return -1;
 	}
 	$cfg->{connected} = 1;
@@ -2909,39 +2925,44 @@ sub ldap_connect_to ($)
 }
 
 
-my $connect_done :shared;
-
-sub background_dialog ($)
-{
-	my $srv = shift;
-	my $info = Gtk2::MessageDialog->new(
-				undef, 'modal', 'info', 'close',
-				_T('Connecting to "%s" ...', $srv)
-			);
-	my $timer_id = Glib::Timeout->add(100, sub {
-		if ($connect_done) {
-			$info->response(1);
-			return 0;
-		}
-		return 1;
-	});
-	$info->run;
-	Glib::Source->remove($timer_id);
-	$info->hide;
-	exit() unless $connect_done;
-}
-
-
 sub ldap_connect_all ()
 {
-	$connect_done = 0;
-	#my $thr = threads->create(sub { background_dialog('server') });
+	my $show_splash = $config{show_splash};
+	my ($splash, $thr);
+	my $done :shared = 0;
+	if ($show_splash) {
+		$splash = Gtk2::MessageDialog->new(undef, 'modal', 'info', 'cancel',
+										_T('Connection in progress ...'));
+		$thr = threads->new( sub ($) {
+			$splash->run;
+			return if $done;
+			log_info('connection aborted');
+			exit();
+		});
+	}
 	for my $srv (keys %servers) {
 		log_info('connecting to "%s"', $srv);
-		ldap_connect_to($srv);
+		if ($show_splash) {
+			$splash->set_title($srv);
+			Gtk2::Gdk->flush;
+		}
+		if (ldap_connect_to($srv) < 0) {
+			if ($show_splash) {
+				$done = 1;
+				$splash->destroy;
+				Gtk2::Gdk->flush;
+				$thr->join;
+			}
+			message_box('info', 'close', _T('Connection to "%s" failed', $srv));
+			exit();
+		}
 	}
-	$connect_done = 1;
-	#$thr->join;
+	if ($show_splash) {
+		$done = 1;
+		$splash->destroy;
+		Gtk2::Gdk->flush;
+		$thr->join;
+	}
 }
 
 
