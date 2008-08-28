@@ -83,7 +83,7 @@ my %config = (
 							# 'ntUser',
 	unix_group_classes	=>	'top,posixGroup',	
 	ad_user_classes		=>	'top,user,person,organizationalPerson',	
-	ad_user_category	=>	'Person.Schema.Configuration',
+	ad_user_category	=>	'cn=Person,cn=Schema,cn=Configuration',
 	cgp_user_classes	=>	'top,person,organizationalPerson,inetOrgPerson,CommuniGateAccount',
 	cgp_group_classes	=>	'top,person,organizationalPerson,inetOrgPerson,CommuniGateGroup',
 	cgp_alias_classes	=>	'top,alias',
@@ -1083,22 +1083,11 @@ sub focus_attr ($$)
 # ======== conversion ========
 
 
-sub subst_path ($%)
-{
-	my ($path, %subst) = @_;
-	for my $from (keys %subst) {
-		$path =~ s/\[$from\]/$subst{$from}/g;		
-	}
-	$path =~ s{/}{\\}g;
-	return $path;
-}
-
-
 sub path2dn ($;$$)
 {
 	my ($path, $prefix, $split) = @_;
-	$prefix = 'cn' unless defined $prefix;
-	$split = '\.' unless defined $split;
+	$prefix = 'dc' unless $prefix;
+	$split = '\.' unless $split;
 	return join(",", map("$prefix=$_",split(/$split/, $path)));
 }
 
@@ -2509,19 +2498,8 @@ sub rework_user ($)
 	set_attr($usr, 'ntObjectClass', append_list(get_attr($usr, 'ntObjectClass'),
 												$config{ad_user_classes}));
 
-	cond_set($usr, 'objectCategory', join(',',path2dn($config{ad_user_category}),
-											path2dn($config{ad_domain},'dc')));
-
-	my %path_subst = (SERVER => $config{home_server}, USER => $uid);
-
-	cond_set($usr, 'ntUserHomeDir',
-			ifnull($uid, subst_path($config{ad_home_dir}, %path_subst)));
-
-	cond_set($usr, 'ntUserProfile',
-			ifnull($uid, subst_path($config{ad_profile_path}, %path_subst)));
-
-	cond_set($usr, 'ntUserScriptPath',
-			ifnull($uid, subst_path($config{ad_script_path}, %path_subst)));
+	cond_set($usr, 'objectCategory',
+			$config{ad_user_category}.','.path2dn($config{ad_domain}));
 
 	cond_set($usr, 'userPrincipalName', $uid.'@'.$config{ad_domain});	
 
