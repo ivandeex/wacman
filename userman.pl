@@ -267,7 +267,7 @@ my %all_attrs = (
 			type => 'groups',
 			label => 'Other groups',
 			popup => 'groups',
-			ldap => { uni => 'uidNumber' },
+			ldap => { uni => 'uid' },
 		},
 		homeDirectory => {
 			label => 'Home directory',
@@ -638,11 +638,16 @@ sub configure (@)
 		}
 		close(CONFIG);
 	}
+
+	# some defaults
 	my $alg = $config{cgp_password};
 	$alg = $alg ? lc(nvl($alg)) : 'cli';
 	log_error("CGP password type \"$alg\" is not one of: cli, sha, clear")
 		if $alg !~ /^(cli|sha|clear)$/;
 	$config{cgp_password} = $alg;
+
+	$config{start_user_id} = 1000 unless $config{start_user_id};
+	$config{start_group_id} = 1000 unless $config{start_group_id};
 }
 
 
@@ -1708,9 +1713,9 @@ sub ldap_write_pass_final ($$$$$)
 sub ldap_read_unix_groups ($$$$)
 {
 	my ($at, $srv, $ldap, $name) = @_;
-	my $uidn = nvl($ldap->get_value($name));
-	$uidn = get_attr($at->{obj}, $name) unless $uidn;
-	my $res = ldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$uidn))", [ 'cn' ]);
+	my $uid = nvl($ldap->get_value($name));
+	$uid = get_attr($at->{obj}, $name) unless $uid;
+	my $res = ldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$uid))", [ 'cn' ]);
 	return join_list map { $_->get_value('cn') } $res->entries;
 }
 
@@ -1745,8 +1750,8 @@ sub ldap_get_unix_group_ids ($$$)
 
 sub ldap_modify_unix_group ($$$$)
 {
-	my ($srv, $gidn, $uidn, $action) = @_;
-	log_debug('will be %s\'ing unix user %d in group %d...', $action, $uidn, $gidn);
+	my ($srv, $gidn, $uid, $action) = @_;
+	log_debug('will be %s\'ing unix user "%s" in group %d...', $action, $uid, $gidn);
 	my $res = ldap_search('uni', "(&(objectClass=posixGroup)(gidNumber=$gidn))",
 							[ 'memberUid' ]);
 	my $grp = $res->pop_entry;
@@ -1757,11 +1762,11 @@ sub ldap_modify_unix_group ($$$$)
 	my ($old, $new, @new, $exists);
 	$exists = $grp->exists('memberUid');
 	$old =  $exists ? join_list($grp->get_value('memberUid')) : '';
-	$new = $action eq 'add' ? append_list($old, $uidn) : remove_list($old, $uidn);
+	$new = $action eq 'add' ? append_list($old, $uid) : remove_list($old, $uid);
 	@new = split_list $new;
 	if ($old eq $new) {
-		log_debug('unix group %d wont change with user %d: (%s) = (%s)',
-				$gidn, $uidn, $old, $new);
+		log_debug('unix group %d wont change with user "%s": (%s) = (%s)',
+				$gidn, $uid, $old, $new);
 		return 'SAME';
 	}
 	if ($exists) {
@@ -1772,12 +1777,12 @@ sub ldap_modify_unix_group ($$$$)
 	$res = ldap_update('uni', $grp);
 	my $retval;
 	if ($res->code) {
-		log_info('%s unix user %d in group %d error: %s',
-				$action, $uidn, $gidn, $res->error);
+		log_info('%s unix user "%s" in group %d error: %s',
+				$action, $uid, $gidn, $res->error);
 		$retval = $res->error;
 	} else {
-		log_debug('success %s\'ing unix user %d in group %d: [%s] -> [%s]...',
-					$action, $uidn, $gidn, $old, $new);
+		log_debug('success %s\'ing unix user "%s" in group %d: [%s] -> [%s]...',
+					$action, $uid, $gidn, $old, $new);
 		$retval = 'OK';
 	}
 	my $sel_grp = $group_obj;
@@ -1793,17 +1798,17 @@ sub ldap_write_unix_groups_final ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
 	return 0 if $at->{old} eq $at->{val};
-	my $uidn = get_attr($at->{obj}, $name);
+	my $uid = get_attr($at->{obj}, $name);
 	my $old = ldap_get_unix_group_ids($srv, $at->{old}, 'nowarn');
 	my $new = ldap_get_unix_group_ids($srv, $at->{val}, 'warn');
 	log_debug('write_unix_groups(1): old=(%s) new=(%s)', $old, $new);
 	($old, $new) = compare_lists($old, $new);
 	log_debug('write_unix_groups(2): del=(%s) add=(%s)', $old, $new);
 	for my $gidn (split_list $old) {
-		ldap_modify_unix_group($srv, $gidn, $uidn, 'remove');
+		ldap_modify_unix_group($srv, $gidn, $uid, 'remove');
 	}
 	for my $gidn (split_list $new) {
-		ldap_modify_unix_group($srv, $gidn, $uidn, 'add');
+		ldap_modify_unix_group($srv, $gidn, $uid, 'add');
 	}
 	return $old ne '' || $new ne '';
 }
@@ -1834,43 +1839,43 @@ sub ldap_read_unix_members ($$$$)
 sub ldap_write_unix_members ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	my (@uidns, %uidns, %touched_uidns);
-	for my $uid (split_list $val) {
-		if ($uid =~ /^\d+/) {
-			push(@uidns, $uid);
+	my (@uids, %uids, %touched_uids);
+	for my $uidn (split_list $val) {
+		if ($uidn !~ /^\d+/) {
+			$uids{$uidn} = $touched_uids{$uidn} = 1;
 			next;
 		}
-		my $res = ldap_search($srv, "(&(objectClass=person)(uid=$uid))", [ 'uidNumber' ]);
+		my $res = ldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", [ 'uid' ]);
 		my $ue = $res->pop_entry;
-		my $uidn = $ue ? $ue->get_value('uidNumber') : -1;
-		log_debug('search for uid="%s" returns uidn=%d (code=%d)', $uid, $uidn, $res->code);
-		if ($uidn != -1) {
-			$uidns{$uidn} = $touched_uidns{$uidn} = 1;
+		my $uid = $ue ? nvl($ue->get_value('uid')) : '';
+		log_debug('search for uidn="%d" returns uid="%s" (code=%d)', $uidn, $uid, $res->code);
+		if ($uid ne '') {
+			$uids{$uid} = $touched_uids{$uid} = 1;
 		} else {
-			log_info('did not find user uid "%s"', $uid);
+			log_info('did not find user uidn %d', $uidn);
 		}
 	}
 
-	@uidns = sort {$a cmp $b} keys %uidns;
-	log_debug('ldap_write_unix_members: uidns "%s"; "%s" => [%s]',
-				$name, $val, join_list @uidns);
-	if ($#uidns < 0) {
+	@uids = sort keys %uids;
+	log_debug('ldap_write_unix_members: uids(%s) [%s] => [%s]',
+				$name, $val, join_list @uids);
+	if ($#uids < 0) {
 		if ($ldap->exists($name)) {
-			for ($ldap->get_value($name)) { $touched_uidns{$_} = 1 }
+			for ($ldap->get_value($name)) { $touched_uids{$_} = 1 }
 			$ldap->delete($name);
 		}
 	} elsif ($ldap->exists($name)) {
-		for ($ldap->get_value($name)) { $touched_uidns{$_} = 1 }
-		$ldap->replace($name => \@uidns);
+		for ($ldap->get_value($name)) { $touched_uids{$_} = 1 }
+		$ldap->replace($name => \@uids);
 	} else {
-		$ldap->add($name => \@uidns);			
+		$ldap->add($name => \@uids);			
 	}
 
 	my $sel_usr = $user_obj;
-	if (!$sel_usr->{changed} && $touched_uidns{get_attr($sel_usr, 'uidNumber')}) {
+	if (!$sel_usr->{changed} && $touched_uids{get_attr($sel_usr, 'uid')}) {
 		# will refresh gui for this user after commit to LDAP
 		$sel_usr->{refresh_request} = 1;
-		log_debug('will re-select currect user');
+		log_debug('will re-select current user');
 	}
 
 	return 1;
@@ -2406,7 +2411,7 @@ sub next_unix_uidn ()
 		my $uidn = $_->get_value('uidNumber');
 		$next_uidn = $uidn if $uidn > $next_uidn;
 	}
-	$next_uidn = $next_uidn > 0 ? $next_uidn + 1 : 1000;
+	$next_uidn = $next_uidn > 0 ? $next_uidn + 1 : $config{start_user_id};
 	log_debug('next uidn: %d', $next_uidn);
 	return $next_uidn;
 }
@@ -2420,7 +2425,7 @@ sub next_unix_gidn ()
 		my $gidn = $_->get_value('gidNumber');
 		$next_gidn = $gidn if $gidn > $next_gidn;
 	}
-	$next_gidn = $next_gidn > 0 ? $next_gidn + 1 : 1000;
+	$next_gidn = $next_gidn > 0 ? $next_gidn + 1 : $config{start_group_id};
 	log_debug('next gidn: %d', $next_gidn);
 	return $next_gidn;
 }
@@ -3146,9 +3151,8 @@ sub user_delete ()
 
 		my $gid_list = get_attr($usr, 'moreGroups', orig => 1);
 		$gid_list = append_list($gid_list, get_attr($usr, 'gidNumber'));
-		my $uidn = get_attr($usr, 'uidNumber');
 		for my $gidn (ldap_get_unix_group_ids('uni', $gid_list, 'nowarn')) {
-			ldap_modify_unix_group('uni', $gidn, $uidn, 'remove');
+			ldap_modify_unix_group('uni', $gidn, $uid, 'remove');
 		}
 
 		unless ($servers{'ads'}{disable}) {
