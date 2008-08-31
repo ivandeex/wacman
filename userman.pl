@@ -143,6 +143,8 @@ my %translations = (
 		'Exit and loose changes ?'	=>	'Выйти и потерять изменения ?',
 		'Passwords dont match' => 'Введенные пароли не совпадают',
 		'Password contains non-basic characters. Are you sure ?' => 'Пароль содержит символы из расширенного набора. Вы уверены ?',
+		'Password is empty. Are you sure ?' => 'Пароль пустой. Вы уверены ?',
+		'Password is less than 4 characters. Are you sure ?' => 'Пароль короче 4 символов. Вы уверены ?',
 		'Mail aliases should not contain non-basic characters' => 'В почтовых алиасах допустимы только символы базового набора',
 		'Attributes'	=>	'Атрибуты',
 		'Save'			=>	'Сохранить',
@@ -3048,6 +3050,22 @@ sub user_save ()
 		focus_attr($usr, 'password');
 		return;
 	}
+	if ($pass eq '') {
+		my $resp = message_box('question', 'yes-no',
+							_T('Password is empty. Are you sure ?'));
+		if ($resp ne 'yes') {
+			focus_attr($usr, 'password');
+			return;
+		}
+	}
+	if (length($pass) < 4) {
+		my $resp = message_box('question', 'yes-no',
+							_T('Password is less than 4 characters. Are you sure ?'));
+		if ($resp ne 'yes') {
+			focus_attr($usr, 'password');
+			return;
+		}
+	}
 	(my $nofirst02 = $pass) =~ s/^\x{02}//;
 	unless (isascii $nofirst02) {
 		my $resp = message_box('question', 'yes-no',
@@ -3205,6 +3223,9 @@ sub users_refresh ()
 	my @attrs = ('uid', 'cn');
 	my $model = $user_list->get_model;
 	$model->clear;
+
+	ldap_disconnect_all();
+	ldap_connect_all();
 
 	my $res = ldap_search('uni', "(objectClass=person)", \@attrs);
 	my @users = $res->entries;
@@ -3763,6 +3784,9 @@ sub groups_refresh ()
 
 	my $model = $group_list->get_model;
 	$model->clear;
+
+	ldap_disconnect_all();
+	ldap_connect_all();
 
 	my $res = ldap_search('uni', '(objectClass=posixGroup)', ['cn']);
 	my @groups = $res->entries;
