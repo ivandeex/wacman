@@ -9,8 +9,6 @@ use Getopt::Std;
 use POSIX;
 use Encode;
 use Time::HiRes 'gettimeofday';
-use File::Find;
-use File::Copy::Recursive;
 use Net::LDAP;
 use Net::LDAP::Entry;
 use Net::LDAP::Extension::SetPassword;
@@ -42,6 +40,7 @@ my ($mailgroup_list, $mailgroup_attr_frame, $mailgroup_name, $mailgroup_obj);
 
 my ($next_uidn, $next_gidn, $next_telnum);
 my ($domain_intercept, $server_intercept);
+my ($idle_timer_id);
 
 my $pic_home = abs_path("$Bin/images");
 my %pic_cache;
@@ -90,8 +89,9 @@ my %config = (
 	cgp_intercept_opts	=>	'Access,Append,Login,Mailbox,Partial,Sent,Signal',
 	cgp_buggy_ldap		=>	1,
 	cli_timeout			=>	3,
-	cli_idle_interval	=>	30,
+	idle_interval		=>	30,
 	language			=>	'ru',
+	locale				=>	'ru_RU.utf8',
 	show_splash			=>	0,
 );
 
@@ -2323,14 +2323,11 @@ sub user_write ($)
 			$install{gidn} = $pwent[3] if $pwent[3];
 		}
 		$install{uidn} = get_attr($usr, 'uidNumber') unless $install{uidn};
-		$install{gidn} = ldap_get_unix_group_ids('uni', get_attr($usr, 'gidNumber'), 'warn') unless $install{gidn};
-
-		my $ret = File::Copy::Recursive::rcopy($install{src}, $install{dst});
-		find(sub {
-				# FIXME: is behaviour `lchown'-compatible ?
-				chown $install{uidn}, $install{gidn}, $File::Find::name;
-			}, $install{dst}
-		);
+		$install{gidn} = ldap_get_unix_group_ids('uni', get_attr($usr, 'gidNumber'), 'warn')
+			unless $install{gidn};
+		# Copying will work only under root
+		system("LANG=$config{locale} cp -r $install{src} $install{dst}");
+		system("chown -R $install{uidn}:$install{gidn} $install{dst}");
 	}
 
 	flush_cached_data();
@@ -2641,7 +2638,6 @@ sub cli_connect ()
 	}
 	log_debug('successfully connected to CLI');
 	$cfg->{connected} = 1;
-	$cfg->{timer_id} = Glib::Timeout->add($config{cli_idle_interval} * 1000, \&cli_idle);
 	return 0;
 }
 
@@ -2650,15 +2646,6 @@ sub cli_disconnect ()
 {
 	my $cfg = get_server('cli');
 	cli_cmd('QUIT');
-	Glib::Source->remove($cfg->{timer_id}) if defined $cfg->{timer_id};
-	undef $cfg->{timer_id};
-}
-
-
-sub cli_idle ()
-{
-	cli_cmd('NOOP') if get_server('cli')->{connected};
-	return 1;
 }
 
 
@@ -2855,6 +2842,7 @@ sub ldap_search ($$;$@)
 {
 	my ($srv, $filter, $attrs, %params) = @_;
 	my $cfg = get_server($srv,1);
+	return {} unless $cfg->{connected};
 	$params{filter} = $filter;
 	$params{base} = $cfg->{base} unless $params{base};
 	$params{attrs} = $attrs if $attrs;
@@ -2983,11 +2971,14 @@ sub ldap_connect_all ()
 		Gtk2::Gdk->flush;
 		$thr->join;
 	}
+	$idle_timer_id = Glib::Timeout->add($config{idle_interval} * 1000, \&ldap_idle_proc);
 }
 
 
 sub ldap_disconnect_all ()
 {
+	Glib::Source->remove($idle_timer_id) if defined $idle_timer_id;
+	undef $idle_timer_id;
 	for my $cfg (values %servers) {
 		next if $cfg->{disable};
 		next unless $cfg->{connected};
@@ -2998,6 +2989,20 @@ sub ldap_disconnect_all ()
 		}
 		$cfg->{connected} = 0;
 	}
+}
+
+
+sub ldap_idle_proc ()
+{
+	for my $srv (keys %servers) {
+		next unless get_server($srv)->{connected};
+		if ($srv eq 'cli') {
+			cli_cmd('NOOP');
+			next;
+		}
+		ldap_search($srv, '(objectclass=nosuchclass)', ['nosuchattr'], base => 'dc=nosuchbase');
+	}
+	return 1;
 }
 
 
