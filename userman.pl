@@ -3218,7 +3218,6 @@ sub user_delete ()
 sub users_refresh ()
 {
 	user_unselect();
-	rework_accounts();
 
 	my @attrs = ('uid', 'cn');
 	my $model = $user_list->get_model;
@@ -3226,6 +3225,7 @@ sub users_refresh ()
 
 	ldap_disconnect_all();
 	ldap_connect_all();
+	rework_accounts();
 
 	my $res = ldap_search('uni', "(objectClass=person)", \@attrs);
 	my @users = $res->entries;
