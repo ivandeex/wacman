@@ -673,6 +673,9 @@ sub attribute_enabled ($$)
 	if ($objtype eq 'user') {
 		return 0 if $name eq 'domainIntercept';
 		return 0 if $name eq 'password2' && $config{show_password};
+		if ($name eq 'real_uidn' || $name eq 'real_gidn') {
+			return 0 unless $config{prefer_nss_ids};
+		}
 	}
 	return 1;
 }
