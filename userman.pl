@@ -90,6 +90,7 @@ my %config = (
 	cgp_buggy_ldap		=>	1,
 	cli_timeout			=>	3,
 	idle_interval		=>	60,
+	connect_timeout		=>	5,
 	language			=>	'ru',
 	locale				=>	'ru_RU.utf8',
 	show_splash			=>	0,
@@ -2916,7 +2917,8 @@ sub ldap_connect_to ($)
 	my $uri = nvl($cfg->{uri});
 	log_error('invalid uri for server "%s"', $srv) if $uri eq '';
 	($cfg->{user}, $cfg->{pass}) = get_credentials($srv);
-	$cfg->{ldap} = Net::LDAP->new($uri, debug => $cfg->{debug});
+	$cfg->{ldap} = Net::LDAP->new($uri, debug => $cfg->{debug},
+								timeout => $config{connect_timeout});
 	unless (defined $cfg->{ldap}) {
 		log_info('error binding to server "%s"', $srv);
 		return -1;
