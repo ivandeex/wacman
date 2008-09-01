@@ -40,7 +40,7 @@ my ($mailgroup_list, $mailgroup_attr_frame, $mailgroup_name, $mailgroup_obj);
 
 my ($next_uidn, $next_gidn, $next_telnum);
 my ($domain_intercept, $server_intercept);
-my ($idle_timer_id);
+my ($idle_timer_id, $last_reconnect_time);
 
 my $pic_home = abs_path("$Bin/images");
 my %pic_cache;
@@ -2992,6 +2992,18 @@ sub ldap_disconnect_all ()
 }
 
 
+sub ldap_reconnect_all ()
+{
+	my $now = time;
+	return if defined($last_reconnect_time)
+			&& $now - $last_reconnect_time >= 0
+			&& $now - $last_reconnect_time <= 2;
+	$last_reconnect_time = $now;
+	ldap_disconnect_all();
+	ldap_connect_all();
+}
+
+
 sub ldap_idle_proc ()
 {
 	for my $srv (keys %servers) {
@@ -3228,8 +3240,7 @@ sub users_refresh ()
 	my $model = $user_list->get_model;
 	$model->clear;
 
-	ldap_disconnect_all();
-	ldap_connect_all();
+	ldap_reconnect_all();
 	rework_accounts();
 
 	my $res = ldap_search('uni', "(objectClass=person)", \@attrs);
@@ -3790,8 +3801,7 @@ sub groups_refresh ()
 	my $model = $group_list->get_model;
 	$model->clear;
 
-	ldap_disconnect_all();
-	ldap_connect_all();
+	ldap_reconnect_all();
 
 	my $res = ldap_search('uni', '(objectClass=posixGroup)', ['cn']);
 	my @groups = $res->entries;
@@ -4498,7 +4508,6 @@ sub gui_main ()
 	dump_config() if $opts{D};
 	$config{debug} = 1 if $opts{d};
 
-	ldap_connect_all();
 	setup_all_attrs();
 
 	my $gtkrc; # for future...
