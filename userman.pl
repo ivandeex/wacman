@@ -536,7 +536,7 @@ my %gui_attrs = (
 	user => [
 		[ 'Common',
 			qw(	givenName sn cn uid mail password password2
-				uidNumber gidNumber moreGroups homeDirectory loginShell
+				uidNumber gidNumber moreGroups homeDirectory telnum
 		) ],
 		[ 'Windows',
 			qw(	ntUserHomeDir ntUserHomeDirDrive
@@ -545,9 +545,9 @@ my %gui_attrs = (
 		) ],
 		[ 'Extended',
 			qw(	telephoneNumber facsimileTelephoneNumber
-				telnum aliases mailgroups
+				aliases mailgroups
 				domainIntercept userIntercept
-				real_uidn real_gidn
+				real_uidn real_gidn loginShell
 		) ],
 	],
 	group => [
