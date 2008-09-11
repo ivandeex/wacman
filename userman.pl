@@ -667,6 +667,24 @@ sub dump_config ()
 }
 
 
+sub get_obj_config ($$%)
+{
+	my ($obj, $what, %override) = @_;
+	my $dn = nvl($config{$what});
+	while ($dn =~ /\$\((\w+)\)/) {
+		my $name = $1;
+		my $val = nvl($override{$name});
+		$val = get_attr($obj, $name) if $val eq '';
+		if ($val eq '') {
+			$dn = '';
+			last;
+		}
+		$dn =~ s/\$\($name\)/$val/g;
+	}
+	return $dn;
+}
+
+
 sub attribute_enabled ($$)
 {
 	my ($objtype, $name) = @_;
@@ -1626,7 +1644,7 @@ sub ldap_read_pass ($$$$)
 sub ldap_write_pass ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	return 0 if $at->{desc}->{verify} || $val eq $at->{oldpass};
+	return 0 if $at->{desc}->{verify} || $val eq nvl($at->{oldpass});
 	if ($srv eq 'ads') {
 		# 'replace' works only for administrator.
 		# unprivileged users need to use change(delete=old,add=new)
@@ -1640,7 +1658,7 @@ sub ldap_write_pass ($$$$$)
 sub ldap_write_pass_final ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
-	return 0 if $at->{desc}->{verify} || $val eq $at->{oldpass};
+	return 0 if $at->{desc}->{verify} || $val eq nvl($at->{oldpass});
 	if ($srv eq 'uni') {
 		my $conf = get_server($srv, 1);
 		$ldap = $conf->{ldap};
@@ -1948,12 +1966,12 @@ sub ldap_write_aliases_final ($$$$$)
 		($old, $new) = compare_lists($old, $new);
 		log_debug('write_aliases(2): del=(%s) add=(%s)', $old, $new);
 		for my $aid (split_list $old) {
-			my $dn = make_dn($obj, 'cgp_user_dn', 'uid' => $aid);
+			my $dn = get_obj_config($obj, 'cgp_user_dn', 'uid' => $aid);
 			my $res = ldap_delete($srv, $dn);
 			log_debug('Removing mail alias "%s" for "%s": %s', $dn, $aliased, $res->error);
 		}
 		for my $aid (split_list $new) {
-			my $dn = make_dn($obj, 'cgp_user_dn', 'uid' => $aid);
+			my $dn = get_obj_config($obj, 'cgp_user_dn', 'uid' => $aid);
 			log_debug('Adding mail alias "%s" for "%s": %s', $dn, $aliased, 'unimplemented');
 		}
 		return $old ne '' || $new ne '';
@@ -2250,6 +2268,89 @@ sub ldap_write_ad_sec_groups_final ($$$$$)
 # ======== read / write ========
 
 
+sub replace_in_dir ($$$);
+
+sub replace_in_dir ($$$)
+{
+	my ($dir, $repl, $excl) = @_;
+	log_debug("replace_in_dir: enter: $dir");
+	for my $path (glob("$dir/*"), glob("$dir/.*")) {
+		#log_debug('try: %s', $path);
+		my $skip = 0;
+		next if $path =~ /\/\.\.?$/;
+		$path =~ /^(.*?)\/([^\/]+)$/;
+		my ($dir, $file) = ($1, $2);
+		my $nfile = $file;
+		for my $s (keys %$repl) {
+			my $d = $repl->{$s};
+			$nfile =~ s/$s/$d/ge;
+		}
+		if ($file ne $nfile) {
+			my $npath = "$dir/$nfile";
+			log_debug('replace_in_dir: rename: %s ==> %s', $path, $npath);
+			rename($path, $npath);
+			$path = $npath;
+		}
+		next if -l $path;
+		for my $pat (@$excl) {
+			if ($file =~ /$pat/) {
+				log_debug('replace_in_dir: excluding: %s', $path);
+				$skip = 1;
+				last;
+			}
+		}
+		next if $skip;
+		if (-d $path) {
+			replace_in_dir($path, $repl, $excl);
+			next;
+		}
+		next unless -r $path;
+		my $tpath = "$path.temp-replace.$$.tmp";
+		my $oldsep = $/;
+		my ($_dev,$_ino,$mode,$_nlink,$uid,$gid,@_unused) = stat($path);
+		$/ = undef;
+		open(IN, "<:raw", $path);
+		my $contents = <IN>;
+		close(IN);
+		$/ = $oldsep;
+		next unless defined $contents;
+		$skip = 1;
+		for my $s (keys %$repl) {
+			if ($contents =~ /$s/) {
+				$skip = 0;
+				last;
+			}
+		}
+		undef $contents;
+		next if $skip;
+		open(IN, "<:raw", $path);
+		open(OUT, ">:raw", $tpath);
+		$skip = 1;
+		while(<IN>) {
+			my $src = $_;
+			my $dst = $_;
+			for my $s (keys %$repl) {
+				my $d = $repl->{$s};
+				$dst =~ s/$s/$d/gx;
+			}
+			$skip = 0 if $src ne $dst;
+			print OUT $dst;
+		}
+		close(IN);
+		close(OUT);
+		if ($skip) {
+			unlink($tpath);
+			next;
+		}
+		chown($uid, $gid, $tpath);
+		chmod($mode, $tpath);
+		unlink($path);
+		rename($tpath, $path);
+		log_debug('replace_in_dir: changed: %s', $path);
+	}
+}
+
+
 sub user_read ($$)
 {
 	my ($usr, $uid) = @_;
@@ -2332,6 +2433,14 @@ sub user_write ($)
 		# Copying will work only under root
 		system("LANG=$config{locale} cp -r $install{src} $install{dst}");
 		system("chown -R $install{uidn}:$install{gidn} $install{dst}");
+		my %replacers;
+		for my $i (0 .. 9) {
+			my $from = get_obj_config($usr, "homes_from_$i");
+			my $to = get_obj_config($usr, "homes_to_$i");
+			$replacers{$from} = $to if $from ne '' && $to ne '';
+		}
+		replace_in_dir($home, \%replacers, [ split_list($config{home_exclude}) ])
+			if scalar(keys %replacers) > 0;
 	}
 
 	flush_cached_data();
@@ -2455,24 +2564,6 @@ sub next_cgp_telnum ()
 }
 
 
-sub make_dn ($$%)
-{
-	my ($obj, $what, %override) = @_;
-	my $dn = $config{$what};
-	while ($dn =~ /\$\((\w+)\)/) {
-		my $name = $1;
-		my $val = nvl($override{$name});
-		$val = get_attr($obj, $name) if $val eq '';
-		if ($val eq '') {
-			$dn = '';
-			last;
-		}
-		$dn =~ s/\$\($name\)/$val/g;
-	}
-	return $dn;
-}
-
-
 sub rework_accounts (@)
 {
 	my @ids = @_;
@@ -2516,9 +2607,9 @@ sub rework_user ($)
 	set_attr($usr, 'objectClass', append_list(get_attr($usr, 'objectClass'),
 											$config{unix_user_classes}));
 
-	cond_set($usr, 'dn', make_dn($usr, 'unix_user_dn'));
-	cond_set($usr, 'ntDn', make_dn($usr, 'ad_user_dn'));
-	cond_set($usr, 'cgpDn', make_dn($usr, 'cgp_user_dn'));
+	cond_set($usr, 'dn', get_obj_config($usr, 'unix_user_dn'));
+	cond_set($usr, 'ntDn', get_obj_config($usr, 'ad_user_dn'));
+	cond_set($usr, 'cgpDn', get_obj_config($usr, 'cgp_user_dn'));
 
 	# assign next available UID number
 	my $uidn;
@@ -2601,7 +2692,7 @@ sub rework_group ($)
 	$val =~ tr/0123456789//cd;
 	set_attr($grp, 'gidNumber', $val);
 
-	set_attr($grp, 'dn', make_dn($grp, 'unix_group_dn'));
+	set_attr($grp, 'dn', get_obj_config($grp, 'unix_group_dn'));
 }
 
 
@@ -2732,6 +2823,9 @@ sub __str2dict ($)
 		if (/^(\S+)\s+=\s+\{\s+(\S+)\s+=\s+(\S+?)\;\s*\}\s*\;$/) {
 			$d->{$1} = { $2 => $3 };
 			next;
+		}
+		if (/^(\w+)\s*=\s*\($/) {
+			while (! /\)/) { $_ .= shift @$t; }
 		}
 		if (/^(\w+)\s*=\s*(.*?)\s*\;\s*(\}?)$/) {
 			$d->{$1} = $2;
@@ -4282,7 +4376,7 @@ sub rework_mailgroup ($)
 	my $mgrp = shift;
 
 	set_attr($mgrp, 'uid', string2id(get_attr($mgrp, 'uid')));
-	set_attr($mgrp, 'dn', make_dn($mgrp, 'cgp_user_dn'));
+	set_attr($mgrp, 'dn', get_obj_config($mgrp, 'cgp_user_dn'));
 	cond_set($mgrp, 'cn', get_attr($mgrp, 'uid'));
 
 	###### constant fields ########
