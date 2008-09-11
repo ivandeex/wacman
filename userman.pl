@@ -88,6 +88,8 @@ my %config = (
 	cgp_alias_classes	=>	'top,alias',
 	cgp_intercept_opts	=>	'Access,Append,Login,Mailbox,Partial,Sent,Signal',
 	cgp_buggy_ldap		=>	1,
+	cgp_password		=>	'cli',
+	cgp_pass_encryption	=>	'A-crpt',
 	cli_timeout			=>	3,
 	idle_interval		=>	60,
 	connect_timeout		=>	5,
@@ -147,6 +149,8 @@ my %translations = (
 		'Password is empty. Are you sure ?' => 'Пароль пустой. Вы уверены ?',
 		'Password is less than 4 characters. Are you sure ?' => 'Пароль короче 4 символов. Вы уверены ?',
 		'Mail aliases should not contain non-basic characters' => 'В почтовых алиасах допустимы только символы базового набора',
+		'Key fields cannot be empty' => 'Ключевые поля должны быть непусты',
+		'Key field modification is broken now. Are you sure ?' => 'Изменение ключевых полей пока не реализовано. Вы уверены, что хотите продолжить ?',
 		'Attributes'	=>	'Атрибуты',
 		'Save'			=>	'Сохранить',
 		'Revert'		=>	'Отменить',
@@ -1659,6 +1663,7 @@ sub ldap_write_pass_final ($$$$$)
 {
 	my ($at, $srv, $ldap, $name, $val) = @_;
 	return 0 if $at->{desc}->{verify} || $val eq nvl($at->{oldpass});
+	my $res;
 	if ($srv eq 'uni') {
 		my $conf = get_server($srv, 1);
 		$ldap = $conf->{ldap};
@@ -1670,7 +1675,6 @@ sub ldap_write_pass_final ($$$$$)
 		}
 		my $obj = $at->{obj};
 		my $dn = get_attr($obj, 'dn');
-		my $res;
 		if ($extop) {
 			# set_password() without 'oldpasswd' works only for administrator
 			# ordinary users need to supply 'oldpasswd'
@@ -1703,7 +1707,17 @@ sub ldap_write_pass_final ($$$$$)
 		}
 		if ($alg eq 'cli') {
 			my $mail = get_attr($obj, 'mail');
-			my $res = cli_cmd('SetAccountPassword %s PASSWORD %s', $mail, $cgpass);
+			my $passenc = nvl($config{cgp_pass_encryption});
+			if ($passenc ne '') {
+				$res = cli_cmd('UpdateAccountSettings %s { PasswordEncryption = %s; }',
+								$mail, $passenc);
+				log_info('Cannot change encryption for %s to %s: %s',
+						$mail, $passenc, $res->{msg})
+					if $res->{code};
+				$res = cli_cmd('GetAccountEffectiveSettings %s', $mail)
+					if $config{debug};
+			}
+			$res = cli_cmd('SetAccountPassword %s PASSWORD %s', $mail, $cgpass);
 			return 1 if $res->{code} == 0;
 			message_box('error', 'close',
 					_T('Cannot change password for "%s" on "%s": %s',
@@ -1719,7 +1733,7 @@ sub ldap_write_pass_final ($$$$$)
 
 		# 'replace' works only for administrator.
 		# unprivileged users need to use change(delete=old,add=new)
-		my $res = $ldap->modify($dn, replace => { $name => $cgpass });
+		$res = $ldap->modify($dn, replace => { $name => $cgpass });
 		log_debug('change password on "%s": dn="%s" attr=%s code=%d',
 					$srv, $dn, $name, $res->code);
 		if ($res->code) {
@@ -1953,7 +1967,7 @@ sub ldap_write_aliases_final ($$$$$)
 	return 0 if $old eq $new;
 	if ($config{cgp_buggy_ldap}) {
 		my $mail = get_attr($obj, 'mail');
-		my $res = cli_cmd('SETACCOUNTALIASES %s (%s)', $mail, join_list split_list $new);
+		my $res = cli_cmd('SetAccountAliases %s (%s)', $mail, join_list split_list $new);
 		log_debug('set_mail_aliases: code="%s" msg="%s" out="%s"',
 					$res->{code}, $res->{msg}, $res->{out});
 		return 1 if $res->{code} == 0;
@@ -1993,7 +2007,7 @@ sub cgp_read_domain_intercept ($$$$)
 {
 	my ($at, $srv, $ldap, $name) = @_;
 	return $domain_intercept if defined $domain_intercept;
-	my $res = cli_cmd('GETDOMAINMAILRULES %s', $config{mail_domain});
+	my $res = cli_cmd('GetDomainMailRules %s', $config{mail_domain});
 	if ($res->{code}) {
 		log_info('cgp_read_domain_intercept error: %s', $res->{msg});
 		return bool2str(0);
@@ -2030,7 +2044,7 @@ sub cgp_write_domain_intercept ($$$$$)
 		];
 	my $out = array2str($rule);
 	log_info('cgp_write_domain_intercept: rule = %s', $out);
-	my $res = cli_cmd('SETDOMAINMAILRULES %s %s', $config{mail_domain}, $out);
+	my $res = cli_cmd('SetDomainMailRules %s %s', $config{mail_domain}, $out);
 	if ($res->{code}) {
 		log_info('cgp_write_domain_intercept error: %s', $res->{msg});
 		return 0;
@@ -2042,7 +2056,7 @@ sub cgp_write_domain_intercept ($$$$$)
 sub cgp_get_server_intercept ()
 {
 	return 0 if defined $server_intercept;
-	my $res = cli_cmd('GETSERVERINTERCEPT');
+	my $res = cli_cmd('GetServerIntercept');
 	if ($res->{code}) {
 		log_info('cgp_get_server_intercept error: %s', $res->{msg});
 		return -1;
@@ -2081,7 +2095,7 @@ sub cgp_write_user_intercept ($$$$$)
 		delete $server_intercept->{$mail};
 	}
 	my $out = dict2str($server_intercept);
-	my $res = cli_cmd('SETSERVERINTERCEPT %s', $out);
+	my $res = cli_cmd('SetServerIntercept %s', $out);
 	if ($res->{code}) {
 		log_info('cgp_write_user_intercept(%s) write error: %s ("%s")',
 				$mail, $res->{msg}, $out);
@@ -2099,7 +2113,7 @@ sub cgp_modify_mail_group ($$$$)
 	my $retval;
 	if ($config{cgp_buggy_ldap}) {
 		my $gname = $gid . '@' . $config{mail_domain};
-		my $res = cli_cmd('GETGROUP %s', $gname);
+		my $res = cli_cmd('GetGroup %s', $gname);
 		if ($res->{code} == 0) {
 			my $dict = str2dict($res->{out});
 			log_debug('group "%s" members: %s', $gid, dict2str($dict));
@@ -2111,7 +2125,7 @@ sub cgp_modify_mail_group ($$$$)
 			$dict->{Members} = "($new)";
 			my $newparams = dict2str($dict);
 			log_debug('newparams: "%s"', $newparams);
-			$res = cli_cmd("SETGROUP %s %s", $gname, $newparams);
+			$res = cli_cmd("SetGroup %s %s", $gname, $newparams);
 			if ($res->{code} == 0) {
 				$retval = 'OK';
 			} else {
@@ -3192,20 +3206,36 @@ sub user_save ()
 		}
 	}
 	unless (isascii(get_attr($usr, 'aliases'))) {
-		my $resp = message_box('warning', 'close',
-								_T('Mail aliases should not contain non-basic characters'));
 		focus_attr($usr, 'aliases');
+		message_box('warning', 'close',
+					_T('Mail aliases should not contain non-basic characters'));
 		return;
 	}
 
 	my $uid = get_attr($usr, 'uid');
-	if (is_new_user($node) && is_reserved_name($uid)) {
-		message_box('warning', 'close', _T('This object name is reserved'));
+	my $cn = get_attr($usr, 'cn');
+	my $is_new = is_new_user($node);
+
+	if ($uid eq '' || $cn eq '') {
+		focus_attr($usr, $uid eq '' ? 'uid' : 'cn');
+		message_box('warning', 'close', _T('Key fields cannot be empty'));
+		return;
+	}
+	if (!$is_new && ($uid ne get_attr($usr, 'uid', orig => 1)
+				|| $cn ne get_attr($usr, 'cn', orig => 1))) {
+		my $resp = message_box('question', 'yes-no',
+					_T('Key field modification is broken now. Are you sure ?'));
+		if ($resp ne 'yes') {
+			focus_attr($usr, $uid ne get_attr($usr, 'uid', orig => 1) ? 'uid' : 'cn');
+			return;
+		}
+	}
+	if ($is_new && is_reserved_name($uid)) {
 		focus_attr($usr, 'uid');
+		message_box('warning', 'close', _T('This object name is reserved'));
 		return;		
 	}
 
-	my $cn = get_attr($usr, 'cn');
 	$model->set($node, 0, $uid, 1, $cn);
 
 	user_write($usr);
@@ -4191,7 +4221,7 @@ sub mailgroup_save ()
 	$dict->{RealName} = get_attr($mgrp, 'cn');
 	$dict->{Members} = '(' . (join_list split_list get_attr($mgrp, 'groupMember')) . ')';
 
-	my $cmd = cli_cmd("GETGROUP $gname")->{code} ? 'CREATEGROUP' : 'SETGROUP';
+	my $cmd = cli_cmd("GetGroup $gname")->{code} ? 'CreateGroup' : 'SetGroup';
 	$cmd = "$cmd $gname ".dict2str($dict);
 	log_debug('mailgroup_save: %s', $cmd);
 	my $res = cli_cmd($cmd);
@@ -4266,7 +4296,7 @@ sub mailgroup_delete ()
 		my $resp = message_box('question', 'yes-no', _T('Delete mail group "%s" ?', $gid));
 		return if $resp ne 'yes';
 
-		my $res = cli_cmd('DELETEGROUP %s@%s', $gid, $config{mail_domain});
+		my $res = cli_cmd('DeleteGroup %s@%s', $gid, $config{mail_domain});
 		if ($res->{code}) {
 			message_box('error', 'close',
 					_T('Error deleting mail group "%s": %s', $gid, $res->error));
@@ -4345,7 +4375,7 @@ sub mailgroup_load ()
 	clear_obj($mgrp);
 
 	unless (is_new_mailgroup($node)) {
-		my $res = cli_cmd('GETGROUP %s@%s', $gid, $config{mail_domain});
+		my $res = cli_cmd('GetGroup %s@%s', $gid, $config{mail_domain});
 		if ($res->{code} == 0) {
 			my $dict = str2dict($res->{out});
 			my $val = nvl($dict->{Members});
