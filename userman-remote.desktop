@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Terminal=false
+Type=Application
+Categories=System;Settings;
+Exec=env SSH_ASKPASS=/usr/lib/openssh/gnome-ssh-askpass start-stop-daemon --start --background --exec /usr/bin/ssh -- -X root@ldap.gclimate.com /usr/bin/userman
+Name=User Manager (remote)
+Name[ru]=Менеджер Пользователей (удаленно)
+Comment=Manage LDAP Users and Groups
+Comment[ru]=Управление пользователями и группами в домене LDAP
+Icon=/usr/share/icons/gnome/32x32/apps/config-users.png
+

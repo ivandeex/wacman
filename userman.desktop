@@ -2,8 +2,10 @@
 Encoding=UTF-8
 Terminal=false
 Type=Application
-Categories=Application;System;
-Exec=/usr/bin/gksu --disable-grab --title "User Manager" /usr/local/bin/userman.pl
-Name=User Manager (root)
+Categories=System;Settings;
+Exec=/usr/bin/gksu --disable-grab --title "User Manager" /usr/bin/userman
+Name=User Manager
+Name[ru]=Менеджер пользователей
 Comment=Manage LDAP Users and Groups
-Icon=/usr/local/bin/images/userman.png
+Comment[ru]=Управление пользователями и группами в домене LDAP
+Icon=/usr/share/userman/images/userman.png
