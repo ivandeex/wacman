@@ -81,6 +81,7 @@ my %config = (
 	unix_user_classes	=>	'top,person,organizationalPerson,inetOrgPerson,posixAccount,shadowAccount',
 							# 'ntUser',
 	unix_group_classes	=>	'top,posixGroup',	
+	home_root			=>	'/home',
 	ad_user_classes		=>	'top,user,person,organizationalPerson',	
 	ad_user_category	=>	'cn=Person,cn=Schema,cn=Configuration',
 	cgp_user_classes	=>	'top,person,organizationalPerson,inetOrgPerson,CommuniGateAccount',
@@ -2639,7 +2640,7 @@ sub rework_user ($)
 	cond_set($usr, 'mail', ifnull($uid, $uid.'@'.$config{mail_domain}));
 
 	# home directory
-	cond_set($usr, 'homeDirectory', ifnull($uid, "/home/$uid"));
+	cond_set($usr, 'homeDirectory', ifnull($uid, $config{home_root}.'/'.$uid));
 
 	############# Active Directory ############
 
