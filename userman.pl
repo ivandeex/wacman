@@ -1710,6 +1710,11 @@ sub ldap_write_pass_final ($$$$$)
 			my $mail = get_attr($obj, 'mail');
 			my $passenc = nvl($config{cgp_pass_encryption});
 			if ($passenc ne '') {
+				$res = cli_cmd('UpdateAccountSettings %s { UseAppPassword = YES; }',
+								$mail, $passenc);
+				log_info('Cannot enable CGP passwords for %s: %s',
+						$mail, $res->{msg})
+					if $res->{code};
 				$res = cli_cmd('UpdateAccountSettings %s { PasswordEncryption = %s; }',
 								$mail, $passenc);
 				log_info('Cannot change encryption for %s to %s: %s',
@@ -2876,7 +2881,7 @@ sub __dict2str ($)
 			if ($v =~ /^\".*?\"$/ || $v =~ /^\(.*?\)$/) {
 				$q = '';
 			} else {
-				$v =~ s/\"/\\"/g;
+				$v =~ s/\"/\\\"/g;
 			}
 			$s .= $q.$v.$q;
 		}
