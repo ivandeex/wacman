@@ -42,7 +42,6 @@ my ($next_uidn, $next_gidn, $next_telnum);
 my ($domain_intercept, $server_intercept);
 my ($idle_timer_id, $last_reconnect_time);
 
-my $pic_home = abs_path("$Bin/images");
 my %pic_cache;
 
 my %ldap_rw_subs;
@@ -57,6 +56,7 @@ use constant ADS_UF_PASSWD_NOT_REQUIRED => 0x20;
 use constant ADS_UF_NORMAL_ACCOUNT => 0x200;
 use constant ADS_UF_DONT_EXPIRE_PASSWD => 0x10000;
 
+my $bindir = abs_path($Bin);
 
 sub _T($@);
 
@@ -77,6 +77,11 @@ my %config = (
 		'/etc/userman.conf',
 		'~/.userman.conf',
 		'./userman.conf'
+	],
+	pic_homes			=> [
+		'/usr/share/userman/images',
+		'/usr/share/userman',
+		'$0/images',
 	],
 	unix_user_classes	=>	'top,person,organizationalPerson,inetOrgPerson,posixAccount,shadowAccount',
 							# 'ntUser',
@@ -986,11 +991,19 @@ sub create_pic ($)
 {
 	my $file = $_[0];
 	return undef unless defined $file;
-	my $path = "$pic_home/$file";
-	return $pic_cache{$path} if $pic_cache{$path};
-	croak "picture not found: $path\n" unless -r $path;
-	$pic_cache{$path} = Gtk2::Gdk::Pixbuf->new_from_file($path);
-	return $pic_cache{$path};
+	return $pic_cache{$file} if $pic_cache{$file};
+	my ($path, $dir);
+	my $home = $ENV{HOME};
+	for $dir (@{$config{pic_homes}}) {
+		$dir =~ s/^\~/$home/;
+		$dir =~ s/^\$0/$bindir/;
+		$path = abs_path($dir);
+		$path = (defined($path) ? $path : $dir) . '/' . $file;
+		last if -r $path;
+	}
+	croak "picture not found: $file\n" unless -r $path;
+	$pic_cache{$file} = Gtk2::Gdk::Pixbuf->new_from_file($path);
+	return $pic_cache{$file};
 }
 
 
