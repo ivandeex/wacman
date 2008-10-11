@@ -1,0 +1,128 @@
+#!/bin/bash
+#
+# winadmin   This shell script takes care of starting and stopping 
+#            Windows 2003 Server
+#
+# chkconfig: 2345 99 01
+#
+# processname: winadmin
+# description: Windows 2003 Server control script
+#
+
+MAXWAIT=150
+INTERVAL=5
+DISP=":99"
+DIR="/var/vmware/winadmin/winsrv"
+USR="winadmin"
+VMWARE="vmware-vmx"
+VMNAME="winsrv"
+TMPOUT=/tmp/vm-shut.tmp.$$
+
+[ x"$USER" = "x" -a "x`/usr/bin/id -u`" = "x0" ] && USER=root
+
+case "$USER" in
+ root)
+   case "$1" in
+     start|stop|restart)
+       exec su -l $USR -- `readlink -fn "$0"` "$@"
+       ;;
+   esac
+   ;;
+ $USR)
+   ;;
+ *)
+   echo "The script should be run as root or $USR (not $USER)"
+   exit 1
+   ;;
+esac
+
+case "$1" in
+ 
+start)
+ PID=`pgrep -n -f ${VMWARE}'.*'${VMNAME}'\.vmx'`
+ if [ -n "${PID}" ]; then
+   echo "windows already started"
+   exit 1
+ fi
+ DISPLAY=$DISP
+ export DISPLAY
+ /usr/bin/vmrun start $DIR/$VMNAME.vmx && OK=1 || OK=0
+ if [ $OK = 1 ]; then
+   echo "windows started succesfully"
+ else
+   echo "windows start failed"
+ fi
+ exit 0
+ ;;
+ 
+stop)
+ PID=`pgrep -n -f ${VMWARE}'.*'${VMNAME}'\.vmx'`
+ if [ -z "$PID" ]; then
+   echo "windows is not running"
+   exit 1
+ fi
+
+ ssh winbatch shutdown -s now > $TMPOUT 2>&1
+ 
+ grep -q NOW $TMPOUT 2>/dev/null && OK=1 || OK=0
+ OUT=`cat $TMPOUT`
+ rm -f $TMPOUT
+ echo $OUT
+ 
+ if [ $OK = 0 ]; then
+   echo "windows shut down failed"
+   exit 1
+ fi
+ 
+ if [ x"$2" = x"nowait" ]; then
+   echo "not waiting for windows to shutdown"
+   exit 0
+ fi
+ 
+ echo "waiting for windows to shut down..."
+ MAXCOUNT=$(($MAXWAIT / $INTERVAL))
+ COUNT=0
+ 
+ while true; do
+   PID=`pgrep -n -f ${VMWARE}'.*'${VMNAME}'\.vmx'`
+   if [ -z "$PID" ]; then
+     echo "."
+     echo "windows terminated succesfully"
+     exit 0
+   fi
+ 
+   COUNT=$(($COUNT + 1))
+   if [ $COUNT -gt $MAXCOUNT ]; then
+     echo "timeout waiting for windows"
+     exit 2
+   fi
+ 
+   echo -n .
+   sleep $INTERVAL
+ done
+ ;;
+
+restart)
+ $0 stop
+ $0 start
+ ;;
+
+status)
+ PID=`pgrep -n -f ${VMWARE}'.*'${VMNAME}'\.vmx'`
+ if [ -n "$PID" ]; then
+   echo "windows is running with pid $PID"
+ else
+   echo "windows is not running"
+ fi
+ ;;
+
+view)
+ nohup /usr/bin/vncviewer $DISP > /dev/null 2>&1 &
+ ;;
+ 
+*)
+ echo "usage: $0 { start | stop | status | view } [nowait]"
+ ;;
+
+esac
+

@@ -1,9 +1,9 @@
 #!/bin/sh
-package="userman"
 [ "x$1" = "x-b" ] && also_build=1 || also_build=0
-name=`grep Name: $package.spec | head -1 | awk '{print $2}'`
-version=`grep Version: $package.spec | head -1 | awk '{print $2}'`
-release=`grep Release: $package.spec | head -1 | awk '{print $2}'`
+spec=`ls -1 *.spec 2>/dev/null | head -1`
+name=`grep Name: $spec | head -1 | awk '{print $2}'`
+version=`grep Version: $spec | head -1 | awk '{print $2}'`
+release=`grep Release: $spec | head -1 | awk '{print $2}'`
 dir="$name-$version"
 tar=$dir.tar.gz
 tmp=/tmp/make-tarball-$$
