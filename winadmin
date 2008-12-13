@@ -16,6 +16,7 @@ DIR="/var/vmware/winadmin/winsrv"
 USR="winadmin"
 VMWARE="vmware-vmx"
 VMNAME="winsrv"
+VMRUN="/usr/bin/vmrun"
 TMPOUT=/tmp/vm-shut.tmp.$$
 
 [ x"$USER" = "x" -a "x`/usr/bin/id -u`" = "x0" ] && USER=root
@@ -46,7 +47,7 @@ start)
  fi
  DISPLAY=$DISP
  export DISPLAY
- /usr/bin/vmrun start $DIR/$VMNAME.vmx && OK=1 || OK=0
+ $VMRUN start $DIR/$VMNAME.vmx && OK=1 || OK=0
  if [ $OK = 1 ]; then
    echo "windows started succesfully"
  else
@@ -54,8 +55,28 @@ start)
  fi
  exit 0
  ;;
- 
+
 stop)
+ PID=`pgrep -n -f ${VMWARE}'.*'${VMNAME}'\.vmx'`
+ if [ -z "${PID}" ]; then
+   echo "windows is not running"
+   exit 1
+ fi
+ DISPLAY=$DISP
+ export DISPLAY
+ $VMRUN stop $DIR/$VMNAME.vmx soft && OK=1 || OK=0
+ if [ $OK = 0 ]; then
+   $VMRUN stop $DIR/$VMNAME.vmx hard && OK=1 || OK=0
+ fi
+ if [ $OK = 1 ]; then
+   echo "windows stopped succesfully"
+ else
+   echo "windows stop failed"
+ fi
+ exit 0
+ ;;
+ 
+stop-via-ssh)
  PID=`pgrep -n -f ${VMWARE}'.*'${VMNAME}'\.vmx'`
  if [ -z "$PID" ]; then
    echo "windows is not running"
@@ -67,7 +88,7 @@ stop)
  grep -q NOW $TMPOUT 2>/dev/null && OK=1 || OK=0
  OUT=`cat $TMPOUT`
  rm -f $TMPOUT
- echo $OUT
+ echo "out: $OUT"
  
  if [ $OK = 0 ]; then
    echo "windows shut down failed"
@@ -116,12 +137,12 @@ status)
  fi
  ;;
 
-view)
+view|console)
  nohup /usr/bin/vncviewer $DISP > /dev/null 2>&1 &
  ;;
  
 *)
- echo "usage: $0 { start | stop | status | view } [nowait]"
+ echo "usage: $0 { start | stop | status | console } [nowait]"
  ;;
 
 esac
