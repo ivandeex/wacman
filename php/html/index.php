@@ -8,11 +8,11 @@ error_reporting(E_ALL);
 
 // General functions needed to proceed.
 ob_start();
-if (! is_readable(LIBDIR.'functions.php')) {
+if (! is_readable(LIBDIR.'common.php')) {
 	ob_end_clean();
-	die("Fatal error: cannot read 'functions.php'");
+	die("Fatal error: cannot read 'common.php'");
 }
-require LIBDIR.'functions.php';
+require LIBDIR.'common.php';
 ob_end_clean();
 // Start the show!
 ?>

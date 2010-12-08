@@ -12,77 +12,26 @@ define('CONFDIR',  realpath(LIBDIR.'../config').'/');
 define('CSSDIR',   'css/');
 define('JSDIR',    'js/');
 
-/* Supplimental functions
- * This list is a list of supplimental functions that are used throughout PLA. The
- * order here IS important - so that files that refer to functions defined in other files
- * need to be listed after those files.*/
+// A list of supplimental functions that are used throughout PLA.
+// Order is important.
 $pla_function_files = array(
-	# Functions for talking to LDAP servers.
+	// Translations
+	LIBDIR.'translations.php',
+	// Functions for talking to LDAP servers.
 	LIBDIR.'server_functions.php',
-	# Functions for sending syslog messages
+	// Functions for sending syslog messages
 	LIBDIR.'syslog.php',
-	# Functions for managing the session (pla_session_start(), etc.)
+	// Functions for managing the session (pla_session_start(), etc.)
 	LIBDIR.'session_functions.php',
-	# Functions for reading the server schema
+	// Functions for reading the server schema
 	LIBDIR.'schema_functions.php',
-	# Functions for hashing passwords with OpenSSL binary (only if mhash not present)
+	// Functions for hashing passwords with OpenSSL binary (only if mhash not present)
 	LIBDIR.'emuhash_functions.php',
-	# Functions for running various hooks
+	// Functions for running various hooks
 	LIBDIR.'hooks.php',
-	# Functions for timeout and automatic logout feature
+	// Functions for timeout and automatic logout feature
 	LIBDIR.'timeout_functions.php'
 );
-
-
-/**
- * Bootstrapping
- */
-
-$config_file = CONFDIR.'config.php';
-
-// Verify that this PHP install has gettext
-if (! extension_loaded('gettext'))
-	pla_error("Your install of PHP appears to be missing GETTEXT support.");
-
-// Helper functions defined in functions.php
-foreach ($pla_function_files as $file) {
-	if (! is_readable($file))
-		pla_error("Fatal error: Cannot read the file \"$file\"");
-	ob_start();
-	require $file;
-	ob_end_clean();
-}
-
-// Make sure this PHP install has LDAP extension
-if (! extension_loaded('ldap'))
-	pla_error("Your install of PHP appears to be missing LDAP support.");
-
-// Make sure that we have php-xml loaded.
-if (! function_exists('xml_parser_create'))
-	pla_error("Your install of PHP appears to be missing XML support");
-
-// Configuration File check
-if (! is_readable($config_file))
-    pla_error("Fatal error: Cannot read the file \"$config_file\"");
-
-// Verify that the config file is properly setup
-ob_start();
-include $config_file;
-$str = ob_get_contents();
-ob_end_clean();
-if ($str) {
-	$str = strip_tags($str);
-	pla_error("Your config file has an error: $str");
-	die();
-}
-
-// Now read in config_default.php, which also reads in config.php
-require LIBDIR.'config_default.php';
-
-// Make sure their session save path is writable, if they are using a file system session module, that is.
-if ( ! strcasecmp('Files', session_module_name() && ! is_writable(realpath(session_save_path()))))
-	pla_error('Your PHP session configuration is incorrect. Please check the value of session.save_path
-		in your php.ini, the current setting of "'.session_save_path().'" is not writable.');
 
 
 /**
