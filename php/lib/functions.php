@@ -7,12 +7,11 @@
  * @package phpLDAPadmin
  */
 
-define('HTDOCDIR',sprintf('%s/',realpath(LIBDIR.'../htdocs/')));
-define('LANGDIR',sprintf('%s/',realpath(LIBDIR.'../locale/')));
-define('CONFDIR',sprintf('%s/',realpath(LIBDIR.'../config')));
-define('TMPLDIR',sprintf('%s/',realpath(LIBDIR.'../templates/')));
-define('CSSDIR','css/');
-define('JSDIR','js/');
+define('HTDOCDIR', realpath(LIBDIR.'../htdocs/').'/');
+define('LANGDIR',  realpath(LIBDIR.'../locale/').'/');
+define('CONFDIR',  realpath(LIBDIR.'../config').'/');
+define('CSSDIR',   'css/');
+define('JSDIR',    'js/');
 
 /* Supplimental functions
  * This list is a list of supplimental functions that are used throughout PLA. The
@@ -27,14 +26,10 @@ $pla_function_files = array(
 	LIBDIR.'session_functions.php',
 	# Functions for reading the server schema
 	LIBDIR.'schema_functions.php',
-	# Functions for template manipulation.
-	LIBDIR.'template_functions.php',
 	# Functions for hashing passwords with OpenSSL binary (only if mhash not present)
 	LIBDIR.'emuhash_functions.php',
 	# Functions for running various hooks
 	LIBDIR.'hooks.php',
-	# Functions for creating Samba passwords
-	LIBDIR.'createlm.php',
 	# Functions for timeout and automatic logout feature
 	LIBDIR.'timeout_functions.php'
 );
