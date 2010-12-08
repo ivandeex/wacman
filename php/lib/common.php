@@ -1,5 +1,5 @@
 <?php
-// $Header: /cvsroot/phpldapadmin/phpldapadmin/lib/common.php,v 1.78 2006/01/03 20:39:59 wurley Exp $
+// $Id$
 
 /**
  * Contains code to be executed at the top of each phpLDAPadmin page.

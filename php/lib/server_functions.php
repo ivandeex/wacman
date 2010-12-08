@@ -1,5 +1,5 @@
 <?php
-/* $Header: /cvsroot/phpldapadmin/phpldapadmin/lib/server_functions.php,v 1.45 2006/05/13 12:52:27 wurley Exp $ */
+// $Id$
 
 /**
  * Classes and functions for LDAP server configuration and capability

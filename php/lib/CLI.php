@@ -1,6 +1,8 @@
 <?php
 /*
  CLI.php - Version 1.0b5
+
+ $Id$
  
  PHP Class interface to CommuniGate Pro CLI.
  A translation of CLI.pm

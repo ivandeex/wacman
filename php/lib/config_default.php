@@ -1,5 +1,5 @@
 <?php
-// $Header: /cvsroot/phpldapadmin/phpldapadmin/lib/config_default.php,v 1.17 2005/12/10 10:34:55 wurley Exp $
+// $Id$
 
 /**
  * Configuration processing and defaults.
