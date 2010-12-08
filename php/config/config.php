@@ -65,11 +65,11 @@ $config->custom->session['blowfish'] = 'a94ac0e9ad49691d93d65b6d381e741b';  # Au
 /*********************************************/
 
 $i=0;
-$ldapservers = new LDAPServers;
+#@#$ldapservers = new LDAPServers;
 
 /* A convenient name that will appear in the tree viewer and throughout
    phpLDAPadmin to identify this LDAP server to users. */
-$ldapservers->SetValue($i,'server','name','Local LDAP Server');
+#@#$ldapservers->SetValue($i,'server','name','Local LDAP Server');
 
 /* Examples:
    'ldap.example.com',
@@ -98,7 +98,7 @@ $ldapservers->SetValue($i,'server','name','Local LDAP Server');
    encrypted using blowfish and the secret your specify above as
    session['blowfish']. */
 // $ldapservers->SetValue($i,'server','auth_type','cookie');
-$ldapservers->SetValue($i,'server','auth_type','session');
+#@#$ldapservers->SetValue($i,'server','auth_type','session');
 
 /* The DN of the user for phpLDAPadmin to bind with. For anonymous binds or
    'cookie' or 'session' auth_types, LEAVE THE LOGIN_DN AND LOGIN_PASS BLANK. If
@@ -168,7 +168,7 @@ $ldapservers->SetValue($i,'server','auth_type','session');
 /* Default password hashing algorithm. One of md5, ssha, sha, md5crpyt, smd5,
    blowfish, crypt or leave blank for now default algorithm. */
 // $ldapservers->SetValue($i,'appearance','password_hash','md5');
-$ldapservers->SetValue($i,'appearance','password_hash','');
+#@#$ldapservers->SetValue($i,'appearance','password_hash','');
 
 /* If you specified 'cookie' or 'session' as the auth_type above, you can
    optionally specify here an attribute to use when logging in. If you enter
@@ -180,7 +180,7 @@ $ldapservers->SetValue($i,'appearance','password_hash','');
    specify 'string', in which case you can provide a string to use for logging
    users in. See 'login_string' directly below. */
 // $ldapservers->SetValue($i,'login','attr','dn');
-$ldapservers->SetValue($i,'login','attr','uid');
+#@#$ldapservers->SetValue($i,'login','attr','uid');
 
 /* If you specified 'cookie' or 'session' as the auth_type above, and you
    specified 'string' for 'login_attr' above, you must provide a string here for

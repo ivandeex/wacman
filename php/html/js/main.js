@@ -1,33 +1,23 @@
-  Ext.onReady(function(){
-      Ext.get('show-btn').on('click', function(){
-          var win;
-          win = new Ext.Window({
-                applyTo:'hello-win',
-                layout:'fit',
-                width:500,
-                height:300,
-                closeAction:'hide',
-                plain: true,
+// $Id$
 
-                items: new Ext.TabPanel({
-                    applyTo: 'hello-tabs',
-                    autoTabs:true,
-                    activeTab:0,
-                    deferredRender:false,
-                    border:false
-                }),
+var main = function() {
+    Ext.get('no-js').hide();
+    var panel = {
+        title: _T('Manage Users'),
+        html: 'Panel',
+        region: 'center',
+        margins: '2 2 2 2'
+    };
+    new Ext.Viewport({
+        defaults: {
+            bodyStyle: 'padding: 5px;',
+        },
+        layout: 'border',
+        items: [
+            panel
+        ]
+    });
+};
 
-                buttons: [{
-                    text:'Submit',
-                    disabled:true
-                },{
-                    text: 'Close',
-                    handler: function(){
-                        win.hide();
-                    }
-                }]
-            });
-          win.show(this);
-      });
-  });
+Ext.onReady(main);
 
