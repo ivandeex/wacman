@@ -1,6 +1,35 @@
 <?php
 // $Id$
 
+// Language configuration. Auto or specified.
+
+$language = 'en';
+header('Content-type: text/html; charset=UTF-8', true);
+
+function setup_language () {
+    global $config;
+    global $language;
+    $language = $config->GetValue('appearance','language');
+
+    if ($language == 'auto') {
+	    // Make sure their browser correctly reports language. If not, skip this.
+    	if (isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+	    	$langs = preg_split ('/[;,]+/', $_SERVER['HTTP_ACCEPT_LANGUAGE']);
+	    	foreach ($langs as $key => $value) {
+	    		$value = preg_split('/[-]+/',$value);
+	    		$value = strtolower(substr($value[0],0,2));
+	    		if ($value == 'q=')
+	    			unset($langs[$key]);
+	    		else
+	    			$langs[$key] = $value;
+	    	}
+	    	$langs = array_unique($langs);
+	    }
+        // FIXME...
+        $language = 'en';
+    }
+}
+
 $translations = array(
 	'ru' => array(
 		'Domain Users'	=>	'Пользователи домена',
@@ -95,15 +124,17 @@ $translations = array(
 	),
 );
 
-
 function _T () {
 	global $translations;
 	$lang = $translations['ru'];
 	$args = func_get_args();
 	$format = array_shift($args);
+	if (count($args) == 1 && is_array($args[0]))
+	    $args = $args[0];
 	if (isset($lang[$format]))
-	  $format = $lang[$format];
-	return vsprintf($format, $args);
+	    $format = $lang[$format];
+	$message = empty($args) ? $format : vsprintf($format, $args);
+	return $message;
 }
 
 ?>

@@ -1,12 +1,7 @@
 <?php
-// $Header: /cvsroot/phpldapadmin/phpldapadmin/lib/timeout_functions.php,v 1.9 2006/01/03 20:39:59 wurley Exp $
+// $Id$
 
-/**
- * A collection of functions used throughout phpLDAPadmin for the timeout and automatic logout feature
- * @author Samuel Tran
- * @package phpLDAPadmin
- *
- */
+// Timeout and automatic logout feature
 
 /**
  * Responsible for setting/updating two session-vars that are used for the timeout and auto logout feature:
@@ -70,7 +65,7 @@ function session_timed_out($ldapserver) {
 		if ((time()-$last_activity) > ($session_timeout*60)) {
 
 			if (in_array($ldapserver->auth_type, array('cookie','session'))) {
-				syslog_notice('Logout for '.$ldapserver->getLoggedInDN());
+				log_notice('Logout for '.$ldapserver->getLoggedInDN());
 				$ldapserver->unsetLoginDN() or pla_error(_('Could not logout.'));
 			}
 

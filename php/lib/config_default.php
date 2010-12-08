@@ -1,15 +1,7 @@
 <?php
 // $Id$
 
-/**
- * Configuration processing and defaults.
- * @author The phpLDAPadmin development team
- * @package phpLDAPadmin
- * @todo Add validation of set variables to enforce limits or particular values.
- */
-
-# The minimum version of PHP required to run phpLDAPadmin.
-define('REQUIRED_PHP_VERSION','4.1.0');
+// Configuration processing and defaults.
 
 class Config {
 	var $custom;
@@ -353,7 +345,7 @@ class Config {
 
 # Define our configuration variable.
 $config = new Config;
-require (CONFDIR.'config.php');
+require_once (CONFDIR.'config.php');
 
 if (($config->GetValue('debug','syslog') || $config->GetValue('debug','file')) && $config->GetValue('debug','level'))
 	define('DEBUG_ENABLED',1);

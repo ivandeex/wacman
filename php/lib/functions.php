@@ -12,28 +12,6 @@ define('CONFDIR',  realpath(LIBDIR.'../config').'/');
 define('CSSDIR',   'css/');
 define('JSDIR',    'js/');
 
-// A list of supplimental functions that are used throughout PLA.
-// Order is important.
-$pla_function_files = array(
-	// Translations
-	LIBDIR.'translations.php',
-	// Functions for talking to LDAP servers.
-	LIBDIR.'server_functions.php',
-	// Functions for sending syslog messages
-	LIBDIR.'syslog.php',
-	// Functions for managing the session (pla_session_start(), etc.)
-	LIBDIR.'session_functions.php',
-	// Functions for reading the server schema
-	LIBDIR.'schema_functions.php',
-	// Functions for hashing passwords with OpenSSL binary (only if mhash not present)
-	LIBDIR.'emuhash_functions.php',
-	// Functions for running various hooks
-	LIBDIR.'hooks.php',
-	// Functions for timeout and automatic logout feature
-	LIBDIR.'timeout_functions.php'
-);
-
-
 /**
  * Fetches whether the user has configured phpLDAPadmin to obfuscate passwords
  * with "*********" when displaying them.
@@ -1008,20 +986,19 @@ function pla_error( $msg, $ldap_err_msg=null, $ldap_err_no=-1, $fatal=true ) {
 
 	?>
 	<center>
-	<table class="error"><tr><td class="img"><img src="images/warning.png" alt="Warning" /></td>
-	<td><center><h2><?php echo _('Error');?></h2></center>
+	<h2><?php echo _('Error');?></h2>
 	<?php echo $msg; ?>
 	<br />
 	<br />
 	<?php
 
-	if (function_exists('syslog_err'))
-		syslog_err($msg);
+	if (function_exists('log_err'))
+		log_err('%s', $msg);
 
 	if( $ldap_err_msg ) {
 		echo sprintf(_('LDAP said: %s'), htmlspecialchars( $ldap_err_msg ));
 		echo '<br />';
-		}
+	}
 
 	if( $ldap_err_no != -1 ) {
 		$ldap_err_no = ( '0x' . str_pad( dechex( $ldap_err_no ), 2, 0, STR_PAD_LEFT ) );
@@ -1037,8 +1014,8 @@ function pla_error( $msg, $ldap_err_msg=null, $ldap_err_no=-1, $fatal=true ) {
 			echo _('Description: (no description available)<br />');
 		}
 
-		if (function_exists('syslog_err'))
-			syslog_err(sprintf(_('Error number: %s<br /><br />'),$ldap_err_no));
+		if (function_exists('log_err'))
+			log_err('Error number: %s<br /><br />', $ldap_err_no);
 	}
 	?>
 	<br />
@@ -1046,7 +1023,7 @@ function pla_error( $msg, $ldap_err_msg=null, $ldap_err_no=-1, $fatal=true ) {
 	</center>
 	<?php
 
-	if( $fatal ) {
+	if ($fatal) {
 		echo "</body>\n</html>";
 		die();
 	}
@@ -2436,9 +2413,9 @@ function debug_log($msg,$level=0) {
 	}
 
 	if ($config->GetValue('debug','syslog'))
-		syslog_notice($debug_message);
+		log_notice($debug_message);
 
-	return syslog_notice( sprintf('%s(%s): %s',$caller,$level,$msg) );
+	return log_notice( sprintf('%s(%s): %s',$caller,$level,$msg) );
 }
 
 function enc_type_select_list($enc_type) {
