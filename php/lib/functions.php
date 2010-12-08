@@ -8,7 +8,6 @@
  */
 
 define('HTDOCDIR', realpath(LIBDIR.'../htdocs/').'/');
-define('LANGDIR',  realpath(LIBDIR.'../locale/').'/');
 define('CONFDIR',  realpath(LIBDIR.'../config').'/');
 define('CSSDIR',   'css/');
 define('JSDIR',    'js/');
@@ -33,6 +32,58 @@ $pla_function_files = array(
 	# Functions for timeout and automatic logout feature
 	LIBDIR.'timeout_functions.php'
 );
+
+
+/**
+ * Bootstrapping
+ */
+
+$config_file = CONFDIR.'config.php';
+
+// Verify that this PHP install has gettext
+if (! extension_loaded('gettext'))
+	pla_error("Your install of PHP appears to be missing GETTEXT support.");
+
+// Helper functions defined in functions.php
+foreach ($pla_function_files as $file) {
+	if (! is_readable($file))
+		pla_error("Fatal error: Cannot read the file \"$file\"");
+	ob_start();
+	require $file;
+	ob_end_clean();
+}
+
+// Make sure this PHP install has LDAP extension
+if (! extension_loaded('ldap'))
+	pla_error("Your install of PHP appears to be missing LDAP support.");
+
+// Make sure that we have php-xml loaded.
+if (! function_exists('xml_parser_create'))
+	pla_error("Your install of PHP appears to be missing XML support");
+
+// Configuration File check
+if (! is_readable($config_file))
+    pla_error("Fatal error: Cannot read the file \"$config_file\"");
+
+// Verify that the config file is properly setup
+ob_start();
+include $config_file;
+$str = ob_get_contents();
+ob_end_clean();
+if ($str) {
+	$str = strip_tags($str);
+	pla_error("Your config file has an error: $str");
+	die();
+}
+
+// Now read in config_default.php, which also reads in config.php
+require LIBDIR.'config_default.php';
+
+// Make sure their session save path is writable, if they are using a file system session module, that is.
+if ( ! strcasecmp('Files', session_module_name() && ! is_writable(realpath(session_save_path()))))
+	pla_error('Your PHP session configuration is incorrect. Please check the value of session.save_path
+		in your php.ini, the current setting of "'.session_save_path().'" is not writable.');
+
 
 /**
  * Fetches whether the user has configured phpLDAPadmin to obfuscate passwords
@@ -1042,18 +1093,6 @@ function pla_error( $msg, $ldap_err_msg=null, $ldap_err_no=-1, $fatal=true ) {
 	}
 	?>
 	<br />
-	<!-- Commented out due to too many false bug reports. :)
-	<br />
-	<center>
-	<small>
-		<?php echo sprintf(_('Is this a phpLDAPadmin bug? If so, please <a href=\'%s\'>report it</a>.') , get_href( 'add_bug' ));?>
-        <?php
-            if( function_exists( "debug_print_backtrace" ) )
-                debug_print_backtrace();
-        ?>
-	</small>
-	</center>
-	-->
 	</td></tr></table>
 	</center>
 	<?php
