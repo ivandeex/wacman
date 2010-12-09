@@ -1,6 +1,6 @@
 // $Id$
 
-var language = 'ru';
+var language = 'en';
 
 var translations = {
 	'ru' : {
@@ -96,11 +96,11 @@ var translations = {
 	}
 };
 
-var _T = function () {
-	var lang = translations[language];
+function _T() {
 	var args = arguments;
 	var format = args[0];
-	var message = lang[format] ? lang[format] : format;
+	var lang = translations[language];
+	var message = lang && lang[format] ? lang[format] : format;
 	for (i = 1; i < arguments.length; i++)
 	    message = message.replace('%s', arguments[i]);
 	return message;
