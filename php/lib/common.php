@@ -44,10 +44,6 @@ if (! function_exists('xml_parser_create'))
 if (! strcasecmp('Files', session_module_name() && ! is_writable(realpath(session_save_path()))))
     pla_error('Please check session.save_path in php.ini: "'.session_save_path().'" is not writable.');
 
-setup_language();
-
-#pla_session_start();
-
 // Strip slashes from GET, POST, and COOKIE variables if this
 // PHP install is configured to automatically addslashes()
 if (get_magic_quotes_gpc() && (! isset($slashes_stripped) || ! $slashes_stripped)) {
@@ -57,5 +53,9 @@ if (get_magic_quotes_gpc() && (! isset($slashes_stripped) || ! $slashes_stripped
     array_stripslashes($_COOKIE);
     $slashes_stripped = true;
 }
+
+setup_language();
+configure();
+#pla_session_start();
 
 ?>

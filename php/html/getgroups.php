@@ -5,13 +5,6 @@
 
 require '../lib/common.php';
 
-configure();
-ldap_connect_to('uni');
-$res = ldap_search_for('uni', "(objectClass=posixGroup)", array('cn'));
-$msg = get_error();
-if (empty($res) && !empty($msg)) {
-    echo "{success:false,message:".json_encode($msg)."}";
-} else {
-    echo "{success:true,rows:".json_encode($res)."}";
-}
+ldap_connect_all();
+echo ldap_encode_json(ldap_search_for('uni', "(objectClass=posixGroup)", array('cn')));
 ?>

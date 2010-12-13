@@ -22,7 +22,7 @@ $config = array(
     'idle_interval'     => 60,
     'connect_timeout'   => 5,
     'language'          => 'en',
-    'locale'            => 'ru_RU.utf8',
+    'locale'            => 'en_US.utf8',
     'show_splash'       => 0,
 );
 

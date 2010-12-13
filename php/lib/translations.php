@@ -124,13 +124,13 @@ $translations = array(
 
 function _T () {
 	global $translations;
-	$lang = $translations['ru']; // FIXME
 	$args = func_get_args();
 	$format = array_shift($args);
 	if (count($args) == 1 && is_array($args[0]))
 	    $args = $args[0];
-	if (isset($lang[$format]))
-	    $format = $lang[$format];
+	$language = get_config('language', 'en');
+	if (isset($translations[$language][$format]))
+	    $format = $translations[$language][$format];
 	$message = empty($args) ? $format : vsprintf($format, $args);
 	return $message;
 }

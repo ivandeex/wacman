@@ -64,17 +64,16 @@ function ldap_connect_to ($srv) {
 function ldap_connect_all () {
     foreach (get_server_names() as $srv) {
         log_info('connecting to "%s"', $srv);
-        if (ldap_connect_to($srv) < 0)
-            pla_error(_T('Connection to "%s" failed', $srv));
+        if (ldap_connect_to($srv) < 0) {
+            log_error('Connection to "%s" failed', $srv);
+            break;
+        }
     }
 }
 
 function convert_ldap_array ($src) {
     if (! is_array($src) || ! isset($src['count']))
         return $src;
-    if ($src['count'] == 1)
-        return $src[0];
-    $dst = array();
     $got_named = 0;
     foreach (array_keys($src) as $key) {
         if (! is_int($key) && $key != 'count') {
@@ -82,12 +81,24 @@ function convert_ldap_array ($src) {
             continue;
         }
     }
+    if ($src['count'] == 1 && ! $got_named)
+        return $src[0];
+    $dst = array();
     foreach ($src as $key => $val) {
         if ($key == 'count' || ($got_named && is_int($key)))
             continue;
         $dst[$key] = convert_ldap_array($val);
     }
     return $dst;
+}
+
+function ldap_encode_json ($res) {
+    $msg = get_error();
+    if (empty($res) && !empty($msg)) {
+        return '{success:false,message:' . json_encode($msg) . '}';
+    } else {
+        return '{success:true,rows:' . json_encode($res) . '}';
+    }
 }
 
 function ldap_search_for ($srv, $filter, $attrs = null, $params = null)
