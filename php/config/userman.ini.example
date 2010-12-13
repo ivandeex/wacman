@@ -1,0 +1,74 @@
+# unix directory server
+[uni]
+uri = "ldaps://ldap.ourdom.com:636"
+base = "dc=ourdom,dc=com"
+debug = 0
+disable = 0
+
+# windows active directory server
+[ads]
+uri = "ldaps://windows.ourdom.com:636"
+base = "dc=ourdom,dc=local"
+debug = 0
+disable = 0
+
+# communigate pro
+[cgp]
+uri = "ldaps://mail.ourdom.com:5636"
+base = "cn=ourdom.com,o=ourdom"
+debug = 0
+disable = 0
+
+# CGP CLI interface
+[cli]
+uri = pwd://localhost:106/
+debug = 0
+disable = 0
+
+# Common options
+[config]
+debug = 0
+ntuser_support = 0
+show_bulbs = 0
+passfile = /etc/userman.secret
+
+skel_dir = /etc/skel
+prefer_nss_ids = 0
+reserved_names = 'public,office,pubadmin,pubwrite'
+
+create_homes  = 1
+remove_homes  = 1
+home_root     = /group
+homes_exclude = "ntuser.dat , secmod.db , urlclassifier3.sqlite"
+homes_from_1  = "vandreev"
+homes_to_1    = "$(uid)"
+homes_from_2  = "Vitaly Andreev"
+homes_to_2    = "$(cn)"
+
+unix_user_dn = 'uid=$(uid),ou=People,dc=ourdom,dc=com'
+unix_group_dn = 'cn=$(cn),ou=Groups,dc=ourdom,dc=com'
+ad_user_dn = 'cn=$(cn),cn=Users,dc=ourdom,dc=local'
+cgp_user_dn = 'uid=$(uid),cn=ourdom.com,o=ourdom'
+
+mail_domain = ourdom.com
+ad_domain = ourdom.local
+start_user_id = 1000
+start_group_id = 1000
+
+min_telnum = 501
+max_telnum = 599
+cgp_listener = listener@communigate
+
+#ad_primary_group = 'Пользователи домена'
+#ad_user_groups = 'Пользователи удаленного рабочего стола'
+
+default_value_user_gidNumber = 100
+default_value_user_loginShell = /bin/bash
+default_value_user_sfuDomain = ourdom
+default_value_user_ntUserHomeDirDrive = H:
+default_value_user_ntUserHomeDir = \\Srv\Homes
+default_value_user_ntUserProfile = \\Srv\Profile
+default_value_user_hostServer = communigate
+default_value_user_mailgroups = pubwrite
+default_value_mailgroup_params = "{ Expand = YES; RejectAutomatic = YES; RemoveToAndCc = YES; SetReplyTo = YES; }"
+

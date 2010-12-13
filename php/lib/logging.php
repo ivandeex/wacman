@@ -17,11 +17,13 @@ function log_msg () {
         $args = $args[0];
     $format = array_shift($args);
     $message = _T($format, $args);
-    syslog($level, '['.$level_str[$level].'] '.$message);
+    static $no = 100;
+    syslog(LOG_INFO, ''.++$no.' ['.$level_str[$level].'] '.$message);
     return true;
 }
 
 function log_err()    { $args = func_get_args(); return log_msg(LOG_ERR,     $args); }
+function log_error()  { $args = func_get_args(); return log_msg(LOG_ERR,     $args); }
 function log_warn()   { $args = func_get_args(); return log_msg(LOG_WARNING, $args); }
 function log_info()   { $args = func_get_args(); return log_msg(LOG_INFO,    $args); }
 function log_notice() { $args = func_get_args(); return log_msg(LOG_NOTICE,  $args); }

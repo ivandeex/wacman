@@ -3,3 +3,7 @@ from http://www.sencha.com/products/js/download.php
 or from http://www.vitki.net/sites/vitki.net/files/attachments/ext-3.3.1.zip
 then unzip ext-3.3.x/ under this directory
 and create symbolic link from "ext-3.3.x" to "ext".
+For example:
+ wget http://www.vitki.net/sites/vitki.net/files/attachments/ext-3.3.1.zip
+ unzip ext-3.3.1.zip
+ ln -s ext-3.3.1 ext

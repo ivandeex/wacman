@@ -977,56 +977,33 @@ function support_oid_to_text($oid_id) {
  * @see ldap_errno
  * @see pla_verbose_error
  */
-function pla_error( $msg, $ldap_err_msg=null, $ldap_err_no=-1, $fatal=true ) {
-	if (defined('DEBUG_ENABLED') && (DEBUG_ENABLED))
-		debug_log('pla_error(): Entered with (%s,%s,%s,%s)',1,$msg,$ldap_err_msg,$ldap_err_no,$fatal);
-
-	@include_once HTDOCDIR.'header.php';
-	global $config;
-
-	?>
-	<center>
-	<h2><?php echo _('Error');?></h2>
-	<?php echo $msg; ?>
-	<br />
-	<br />
-	<?php
-
-	if (function_exists('log_err'))
-		log_err('%s', $msg);
-
-	if( $ldap_err_msg ) {
-		echo sprintf(_('LDAP said: %s'), htmlspecialchars( $ldap_err_msg ));
-		echo '<br />';
-	}
-
-	if( $ldap_err_no != -1 ) {
-		$ldap_err_no = ( '0x' . str_pad( dechex( $ldap_err_no ), 2, 0, STR_PAD_LEFT ) );
-		$verbose_error = pla_verbose_error( $ldap_err_no );
-
-		if( $verbose_error ) {
-			echo sprintf( _('Error number: %s (%s)'), $ldap_err_no, $verbose_error['title']);
-			echo '<br />';
-			echo sprintf( _('Description: %s <br /><br />'), $verbose_error['desc']);
-		} else {
-			echo sprintf(_('Error number: %s<br /><br />'), $ldap_err_no);
-			echo '<br />';
-			echo _('Description: (no description available)<br />');
-		}
-
-		if (function_exists('log_err'))
-			log_err('Error number: %s<br /><br />', $ldap_err_no);
+function pla_error ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = true) {
+    @include_once HTDOCDIR.'header.php';
+    //if (function_exists('log_err'))  log_err('%s', $msg);
+    ?>
+    <center>
+        <h2><?php echo _('Error');?></h2>
+        <?php echo $msg; ?>
+        <br />
+        <?php
+        if( $ldap_err_msg ) {
+            echo sprintf(_('LDAP said: %s'), htmlspecialchars( $ldap_err_msg ));
+            echo '<br />';
+        }
+        if( $ldap_err_no != -1 ) {
+            $ldap_err_no = '0x' . str_pad(dechex( $ldap_err_no ), 2, 0, STR_PAD_LEFT);
+            if (function_exists('log_err'))
+                log_err('Error number: %s<br /><br />', $ldap_err_no);
 	}
 	?>
-	<br />
-	</td></tr></table>
-	</center>
-	<?php
-
-	if ($fatal) {
-		echo "</body>\n</html>";
-		die();
-	}
+        <br />
+        </td></tr></table>
+    </center>
+    <?php
+    if ($fatal) {
+        echo "</body>\n</html>";
+        die();
+    }
 }
 
 /**
