@@ -67,7 +67,7 @@ if( ! function_exists( 'mhash' ) && ! function_exists( 'mhash_keygen_s2k' ) ) {
 			$pwhandle = fopen( $tmpfile, "w" );
 
 			if( ! $pwhandle )
-				pla_error( "Unable to create a temporary file '$tmpfile' to create hashed password" );
+				error_page( "Unable to create a temporary file '$tmpfile' to create hashed password" );
 
 			fwrite( $pwhandle, $password_clear );
 			fclose( $pwhandle );

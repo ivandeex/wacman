@@ -109,7 +109,7 @@ function pla_session_start() {
 	@header("Cache-control: private"); // IE 6 Fix
 
 	if( pla_session_id_paranoid && ! pla_session_verify_id() )
-		pla_error("Session inconsistent or session timeout");
+		error_page("Session inconsistent or session timeout");
 
 	return ( ! $is_initialized ) ? true : false;
 }

@@ -253,7 +253,7 @@ class PlaLdapExporter extends PlaAbstractExporter {
 
 		# if no result, there is a something wrong
 		if (! $this->results && $this->ldap_info->ldapserver->errno())
-			pla_error(_('Encountered an error while performing search.'),$this->ldap_info->ldapserver->error(),
+			error_page(_('Encountered an error while performing search.'),$this->ldap_info->ldapserver->error(),
 				$this->ldap_info->ldapserver->errno());
 
 		usort($this->results,'pla_compare_dns');

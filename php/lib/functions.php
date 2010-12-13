@@ -12,6 +12,44 @@ define('CONFDIR',  realpath(LIBDIR.'../config').'/');
 define('CSSDIR',   'css/');
 define('JSDIR',    'js/');
 
+//
+// Print HTML-formatted error string.
+// Optional parameters $ldap_err_msg and $ldap_err_no make this function
+// lookup the error number and display an extra verbose message.
+//
+
+function error_page ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = true) {
+    @include_once HTDOCDIR.'header.php';
+    //if (function_exists('log_err'))  log_err('%s', $msg);
+    ?>
+    <center>
+        <h2><?php echo _('Error');?></h2>
+        <?php echo $msg; ?>
+        <br />
+        <?php
+        if( $ldap_err_msg ) {
+            echo sprintf(_('LDAP said: %s'), htmlspecialchars( $ldap_err_msg ));
+            echo '<br />';
+        }
+        if( $ldap_err_no != -1 ) {
+            $ldap_err_no = '0x' . str_pad(dechex( $ldap_err_no ), 2, 0, STR_PAD_LEFT);
+            if (function_exists('log_err'))
+                log_err('Error number: %s<br /><br />', $ldap_err_no);
+	}
+	?>
+        <br />
+        </td></tr></table>
+    </center>
+    <?php
+    if ($fatal) {
+        echo "</body>\n</html>";
+        die();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
  * Fetches whether the user has configured phpLDAPadmin to obfuscate passwords
  * with "*********" when displaying them.
@@ -57,7 +95,7 @@ function pretty_print_dn( $dn ) {
 		debug_log('pretty_print_dn(): Entered with (%s)',1,$dn);
 
 	if (! is_dn_string($dn))
-		pla_error(sprintf(_('DN "%s" is not an LDAP distinguished name.'),htmlspecialchars($dn)));
+		error_page(sprintf(_('DN "%s" is not an LDAP distinguished name.'),htmlspecialchars($dn)));
 
 	$dn = pla_explode_dn( $dn );
 	foreach( $dn as $i => $element ) {
@@ -390,7 +428,7 @@ function get_next_number(&$ldapserver,$startbase='',$type='uid') {
 				$base_dn = $ldapservers->GetValue($ldapserver->server_id,'auto_number','search_base');
 
 				if (is_null($base_dn))
-					pla_error(sprintf(_('You specified the "auto_uid_number_mechanism" as "search" in your
+					error_page(sprintf(_('You specified the "auto_uid_number_mechanism" as "search" in your
                               configuration for server <b>%s</b>, but you did not specify the
                               "auto_uid_number_search_base". Please specify it before proceeding.'),$ldapserver->name));
 
@@ -399,7 +437,7 @@ function get_next_number(&$ldapserver,$startbase='',$type='uid') {
 			}
 
 			if (! $ldapserver->dnExists($base_dn))
-				pla_error(sprintf(_('Your phpLDAPadmin configuration specifies an invalid auto_uid_search_base for server %s'),$ldapserver->name));
+				error_page(sprintf(_('Your phpLDAPadmin configuration specifies an invalid auto_uid_search_base for server %s'),$ldapserver->name));
 
 			$filter = '(|(uidNumber=*)(gidNumber=*))';
 			$results = array();
@@ -410,12 +448,12 @@ function get_next_number(&$ldapserver,$startbase='',$type='uid') {
 				$ldapservers->GetValue($ldapserver->server_id,'auto_number','pass'));
 
 			if (! $con)
-				pla_error(sprintf(_('Unable to bind to <b>%s</b> with your with auto_uid credentials. Please check your configuration file.'),$ldapserver->name));
+				error_page(sprintf(_('Unable to bind to <b>%s</b> with your with auto_uid credentials. Please check your configuration file.'),$ldapserver->name));
 
 			$search = $ldapserver->search($con,$base_dn,$filter,array('uidNumber','gidNumber'),'sub',false,$config->GetValue('deref','search'));
 
 			if (! is_array($search))
-				pla_error('Untrapped error.');
+				error_page('Untrapped error.');
 
 			foreach ($search as $dn => $attrs) {
 				$attrs = array_change_key_case($attrs);
@@ -438,7 +476,7 @@ function get_next_number(&$ldapserver,$startbase='',$type='uid') {
 						}
 						break;
 					default :
-						pla_error(sprintf('Unknown type [%s] in search',$type));
+						error_page(sprintf('Unknown type [%s] in search',$type));
 				}
 			}
 
@@ -470,7 +508,7 @@ function get_next_number(&$ldapserver,$startbase='',$type='uid') {
 
 		# No other cases allowed. The user has an error in the configuration
 		default :
-			pla_error( sprintf( _('You specified an invalid value for auto_uid_number_mechanism ("%s")
+			error_page( sprintf( _('You specified an invalid value for auto_uid_number_mechanism ("%s")
                                    in your configration. Only "uidpool" and "search" are valid.
                                    Please correct this problem.') , $mechanism) );
 	}
@@ -963,50 +1001,6 @@ function support_oid_to_text($oid_id) {
 }
 
 /**
- * Prints an HTML-formatted error string. If you specify the optional
- * parameters $ldap_err_msg and $ldap_err_no, this function will
- * lookup the error number and display a verbose message in addition
- * to the message you pass it.
- *
- * @param string $msg The error message to display.
- * @param string $ldap_err_msg (optional) The error message supplied by the LDAP server
- * @param string $ldap_err_no (optional) The hexadecimal error number string supplied by the LDAP server
- * @param bool $fatal (optional) If true, phpLDAPadmin will terminate execution with the PHP die() function.
- *
- * @see die
- * @see ldap_errno
- * @see pla_verbose_error
- */
-function pla_error ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = true) {
-    @include_once HTDOCDIR.'header.php';
-    //if (function_exists('log_err'))  log_err('%s', $msg);
-    ?>
-    <center>
-        <h2><?php echo _('Error');?></h2>
-        <?php echo $msg; ?>
-        <br />
-        <?php
-        if( $ldap_err_msg ) {
-            echo sprintf(_('LDAP said: %s'), htmlspecialchars( $ldap_err_msg ));
-            echo '<br />';
-        }
-        if( $ldap_err_no != -1 ) {
-            $ldap_err_no = '0x' . str_pad(dechex( $ldap_err_no ), 2, 0, STR_PAD_LEFT);
-            if (function_exists('log_err'))
-                log_err('Error number: %s<br /><br />', $ldap_err_no);
-	}
-	?>
-        <br />
-        </td></tr></table>
-    </center>
-    <?php
-    if ($fatal) {
-        echo "</body>\n</html>";
-        die();
-    }
-}
-
-/**
  * phpLDAPadmin's custom error handling function. When a PHP error occurs,
  * PHP will call this function rather than printing the typical PHP error string.
  * This provides phpLDAPadmin the ability to format an error message more "pretty"
@@ -1023,9 +1017,9 @@ function pla_error ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = true
  *
  * @see set_error_handler
  */
-function pla_error_handler( $errno, $errstr, $file, $lineno ) {
+function error_handler( $errno, $errstr, $file, $lineno ) {
 	if (DEBUG_ENABLED)
-		debug_log('pla_error_handler(): Entered with (%s,%s,%s,%s)',1,$errno,$errstr,$file,$lineno);
+		debug_log('error_handler(): Entered with (%s,%s,%s,%s)',1,$errno,$errstr,$file,$lineno);
 
 	// error_reporting will be 0 if the error context occurred
 	// within a function call with '@' preprended (ie, @ldap_bind() );
@@ -1070,7 +1064,7 @@ function pla_error_handler( $errno, $errstr, $file, $lineno ) {
 
 	$server = isset( $_SERVER['SERVER_SOFTWARE'] ) ? $_SERVER['SERVER_SOFTWARE'] : 'undefined';
 	$phpself = isset( $_SERVER['PHP_SELF'] ) ? basename( $_SERVER['PHP_SELF'] ) : 'undefined';
-	pla_error( sprintf(_('Congratulations! You found a bug in phpLDAPadmin.<br /><br />
+	error_page( sprintf(_('Congratulations! You found a bug in phpLDAPadmin.<br /><br />
 	     <table class=\'bug\'>
 	     <tr><td>Error:</td><td><b>%s</b></td></tr>
 	     <tr><td>Level:</td><td><b>%s</b></td></tr>
@@ -1159,7 +1153,7 @@ function draw_jpeg_photos($ldapserver,$dn,$attr_name='jpegPhoto',$draw_delete_bu
 
 	$jpeg_temp_dir = realpath($config->GetValue('jpeg','tmpdir').'/');
 	if (! is_writable($jpeg_temp_dir))
-		pla_error(_('Please set $jpeg_temp_dir to a writable directory in the phpLDAPadmin config.php') );
+		error_page(_('Please set $jpeg_temp_dir to a writable directory in the phpLDAPadmin config.php') );
 
 	if (! is_array($jpeg_data[$attr_name]))
 		$jpeg_data[$attr_name] = array($jpeg_data[$attr_name]);
@@ -1168,7 +1162,7 @@ function draw_jpeg_photos($ldapserver,$dn,$attr_name='jpegPhoto',$draw_delete_bu
 		$jpeg_filename = tempnam($jpeg_temp_dir.'/','pla');
 		$outjpeg = @fopen($jpeg_filename,'wb');
 		if (! $outjpeg)
-			pla_error(sprintf(_('Could not write to the $jpeg_temp_dir directory %s. Please verify that your web server can write files there.'),$jpeg_temp_dir));
+			error_page(sprintf(_('Could not write to the $jpeg_temp_dir directory %s. Please verify that your web server can write files there.'),$jpeg_temp_dir));
 		fwrite($outjpeg,$jpeg);
 		fclose ($outjpeg);
 
@@ -1252,21 +1246,21 @@ function password_hash( $password_clear, $enc_type ) {
 		case 'ext_des':
 			// extended des crypt. see OpenBSD crypt man page.
 			if ( ! defined( 'CRYPT_EXT_DES' ) || CRYPT_EXT_DES == 0 )
-				pla_error( _('Your system crypt library does not support extended DES encryption.') );
+				error_page( _('Your system crypt library does not support extended DES encryption.') );
 
 			$new_value = '{CRYPT}' . crypt( $password_clear, '_' . random_salt(8) );
 			break;
 
 		case 'md5crypt':
 			if( ! defined( 'CRYPT_MD5' ) || CRYPT_MD5 == 0 )
-				pla_error( _('Your system crypt library does not support md5crypt encryption.') );
+				error_page( _('Your system crypt library does not support md5crypt encryption.') );
 
 			$new_value = '{CRYPT}' . crypt( $password_clear , '$1$' . random_salt(9) );
 			break;
 
 		case 'blowfish':
 			if( ! defined( 'CRYPT_BLOWFISH' ) || CRYPT_BLOWFISH == 0 )
-				pla_error( _('Your system crypt library does not support blowfish encryption.') );
+				error_page( _('Your system crypt library does not support blowfish encryption.') );
 
 			// hardcoded to second blowfish version and set number of rounds
 			$new_value = '{CRYPT}' . crypt( $password_clear , '$2a$12$' . random_salt(13) );
@@ -1285,7 +1279,7 @@ function password_hash( $password_clear, $enc_type ) {
 				$new_value = '{SHA}' . base64_encode( mhash( MHASH_SHA1, $password_clear) );
 
 			} else {
-				pla_error( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
+				error_page( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
 			}
 			break;
 
@@ -1296,7 +1290,7 @@ function password_hash( $password_clear, $enc_type ) {
 				$new_value = "{SSHA}".base64_encode( mhash( MHASH_SHA1, $password_clear.$salt ).$salt );
 
 			} else {
-				pla_error( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
+				error_page( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
 			}
 			break;
 
@@ -1307,7 +1301,7 @@ function password_hash( $password_clear, $enc_type ) {
 				$new_value = "{SMD5}".base64_encode( mhash( MHASH_MD5, $password_clear.$salt ).$salt );
 
 			} else {
-				pla_error( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
+				error_page( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
 			}
 			break;
 
@@ -1355,7 +1349,7 @@ function password_check( $cryptedpassword, $plainpassword ) {
 					return false;
 
 			} else {
-				pla_error( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
+				error_page( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
 			}
 			break;
 
@@ -1373,7 +1367,7 @@ function password_check( $cryptedpassword, $plainpassword ) {
 					return false;
 
 			} else {
-				pla_error( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
+				error_page( _('Your PHP install does not have the mhash() function. Cannot do SHA hashes.') );
 			}
 			break;
 
@@ -1400,7 +1394,7 @@ function password_check( $cryptedpassword, $plainpassword ) {
 
 				// make sure that web server supports blowfish crypt
 				if( ! defined( 'CRYPT_BLOWFISH' ) || CRYPT_BLOWFISH == 0 )
-					pla_error( _('Your system crypt library does not support blowfish encryption.') );
+					error_page( _('Your system crypt library does not support blowfish encryption.') );
 
 				list(,$version,$rounds,$salt_hash) = explode('$',$cryptedpassword);
 
@@ -1415,7 +1409,7 @@ function password_check( $cryptedpassword, $plainpassword ) {
 
 				// make sure that web server supports md5 crypt
 				if( ! defined( 'CRYPT_MD5' ) || CRYPT_MD5 == 0 )
-					pla_error( _('Your system crypt library does not support md5crypt encryption.') );
+					error_page( _('Your system crypt library does not support md5crypt encryption.') );
 
 				list(,$type,$salt,$hash) = explode('$',$cryptedpassword);
 
@@ -1430,7 +1424,7 @@ function password_check( $cryptedpassword, $plainpassword ) {
 
 				// make sure that web server supports ext_des
 				if ( ! defined( 'CRYPT_EXT_DES' ) || CRYPT_EXT_DES == 0 )
-					pla_error( _('Your system crypt library does not support extended DES encryption.') );
+					error_page( _('Your system crypt library does not support extended DES encryption.') );
 
 				if( crypt($plainpassword, $cryptedpassword ) == $cryptedpassword )
 					return true;
@@ -1980,7 +1974,7 @@ function get_default_search_display() {
 		return 'table';
 
 	else
-		pla_error( sprintf( _('Your config.php specifies an invalid value for $default_search_display: %s. Please fix it'), htmlspecialchars( $default_search_display ) ) );
+		error_page( sprintf( _('Your config.php specifies an invalid value for $default_search_display: %s. Please fix it'), htmlspecialchars( $default_search_display ) ) );
 }
 
 /**

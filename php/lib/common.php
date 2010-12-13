@@ -16,10 +16,10 @@ require_once realpath(LIBDIR.'functions.php');
 #ob_end_clean();
 
 if (phpversion() < 5)
-    pla_error('Sorry, Userman is a PHP5 application.');
+    error_page('Sorry, Userman is a PHP5 application.');
 
 // Our error handler receives all error notices that pass the error_reporting() level set above.
-#set_error_handler('pla_error_handler');
+#set_error_handler('error_handler');
 // Disable error reporting until all our required functions are loaded.
 #error_reporting(0);
 error_reporting(E_ALL);
@@ -45,15 +45,15 @@ foreach ($includes as $file) {
 
 // Make sure this PHP install has LDAP extension
 if (! extension_loaded('ldap'))
-    pla_error("Your install of PHP appears to be missing LDAP support.");
+    error_page("Your install of PHP appears to be missing LDAP support.");
 
 // Make sure that we have php-xml loaded.
 if (! function_exists('xml_parser_create'))
-    pla_error("Your install of PHP appears to be missing XML support");
+    error_page("Your install of PHP appears to be missing XML support");
 
 // Make sure their session save path is writable, if they are using a file system session module, that is.
 if (! strcasecmp('Files', session_module_name() && ! is_writable(realpath(session_save_path()))))
-    pla_error('Please check session.save_path in php.ini: "'.session_save_path().'" is not writable.');
+    error_page('Please check session.save_path in php.ini: "'.session_save_path().'" is not writable.');
 
 // Strip slashes from GET, POST, and COOKIE variables if this
 // PHP install is configured to automatically addslashes()

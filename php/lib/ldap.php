@@ -18,10 +18,10 @@ function get_server_names () {
 function &get_server ($srv, $allow_disabled = false) {
     global $servers;
     if (! isset($servers[$srv]))
-        pla_error(_T('unknown ldap server "%s"', $srv));
+        error_page(_T('unknown ldap server "%s"', $srv));
     $cfg = &$servers[$srv];
     if (! $allow_disabled && $cfg['disable'])
-        pla_error(_T('server "%s" is disabled', $srv));
+        error_page(_T('server "%s" is disabled', $srv));
     return $cfg;
 }
 

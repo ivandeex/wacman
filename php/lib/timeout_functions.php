@@ -66,7 +66,7 @@ function session_timed_out($ldapserver) {
 
 			if (in_array($ldapserver->auth_type, array('cookie','session'))) {
 				log_notice('Logout for '.$ldapserver->getLoggedInDN());
-				$ldapserver->unsetLoginDN() or pla_error(_('Could not logout.'));
+				$ldapserver->unsetLoginDN() or error_page(_('Could not logout.'));
 			}
 
 			return true;
