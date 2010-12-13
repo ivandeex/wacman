@@ -24,10 +24,20 @@ if (phpversion() < 5)
 #error_reporting(0);
 error_reporting(E_ALL);
 
-require_once realpath(LIBDIR . 'translations.php');
-require_once realpath(LIBDIR . 'logging.php');
-require_once realpath(LIBDIR . 'config.php');
-require_once realpath(LIBDIR . 'ldap.php');
+// Include all function libraries
+$includes = array(
+    'translations.php',
+    'logging.php',
+    'config.php',
+    'http.php',
+    'ldap.php',
+    'CLI.php',
+    'communigate.php'
+    );
+
+foreach ($includes as $file) {
+    require_once realpath(LIBDIR . $file);
+}
 
 // We are now ready for error reporting.
 #error_reporting(E_DEBUG);
@@ -54,8 +64,8 @@ if (get_magic_quotes_gpc() && (! isset($slashes_stripped) || ! $slashes_stripped
     $slashes_stripped = true;
 }
 
-setup_language();
 configure();
+setup_language();
 #pla_session_start();
 
 ?>

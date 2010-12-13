@@ -30,8 +30,8 @@ function ldap_connect_to ($srv) {
     $cfg = &get_server($srv, true);
     $cfg['name'] = $srv;
     $cfg['connected'] = 0;
-    //if ($srv == 'cli')
-    //    return cli_connect();
+    if ($srv == 'cli')
+        return cli_connect();
     if ($cfg['disable']) {
         $cfg['ldap'] = null;
         return 0;
@@ -62,12 +62,26 @@ function ldap_connect_to ($srv) {
 }
 
 function ldap_connect_all () {
-    foreach (get_server_names() as $srv) {
+    global $servers;
+    foreach ($servers as $srv => $cfg) {
         log_info('connecting to "%s"', $srv);
-        if (ldap_connect_to($srv) < 0) {
+        $cfg['connected'] = 0;
+        if (ldap_connect_to($srv) < 0)
             log_error('Connection to "%s" failed', $srv);
-            break;
-        }
+    }
+}
+
+function ldap_disconnect_all () {
+    global $servers;
+    foreach ($servers as $srv => &$cfg) {
+        if ($cfg['disable'] || ! $cfg['connected'])
+            continue;
+        if ($cfg['name'] == 'cli')
+            cli_disconnect();
+        else
+            ldap_close($cfg['ldap']);
+        unset($cfg['ldap']);
+        $cfg['connected'] = 0;
     }
 }
 
@@ -95,9 +109,9 @@ function convert_ldap_array ($src) {
 function ldap_encode_json ($res) {
     $msg = get_error();
     if (empty($res) && !empty($msg)) {
-        return '{success:false,message:' . json_encode($msg) . '}';
+        return "{success:false,message:" . json_encode($msg) . "}\n";
     } else {
-        return '{success:true,rows:' . json_encode($res) . '}';
+        return "{success:true,rows:" . json_encode($res) . "}\n";
     }
 }
 
