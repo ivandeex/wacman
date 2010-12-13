@@ -3,13 +3,11 @@
 
 // Language configuration. Auto or specified.
 
-$language = 'en';
 header('Content-type: text/html; charset=UTF-8', true);
 
 function setup_language () {
     global $config;
-    global $language;
-    $language = $config->GetValue('appearance','language');
+    $language = get_config('language', 'en');
 
     if ($language == 'auto') {
 	    // Make sure their browser correctly reports language. If not, skip this.
@@ -126,7 +124,7 @@ $translations = array(
 
 function _T () {
 	global $translations;
-	$lang = $translations['ru'];
+	$lang = $translations['ru']; // FIXME
 	$args = func_get_args();
 	$format = array_shift($args);
 	if (count($args) == 1 && is_array($args[0]))

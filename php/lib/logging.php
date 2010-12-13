@@ -6,6 +6,18 @@
 define_syslog_variables();
 openlog('userman', LOG_ODELAY, LOG_DAEMON);
 
+$last_error = '';
+
+function get_error () {
+    global $last_error;
+    return $last_error;
+}
+
+function set_error ($message = '') {
+    global $last_error;
+    $last_error = $message;
+}
+
 function log_msg () {
     static $level_str = array(
         LOG_ERR => 'error', LOG_WARNING => 'warning', LOG_INFO => 'info',
@@ -19,6 +31,8 @@ function log_msg () {
     $message = _T($format, $args);
     static $no = 100;
     syslog(LOG_INFO, ''.++$no.' ['.$level_str[$level].'] '.$message);
+    if ($level == LOG_ERR)
+        set_error($message);
     return true;
 }
 
