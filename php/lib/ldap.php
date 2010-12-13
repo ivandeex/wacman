@@ -77,13 +77,13 @@ function convert_ldap_array ($src) {
     $dst = array();
     $got_named = 0;
     foreach (array_keys($src) as $key) {
-        if (! preg_match('/^\d+$/', $key) && $key != 'count') {
+        if (! is_int($key) && $key != 'count') {
             $got_named = 1;
             continue;
         }
     }
     foreach ($src as $key => $val) {
-        if ($key == 'count' || ($got_named && preg_match('/^\d+$/', $key)))
+        if ($key == 'count' || ($got_named && is_int($key)))
             continue;
         $dst[$key] = convert_ldap_array($val);
     }
