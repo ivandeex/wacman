@@ -1,5 +1,5 @@
 <?php
-// $Id: group-list.php 1585 2010-12-14 02:28:00Z vitki $
+// $Id$
 
 // Return translations
 
