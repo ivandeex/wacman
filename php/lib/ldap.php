@@ -10,10 +10,12 @@ $servers = array(
     'cli' => array( 'disable' => 1 )     // CommuniGate Pro - CLI interface
 );
 
+
 function get_server_names () {
     global $servers;
     return array_keys($servers);
 }
+
 
 function & get_server ($srv, $allow_disabled = false) {
     global $servers;
@@ -24,6 +26,7 @@ function & get_server ($srv, $allow_disabled = false) {
         error_page(_T('server "%s" is disabled', $srv));
     return $cfg;
 }
+
 
 function uldap_connect ($srv) {
     global $servers;
@@ -61,6 +64,7 @@ function uldap_connect ($srv) {
     return 0;
 }
 
+
 function uldap_connect_all () {
     global $servers;
     foreach ($servers as $srv => $cfg) {
@@ -70,6 +74,7 @@ function uldap_connect_all () {
             log_error('Connection to "%s" failed', $srv);
     }
 }
+
 
 function uldap_disconnect_all () {
     global $servers;
@@ -84,6 +89,7 @@ function uldap_disconnect_all () {
         $cfg['connected'] = 0;
     }
 }
+
 
 function uldap_convert_array (&$src) {
     if (! is_array($src) || ! isset($src['count']))
@@ -109,11 +115,36 @@ function uldap_convert_array (&$src) {
     return $dst;
 }
 
+
+function uldap_get_value ($data, $name, $asarray = false) {
+    $src = $data;
+    if (is_array($src) && isset($src['count']) && $src['count'] == 1)
+        $src = $data[0];
+    $lcname = strtolower($name);
+    if (isset($src[$lcname]))
+        $val = $src[$lcname];
+    else if (isset($src[$name]))
+        $val = $src[$name];
+    else
+        $val = array();
+    unset($val['count']);
+    if (is_array($val) && !$asarray) {
+        if (count($val) == 1)
+            $val = $val[0];
+        else if (count($val) == 0)
+            $val = null;
+    }
+    #echo _T("ugv(%s,%s):(%s)======>(%s)<br>\n", $name, $asarray?"T":"F", print_r($data,1), print_r($val,1));
+    return $val;
+}
+
+
 function uldap_json_encode ($res) {
     if ($res['code'])
         return json_error($res['error']);
     return "{success:true,rows:" . json_encode(uldap_convert_array($res['data'])) . "}\n";
 }
+
 
 function uldap_search ($srv, $filter, $attrs = null, $params = null)
 {
@@ -171,7 +202,7 @@ function uldap_obj_read (&$obj, $srv, $filter) {
 }
 
 
-function ldap_obj_write ($obj, $srv) {
+function uldap_obj_write ($obj, $srv) {
     global $servers;
 
     if ($servers[$srv]['disable'])
@@ -218,6 +249,7 @@ function ldap_obj_write ($obj, $srv) {
 //////////////////////////////////////////////////////////////
 // ================  ldap readers / writers  ================
 //
+
 
 function ldap_read_none () {
     return '';
@@ -602,14 +634,19 @@ function ldap_write_unix_groups_final ($at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_unix_members ($at, $srv, $ldap, $name) {
-    $uidns = uldap_get_value($ldap, $name);
+    // RHDS returns uid numbers, OpenLDAP returns usernames. We handle both cases.
+    $uidns = uldap_get_value($ldap, $name, true);
     log_debug('ldap_read_unix_members: "%s" is (%s)', $name, join_list($uidns));
     $uids = array();
     foreach ($uidns as $uidn) {
-        $res = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
-        $ue = $res[0];
-        $uid = $ue ? nvl(uldap_get_value($ue, 'uid')) : '';
-        $uids[] = empty($uid) ? $uidn : $uid;
+        if (preg_match('!^\d+$!', $uidn)) {
+            $res = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
+            $ue = $res['data'];
+            $uid = $ue ? nvl(uldap_get_value($ue, 'uid')) : '';
+            $uids[] = empty($uid) ? $uidn : $uid;
+        } else {
+            $uids[] = $uidn;
+        }
     }
     $val = join_list($uids);
     log_debug('ldap_read_unix_members: "%s" returns "%s"...', $name, $val);
