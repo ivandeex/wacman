@@ -1,5 +1,5 @@
 <?php
-// $Id: ldap.php 1580 2010-12-13 12:59:13Z vitki $
+// $Id$
 
 // HTTP helpers
 
