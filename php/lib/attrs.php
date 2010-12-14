@@ -451,38 +451,38 @@ function setup_all_attrs () {
 
     $all_lc_attrs = array();
 
-	foreach ($all_attrs as $objtype => &$descs) {
+    foreach ($all_attrs as $objtype => &$descs) {
 
-		foreach ($servers as $srv => &$cfg) {
-		    $cfg['attrhash'] = array();
-		    $cfg['attrhash'][$objtype] = array();
-		}
+        foreach ($servers as $srv => &$cfg) {
+            $cfg['attrhash'] = array();
+            $cfg['attrhash'][$objtype] = array();
+        }
 
-		$all_lc_attrs[$objtype] = array();
+        $all_lc_attrs[$objtype] = array();
 
         foreach ($descs as $name => &$desc) {
 
             $all_lc_attrs[$objtype][strtolower($name)] = $desc;
 
-			$desc['name'] = $name;
-			if (empty($desc['type']))
-			    $desc['type'] = 'string';
-			$desc['visual'] = isset($desc['label']);
-			if (isset($desc['label']))
+            $desc['name'] = $name;
+            if (empty($desc['type']))
+                $desc['type'] = 'string';
+            $desc['visual'] = isset($desc['label']);
+            if (isset($desc['label']))
 			    $desc['label'] = _T($desc['label']);
-			if (! isset($desc['readonly']))
+            if (! isset($desc['readonly']))
                 $desc['readonly'] = 0;
-			if (! isset($desc['verify']))
+            if (! isset($desc['verify']))
                 $desc['verify'] = 0;
 
             if (! isset($desc['popup']))
 			    $desc['popup'] = 0;
             if (! isset($desc['checkbox']))
 			    $desc['checkbox'] = 0;
-			if ($desc['checkbox'])
+            if ($desc['checkbox'])
                 $desc['popup'] = 'yesno';
 			
-			if (! isset($desc['default'])) {
+            if (! isset($desc['default'])) {
                 $cfg_def = "default_value_${objtype}_${name}";
                 if (isset($config[$cfg_def]))
                     $desc['default'] = $config[$cfg_def];
@@ -507,15 +507,15 @@ function setup_all_attrs () {
             if (! isset($desc['disable']))
 			    $desc['disable'] = 0;
 
-			$ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
-			if (! is_array($ldap)) {
+            $ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
+            if (! is_array($ldap)) {
                 $arr = split_list($ldap);
                 $ldap = array();
                 foreach ($arr as $x)
                     $ldap[$x] = '';
             }
 
-			foreach (array_keys($ldap) as $srv) {
+            foreach (array_keys($ldap) as $srv) {
 
 				// 'ntuser' is a special set of unix attributes
 				// they can be either supported as 'uni' or unsupported
@@ -548,12 +548,12 @@ function setup_all_attrs () {
                 }
             }
 
-			$desc['ldap'] = $ldap;
-			if (empty($ldap) || ! attribute_enabled($objtype, $name))
+            $desc['ldap'] = $ldap;
+            if (empty($ldap) || ! attribute_enabled($objtype, $name))
     			$desc['disable'] = 1;
 
-			$subs = $ldap_rw_subs[ $desc['disable'] ? 'none' : $desc['type'] ];
-			if (! $subs)
+            $subs = $ldap_rw_subs[ $desc['disable'] ? 'none' : $desc['type'] ];
+            if (! $subs)
                 log_error('type "%s" of "%s" attribute "%s" is not supported',
                             $desc['type'], $objtype, $name);
             $desc['ldap_read'] = $subs[0];
