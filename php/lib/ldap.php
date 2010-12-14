@@ -94,18 +94,18 @@ function uldap_disconnect_all () {
 function uldap_convert_array (&$src) {
     if (! is_array($src) || ! isset($src['count']))
         return $src;
-    $got_named = 0;
+    $got_named = false;
     foreach (array_keys($src) as $key) {
         if (! is_int($key) && $key != 'count') {
-            $got_named = 1;
-            continue;
+            $got_named = true;
+            break;
         }
     }
     if ($src['count'] == 1 && ! $got_named)
         return uldap_convert_array($src[0]);
     $dst = array();
     foreach ($src as $key => &$val) {
-        if ($key == 'count' || ($got_named && is_int($key)))
+        if ($key === 'count' || ($got_named && is_int($key)))
             continue;
         if ($got_named)
             $dst[$key] = uldap_convert_array($val);
@@ -176,7 +176,7 @@ function uldap_obj_read (&$obj, $srv, $filter) {
 
     if ($servers[$srv]['disable']) {
         $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
-        return undef;
+        return null;
     }
 
     $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
@@ -185,7 +185,7 @@ function uldap_obj_read (&$obj, $srv, $filter) {
         log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
         return $res['error'] ? $res['error'] : 'not found';
     }
-    $ldap = $obj['ldap'][$srv] = $res['data'];
+    $obj['ldap'][$srv] = $res['data'];
 
     foreach ($obj['attrs'] as $at) {
         if ($at['state'] != 'empty')
@@ -194,7 +194,7 @@ function uldap_obj_read (&$obj, $srv, $filter) {
         if (! $name)
             continue;
         $func = $at['desc']['ldap_read'];
-        $val = call_user_func ($func, $at, $srv, $ldap, $name);
+        $val = call_user_func ($func, $at, $srv, $obj['ldap'][$srv], $name);
         init_attr($obj, $at['name'], $val);
     }
 
