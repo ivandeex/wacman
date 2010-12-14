@@ -47,7 +47,7 @@ function user_delete() {
 }
 
 function users_refresh() {
-    test_msg();
+    user_store.reload();
 }
 
 function user_unselect() {
@@ -123,7 +123,7 @@ function group_delete() {
 }
 
 function groups_refresh() {
-    test_msg();
+    group_store.reload();
 }
 
 function group_unselect() {
@@ -191,7 +191,7 @@ function mailgroup_delete() {
 }
 
 function mailgroups_refresh() {
-    test_msg();
+    mailgroup_store.reload();
 }
 
 function mailgroup_unselect() {
