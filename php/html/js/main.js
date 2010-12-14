@@ -48,12 +48,17 @@ function create_user_list() {
         user_test_data[i] = [ 'u'+(i+10), 'User #'+(i+10) ];
     }
     var user_rec = Ext.data.Record.create([
-        'username',
-        'fullname'
+        'uid',
+        'cn',
+        'dn'
     ]);
     var user_store = new Ext.data.Store({
-        data: user_test_data,
-        reader: new Ext.data.ArrayReader({idIndex: 0}, user_rec)
+        url: 'user-list.php',
+        autoLoad: true,
+        reader: new Ext.data.JsonReader({
+            root: 'rows',
+            idProperty: 'uid'
+        }, user_rec)
     });
     return {
         xtype: 'grid',
@@ -61,12 +66,12 @@ function create_user_list() {
         colModel: new Ext.grid.ColumnModel({
             columns: [{
                 header: _T('Identifier'),
-                dataIndex: 'username',
+                dataIndex: 'uid',
                 sortable: true,
                 width: 100,
             },{
                 header: _T('Full name'),
-                dataIndex: 'fullname',
+                dataIndex: 'dn',
                 sortable: true,
                 width: 190
             }]
@@ -120,11 +125,16 @@ function create_group_list() {
         group_test_data[i] = [ 'grp'+(i+10) ];
     }
     var group_rec = Ext.data.Record.create([
-        'group'
+        'cn',
+        'dn'
     ]);
     var group_store = new Ext.data.Store({
-        data: group_test_data,
-        reader: new Ext.data.ArrayReader({idIndex: 0}, group_rec)
+        url: 'group-list.php',
+        autoLoad: true,
+        reader: new Ext.data.JsonReader({
+            root: 'rows',
+            idProperty: 'dn'
+        }, group_rec)
     });
     return {
         xtype: 'grid',
@@ -132,7 +142,7 @@ function create_group_list() {
         colModel: new Ext.grid.ColumnModel({
             columns: [{
                 header: _T('Group name'),
-                dataIndex: 'group',
+                dataIndex: 'cn',
                 sortable: true,
                 width: 120
             }]
@@ -184,11 +194,15 @@ function create_mailgroup_list() {
         mailgroup_test_data[i] = [ 'grp'+(i+10) ];
     }
     var mailgroup_rec = Ext.data.Record.create([
-        'mailgroup'
+        'cn'
     ]);
     var mailgroup_store = new Ext.data.Store({
-        data: mailgroup_test_data,
-        reader: new Ext.data.ArrayReader({idIndex: 0}, mailgroup_rec)
+        url: 'mailgroup-list.php',
+        autoLoad: true,
+        reader: new Ext.data.JsonReader({
+            root: 'rows',
+            idProperty: 'cn'
+        }, mailgroup_rec)
     });
     return {
         xtype: 'grid',
@@ -196,7 +210,7 @@ function create_mailgroup_list() {
         colModel: new Ext.grid.ColumnModel({
             columns: [{
                 header: _T('Mail group name'),
-                dataIndex: 'mailgroup',
+                dataIndex: 'cn',
                 sortable: true,
                 width: 140
             }]
