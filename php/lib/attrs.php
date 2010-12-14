@@ -13,350 +13,351 @@ define('ADS_UF_PASSWD_NOT_REQUIRED', 0x20);
 define('ADS_UF_NORMAL_ACCOUNT', 0x200);
 define('ADS_UF_DONT_EXPIRE_PASSWD', 0x10000);
 
+
 $all_attrs = array(
     // ========== user ==========
     'user' => array(
         'dn' => array(
-			'type' => 'dn',
-			'ldap' => 'uni',
-			'label' => 'UNIX DN',
-			'readonly' => 1,
-		),
-		'ntDn' => array(
-			'type' => 'dn',
-			'ldap' => 'ads',
-			'label' => 'Windows DN',
-			'readonly' => 1,
-		),
-		'cgpDn' => array(
-			'type' => 'dn',
-			'ldap' => 'cgp',
-			'label' => 'CGP DN',
-			'readonly' => 1,
-		),
-		'objectClass' => array(
-			'type' => 'class',
-			'ldap' => array( 'uni' => 'objectClass' ),
-		),
-		'ntObjectClass' => array(
-			'type' => 'class',
-			'ldap' => array( 'ads' => 'objectClass' ),
-		),
-		'cgpObjectClass' => array(
-			'type' => 'class',
-			'ldap' => array( 'cgp' => 'objectClass' ),
-		),
-		// ======== posixAccount... ========
-		'givenName' => array(
-			'label' => 'Name',
-			'ldap' => 'uni,ads',
-		),
-		'sn' => array(
-			'label' => 'Second name',
-			'ldap' => 'uni,ads,cgp',
-		),
-		'cn' => array(
-			'label' => 'Full name',
-			'ldap' => 'uni,ads,cgp',
-		),
-		'uid' => array(
-			'type' => 'number',
-			'label' => 'Identifier',
-			'ldap' => 'uni,ads,cgp',
-		),
-		'password' => array(
-			'type' => 'pass',
-			'label' => 'Password',
-			'ldap' => array(
-			    'uni' => 'userPassword',
-			    'ads' => 'unicodePwd',
-			    'cgp' => 'userPassword'
+            'type' => 'dn',
+            'ldap' => 'uni',
+            'label' => 'UNIX DN',
+            'readonly' => 1,
+    ),
+    'ntDn' => array(
+        'type' => 'dn',
+        'ldap' => 'ads',
+        'label' => 'Windows DN',
+        'readonly' => 1,
+        ),
+        'cgpDn' => array(
+            'type' => 'dn',
+            'ldap' => 'cgp',
+            'label' => 'CGP DN',
+            'readonly' => 1,
+        ),
+        'objectClass' => array(
+            'type' => 'class',
+            'ldap' => array( 'uni' => 'objectClass' ),
+        ),
+        'ntObjectClass' => array(
+            'type' => 'class',
+            'ldap' => array( 'ads' => 'objectClass' ),
+        ),
+        'cgpObjectClass' => array(
+            'type' => 'class',
+            'ldap' => array( 'cgp' => 'objectClass' ),
+        ),
+        // ======== posixAccount... ========
+        'givenName' => array(
+            'label' => 'Name',
+            'ldap' => 'uni,ads',
+        ),
+        'sn' => array(
+            'label' => 'Second name',
+            'ldap' => 'uni,ads,cgp',
+        ),
+        'cn' => array(
+            'label' => 'Full name',
+            'ldap' => 'uni,ads,cgp',
+        ),
+        'uid' => array(
+            'type' => 'number',
+            'label' => 'Identifier',
+            'ldap' => 'uni,ads,cgp',
+        ),
+        'password' => array(
+            'type' => 'pass',
+            'label' => 'Password',
+            'ldap' => array(
+                'uni' => 'userPassword',
+                'ads' => 'unicodePwd',
+                'cgp' => 'userPassword'
 			),
-		),
-		'password2' => array(
-			'type' => 'pass',
-			'label' => 'Again password',
-			'ldap' => array(
-			    'uni' => 'userPassword',
-			    'ads' => 'unicodePwd',
-			    'cgp' => 'userPassword'
-			),
-			'verify' => 1,
-		),
-		'mail' => array(
-			'label' => 'Mail',
-			'ldap' => 'uni,ads,cgp',
-		),
-		'uidNumber' => array(
-			'label' => 'User#',
-			'ldap' => 'uni,ads',
-		),
-		'gidNumber' => array(
-			'type' => 'gid',
-			'label' => 'Group',
-			'popup' => 'gid',
-			'ldap' => 'uni,ads',
-		),
-		'moreGroups' => array(
-			'type' => 'groups',
-			'label' => 'Other groups',
-			'popup' => 'groups',
-			'ldap' => array( 'uni' => 'uid' ),
-		),
-		'homeDirectory' => array(
-			'label' => 'Home directory',
-			'ldap' =>  array( 'uni' => '', 'ads' => 'unixHomeDirectory' ),
-		),
-		'loginShell' => array(
-			'label' => 'Login shell',
-			'ldap' => 'uni,ads',
-		),
-		// ======== Active Directory... ========
-		'accountExpires' => array(
-			'default' => NO_EXPIRE,
-			'ldap' => 'ads',
-			'conv' => 'adtime',
-			'label' => 'Expires at',
-		),
-		'sAMAccountName' => array(
-			'ldap' => 'ads',
-			'copyfrom' => 'uid',
-		),
-		'displayName' => array(
-			'ldap' => 'ads',
-			'copyfrom' => 'cn',
-		),
-		'instanceType' => array(
-			'default' => '4',
-			'ldap' => 'ads',
-		),
-		'userAccountControl' => array(
-			'conv' => 'decihex',
-			'label' => 'Account control',
-			'ldap' => 'ads',
-		),
-		'userPrincipalName' => array(
-			'ldap' => 'ads',
-			'label' => 'Principal name'
-		),
-		'ntUserHomeDir' => array(
-			'label' => 'Home directory',
-			'ldap' => array( 'ntuser' => '', 'ads' => 'homeDirectory' ),
-		),
-		'ntUserHomeDirDrive' => array(
-			'label' => 'Drive',
-			'ldap' => array( 'ntuser' => '', 'ads' => 'homeDrive' ),
-		),
-		'ntUserProfile' => array(
-			'label' => 'Profile',
-			'ldap' => array( 'ntuser' => '', 'ads' => 'profilePath' ),
-		),
-		'ntUserScriptPath' => array(
-			'label' => 'Logon script',
-			'ldap' => array( 'ntuser' => '', 'ads' => 'scriptPath' ),
-		),
-		'PrimaryGroupID' => array(
-			'type' => 'ntprig',
-			'ldap' => 'ads',
-		),
-		'SecondaryGroups' => array(
-			'type' => 'ntsecg',
-			'ldap' => 'ads',
-		),
-		'sfuDomain' => array(
-			'ldap' => array( 'ads' => 'msSFU30NisDomain' ),
-		),
-		'sfuName' => array(
-			'ldap' => array( 'ads' => 'msSFU30Name' ),
-			'copyfrom' => 'uid',
-		),
-		// ======== ntUser... ========
-		'ntUserCreateNewAccount' => array(
-			'default' => 'false',
-			'ldap' => 'ntuser',
-		),
-		'ntUserDeleteAccount' => array(
-			'default' => 'false',
-			'ldap' => 'ntuser',
-		),
-		'ntUserAcctExpires' => array(
-			'default' => NO_EXPIRE,
-			'conv' => 'adtime',
-			'ldap' => 'ntuser',
-		),
-		'ntUserLastLogon' => array(
-			'conv' => 'adtime',
-			'ldap' => 'ntuser',
-			'disable' => 1,
-		),
-		'ntUserDomainId' => array(
-			'ldap' => 'ntuser',
-			'copyfrom' => 'uid',
-			'disable' => 1,
-		),
-		// ======== Active Directory disabled... ========
-		'ufn'			=> array( 'conv' => 'bkslash', ),
-		'objectSid'     => array( 'conv' => 'binary', ),
-		'objectGuid'	=> array( 'conv' => 'binary', ),
-		'systemFlags'	=> array( 'conv' => 'decihex', ),
-		'groupType'     => array( 'conv' => 'decihex', ),
-		'whenCreated'	=> array( 'conv' => 'monotime', ),
-		'whenChanged'	=> array( 'conv' => 'monotime', ),
-		'pwdLastSet'	=> array( 'conv' => 'adtime', ),
-		'badPasswordTime'=>array( 'conv' => 'adtime', ),
-		'lastLogon'     => array( 'conv' => 'adtime', ),
-		'lastLogoff'	=> array( 'conv' => 'adtime', ),
-		'logonHours'	=> array( 'conv' => 'binary', ),
-		'userParameters'=> array( 'conv' => 'binary', ),
-		'codePage'      => array( 'default' => pack('c',0), ),
-		'countryCode'   => array( 'default' => '0', ),
-		'logonCount'    => array( 'default' => '0', ),
-		'pwdLastSet'    => array( 'default' => '0', ),
-		'objectCategory'=> array( 'disable' => 1 ),
-		'samAccountType'=> array(
-			'default' => SAM_USER_OBJECT,
-			'conv' => 'decihex',
-			'disable' => 1,
-		),
-		// ======== CommuniGate Pro ========
-		'hostServer' => array(
-			'ldap' => 'cgp',
-		),
-		'storageLocation' => array(
-			'ldap' => 'cgp',
-			'default' => '*',
-		),
-		'aliases' => array(
-			'type' => 'aliases',
-			'label' => 'Mail aliases',
-			'ldap' => array( 'cgp' => 'uid' ),
-		),
-		'telnum' => array(
-			'type' => 'none',		// (read/write via aliases)
-			'label' => 'Short number',
-			'ldap' => array( 'cgp' => 'uid' ),
-		),
-		'mailgroups' => array(
-			'type' => 'mgroups',
-			'label' => 'Mail groups',
-			'popup' => 'mgroups',
-			'ldap' => array( 'cgp' => 'uid' ),
-		),
-		'domainIntercept' => array(
-			'type' => 'domainIntercept',
-			'label' => 'Domain Intercept',
-			'checkbox' => 1,
-			'ldap' => array( 'cgp' => 'uid' ),
-		),
-		'userIntercept' => array(
-			'type' => 'userIntercept',
-			'label' => 'User Intercept',
-			'checkbox' => 1,
-			'ldap' => array( 'cgp' => 'uid' ),
-		),
-		// ======== Personal / Extended... ========
-		'telephoneNumber' => array(
-			'label' => 'Telephone',
-			'ldap' => 'uni,ads',
-		),
-		'facsimileTelephoneNumber' => array(
-			'label' => 'Fax number',
-			'ldap' => 'uni,ads',
-		),
-		'physicalDeliveryOfficeName' => array(
-			'ldap' => 'uni,ads',
-		),
-		'o' => array( 'ldap' => 'uni,ads', ),
-		'ou' => array( 'ldap' => 'uni,ads', ),
-		'label' => array( 'ldap' => 'uni,ads', ),
-		'real_uidn' => array(
-			'ldap' => array( 'uni' => 'uidNumber' ),
-			'type' => 'real_uidn',
-			'label' => 'Real user id',
-			'readonly' => 1,
-		),
-		'real_gidn' => array(
-			'ldap' => array( 'uni' => 'gidNumber' ),
-			'type' => 'real_gidn',
-			'label' => 'Real group id',
-			'readonly' => 1,
-		),
-	),
-	// ============ group ============
-	'group' => array(
-		'objectClass' => array(
-			'type' => 'class',
-			'ldap' => 'uni',
-		),
-		'dn' => array(
-			'type' => 'dn',
-			'ldap' => 'uni',
-			'label' => 'DN'
-		),
-		'cn' => array(
-			'label' => 'Group name',
-			'ldap' => 'uni',
-		),
-		'gidNumber' => array(
-			'label' => 'Group number',
-			'ldap' => 'uni',
-		),
-		'description' => array(
-			'label' => 'Description',
-			'ldap' => 'uni',
-		),
-		'memberUid' => array(
-			'type' => 'users',
-			'label' => 'Members',
-			'popup' => 'users',
-			'ldap' => 'uni',
-		),
-	),
-	// ============ mail group ============
-	'mailgroup' => array(
-		'dn' => array(
-			'type' => 'mailgroup',
-			'ldap' => 'cli',
-		),
-		'uid' => array(
-			'type' => 'mailgroup',
-			'label' => 'Group name',
-			'ldap' => 'cli',
-		),
-		'cn' => array(
-			'type' => 'mailgroup',
-			'label' => 'Description',
-			'ldap' => 'cli',
-		),
-		'groupMember' => array(
-			'type' => 'mailgroup',
-			'label' => 'Members',
-			'popup' => 'mailusers',
-			'ldap' => 'cli',
-		),
-		'params' => array(
-			'type' => 'mailgroup',
-			'ldap' => 'cli',
-			'label' => 'Params',
-		),
-	),
-	// ======== mail alias (not for creation :) ) ========
-	'alias' => array(
-		'objectclass' => array(
-			'type' => 'class',
-			'ldap' => 'cgp',
-		),
-		'dn' => array(
-			'type' => 'dn',
-			'ldap' => 'cgp',
-		),
-		'uid' => array(
-			'ldap' => 'cgp',
-		),
-		'aliasedObjectName' => array(
-			'ldap' => 'cgp',
-		),
-	),
+        ),
+        'password2' => array(
+            'type' => 'pass',
+            'label' => 'Again password',
+            'ldap' => array(
+                'uni' => 'userPassword',
+                'ads' => 'unicodePwd',
+                'cgp' => 'userPassword'
+            ),
+            'verify' => 1,
+        ),
+        'mail' => array(
+            'label' => 'Mail',
+            'ldap' => 'uni,ads,cgp',
+        ),
+        'uidNumber' => array(
+            'label' => 'User#',
+            'ldap' => 'uni,ads',
+        ),
+        'gidNumber' => array(
+            'type' => 'gid',
+            'label' => 'Group',
+            'popup' => 'gid',
+            'ldap' => 'uni,ads',
+        ),
+        'moreGroups' => array(
+            'type' => 'groups',
+            'label' => 'Other groups',
+            'popup' => 'groups',
+            'ldap' => array( 'uni' => 'uid' ),
+        ),
+        'homeDirectory' => array(
+            'label' => 'Home directory',
+            'ldap' =>  array( 'uni' => '', 'ads' => 'unixHomeDirectory' ),
+        ),
+        'loginShell' => array(
+            'label' => 'Login shell',
+            'ldap' => 'uni,ads',
+        ),
+        // ======== Active Directory... ========
+        'accountExpires' => array(
+            'default' => NO_EXPIRE,
+            'ldap' => 'ads',
+            'conv' => 'adtime',
+            'label' => 'Expires at',
+        ),
+        'sAMAccountName' => array(
+            'ldap' => 'ads',
+            'copyfrom' => 'uid',
+        ),
+        'displayName' => array(
+            'ldap' => 'ads',
+            'copyfrom' => 'cn',
+        ),
+        'instanceType' => array(
+            'default' => '4',
+            'ldap' => 'ads',
+        ),
+        'userAccountControl' => array(
+            'conv' => 'decihex',
+            'label' => 'Account control',
+            'ldap' => 'ads',
+        ),
+        'userPrincipalName' => array(
+            'ldap' => 'ads',
+            'label' => 'Principal name'
+        ),
+        'ntUserHomeDir' => array(
+            'label' => 'Home directory',
+            'ldap' => array( 'ntuser' => '', 'ads' => 'homeDirectory' ),
+        ),
+        'ntUserHomeDirDrive' => array(
+            'label' => 'Drive',
+            'ldap' => array( 'ntuser' => '', 'ads' => 'homeDrive' ),
+        ),
+        'ntUserProfile' => array(
+            'label' => 'Profile',
+            'ldap' => array( 'ntuser' => '', 'ads' => 'profilePath' ),
+        ),
+        'ntUserScriptPath' => array(
+            'label' => 'Logon script',
+            'ldap' => array( 'ntuser' => '', 'ads' => 'scriptPath' ),
+        ),
+        'PrimaryGroupID' => array(
+            'type' => 'ntprig',
+            'ldap' => 'ads',
+        ),
+        'SecondaryGroups' => array(
+            'type' => 'ntsecg',
+            'ldap' => 'ads',
+        ),
+        'sfuDomain' => array(
+            'ldap' => array( 'ads' => 'msSFU30NisDomain' ),
+        ),
+        'sfuName' => array(
+            'ldap' => array( 'ads' => 'msSFU30Name' ),
+            'copyfrom' => 'uid',
+        ),
+        // ======== ntUser... ========
+        'ntUserCreateNewAccount' => array(
+            'default' => 'false',
+            'ldap' => 'ntuser',
+        ),
+        'ntUserDeleteAccount' => array(
+            'default' => 'false',
+            'ldap' => 'ntuser',
+        ),
+        'ntUserAcctExpires' => array(
+            'default' => NO_EXPIRE,
+            'conv' => 'adtime',
+            'ldap' => 'ntuser',
+        ),
+        'ntUserLastLogon' => array(
+            'conv' => 'adtime',
+            'ldap' => 'ntuser',
+            'disable' => 1,
+        ),
+        'ntUserDomainId' => array(
+            'ldap' => 'ntuser',
+            'copyfrom' => 'uid',
+            'disable' => 1,
+        ),
+        // ======== Active Directory disabled... ========
+        'ufn'			=> array( 'conv' => 'bkslash', ),
+        'objectSid'     => array( 'conv' => 'binary', ),
+        'objectGuid'	=> array( 'conv' => 'binary', ),
+        'systemFlags'	=> array( 'conv' => 'decihex', ),
+        'groupType'     => array( 'conv' => 'decihex', ),
+        'whenCreated'	=> array( 'conv' => 'monotime', ),
+        'whenChanged'	=> array( 'conv' => 'monotime', ),
+        'pwdLastSet'	=> array( 'conv' => 'adtime', ),
+        'badPasswordTime'=>array( 'conv' => 'adtime', ),
+        'lastLogon'     => array( 'conv' => 'adtime', ),
+        'lastLogoff'	=> array( 'conv' => 'adtime', ),
+        'logonHours'	=> array( 'conv' => 'binary', ),
+        'userParameters'=> array( 'conv' => 'binary', ),
+        'codePage'      => array( 'default' => pack('c',0), ),
+        'countryCode'   => array( 'default' => '0', ),
+        'logonCount'    => array( 'default' => '0', ),
+        'pwdLastSet'    => array( 'default' => '0', ),
+        'objectCategory'=> array( 'disable' => 1 ),
+        'samAccountType'=> array(
+            'default' => SAM_USER_OBJECT,
+            'conv' => 'decihex',
+            'disable' => 1,
+        ),
+        // ======== CommuniGate Pro ========
+        'hostServer' => array(
+            'ldap' => 'cgp',
+        ),
+        'storageLocation' => array(
+            'ldap' => 'cgp',
+            'default' => '*',
+        ),
+        'aliases' => array(
+            'type' => 'aliases',
+            'label' => 'Mail aliases',
+            'ldap' => array( 'cgp' => 'uid' ),
+        ),
+        'telnum' => array(
+            'type' => 'none',		// (read/write via aliases)
+            'label' => 'Short number',
+            'ldap' => array( 'cgp' => 'uid' ),
+        ),
+        'mailgroups' => array(
+            'type' => 'mgroups',
+            'label' => 'Mail groups',
+            'popup' => 'mgroups',
+            'ldap' => array( 'cgp' => 'uid' ),
+        ),
+        'domainIntercept' => array(
+            'type' => 'domainIntercept',
+            'label' => 'Domain Intercept',
+            'checkbox' => 1,
+            'ldap' => array( 'cgp' => 'uid' ),
+        ),
+        'userIntercept' => array(
+            'type' => 'userIntercept',
+            'label' => 'User Intercept',
+            'checkbox' => 1,
+            'ldap' => array( 'cgp' => 'uid' ),
+        ),
+        // ======== Personal / Extended... ========
+        'telephoneNumber' => array(
+            'label' => 'Telephone',
+            'ldap' => 'uni,ads',
+        ),
+        'facsimileTelephoneNumber' => array(
+            'label' => 'Fax number',
+            'ldap' => 'uni,ads',
+        ),
+        'physicalDeliveryOfficeName' => array(
+            'ldap' => 'uni,ads',
+        ),
+        'o' => array( 'ldap' => 'uni,ads', ),
+        'ou' => array( 'ldap' => 'uni,ads', ),
+        'label' => array( 'ldap' => 'uni,ads', ),
+        'real_uidn' => array(
+            'ldap' => array( 'uni' => 'uidNumber' ),
+            'type' => 'real_uidn',
+            'label' => 'Real user id',
+            'readonly' => 1,
+        ),
+        'real_gidn' => array(
+            'ldap' => array( 'uni' => 'gidNumber' ),
+            'type' => 'real_gidn',
+            'label' => 'Real group id',
+            'readonly' => 1,
+        ),
+    ),
+    // ============ group ============
+    'group' => array(
+        'objectClass' => array(
+            'type' => 'class',
+            'ldap' => 'uni',
+        ),
+        'dn' => array(
+            'type' => 'dn',
+            'ldap' => 'uni',
+            'label' => 'DN'
+        ),
+        'cn' => array(
+            'label' => 'Group name',
+            'ldap' => 'uni',
+        ),
+        'gidNumber' => array(
+            'label' => 'Group number',
+            'ldap' => 'uni',
+        ),
+        'description' => array(
+            'label' => 'Description',
+            'ldap' => 'uni',
+        ),
+        'memberUid' => array(
+            'type' => 'users',
+            'label' => 'Members',
+            'popup' => 'users',
+            'ldap' => 'uni',
+        ),
+    ),
+    // ============ mail group ============
+    'mailgroup' => array(
+        'dn' => array(
+            'type' => 'mailgroup',
+            'ldap' => 'cli',
+        ),
+        'uid' => array(
+            'type' => 'mailgroup',
+            'label' => 'Group name',
+            'ldap' => 'cli',
+        ),
+        'cn' => array(
+            'type' => 'mailgroup',
+            'label' => 'Description',
+            'ldap' => 'cli',
+        ),
+        'groupMember' => array(
+            'type' => 'mailgroup',
+            'label' => 'Members',
+            'popup' => 'mailusers',
+            'ldap' => 'cli',
+        ),
+        'params' => array(
+            'type' => 'mailgroup',
+            'ldap' => 'cli',
+            'label' => 'Params',
+        ),
+    ),
+    // ======== mail alias (not for creation :) ) ========
+    'alias' => array(
+        'objectclass' => array(
+            'type' => 'class',
+            'ldap' => 'cgp',
+        ),
+        'dn' => array(
+            'type' => 'dn',
+            'ldap' => 'cgp',
+        ),
+        'uid' => array(
+            'ldap' => 'cgp',
+        ),
+        'aliasedObjectName' => array(
+            'ldap' => 'cgp',
+        ),
+    ),
 );
 
 
@@ -393,6 +394,7 @@ $gui_attrs = array(
 	),
 );
 
+
 $ldap_rw_subs = array(
     'none'    => array( 'ldap_read_none', 'ldap_write_none', 'ldap_write_none' ),
     'string'  => array( 'ldap_read_string', 'ldap_write_string', 'ldap_write_none' ),
@@ -412,13 +414,40 @@ $ldap_rw_subs = array(
     'mailgroup' => array( 'ldap_read_none', 'ldap_write_none', 'ldap_write_none' ),
     'real_uidn' => array( 'ldap_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
     'real_gidn' => array( 'ldap_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
-);
+    );
+
+
+$convtype2subs = array(
+    'none'      => array('conv_none', 'conv_none'),
+    'bkslash'   => array('bkslash_front', 'bkslash_back'),
+    'binary'    => array('binary_front', 'binary_back'),
+    'monotime'  => array('monotime_front', 'monotime_back'),
+    'decihex'	=> array('decihex_front', 'decihex_back'),
+    'adtime'	=> array('adjtime_front', 'adjtime_back')
+    );
+
+
+function attribute_enabled ($objtype, $name) {
+    if ($objtype == 'user') {
+        if ($name == 'domainIntercept')
+            return false;
+        if ($name == 'password2' && get_config('show_password'))
+            return false;
+        if ($name == 'real_uidn' || $name == 'real_gidn') {
+            if (! get_config('prefer_nss_ids'))
+                return false;
+        }
+    }
+    return true;
+}
+
 
 function setup_all_attrs () {
 
     global $all_attrs;
     global $servers;
     global $ldap_rw_subs;
+    global $convtype2subs;
 
     $all_lc_attrs = array();
 
@@ -471,19 +500,19 @@ function setup_all_attrs () {
                 $desc[$dir ? 'disp2attr' : 'attr2disp'] = $sub;
             }
 
-            if ($desc['copyfrom'] && !isset($descs[$desc['copyfrom']]))
+            if (isset($desc['copyfrom']) && !isset($descs[$desc['copyfrom']]))
                 log_error('%s attribute "%s" is copy-from unknown "%s"',
                             $objtype, $name, $desc['copyfrom']);
 
             if (! isset($desc['disable']))
 			    $desc['disable'] = 0;
 
-			$ldap = $desc['ldap'];
+			$ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
 			if (! is_array($ldap)) {
                 $arr = split_list($ldap);
                 $ldap = array();
-                foreach ($arr as $val)
-                    $ldap[$val] = '';
+                foreach ($arr as $x)
+                    $ldap[$x] = '';
             }
 
 			foreach (array_keys($ldap) as $srv) {
@@ -504,10 +533,10 @@ function setup_all_attrs () {
 
                 $ldapattr = $ldap[$srv];
 				$cfg = &$servers[$srv];
-                if ($cfg['attrhash'][$objtype][$ldapattr])
+                if (isset($cfg['attrhash'][$objtype][$ldapattr]))
                     log_debug('duplicate attribute "%s" as "%s" for server "%s"',
                                 $name, $ldapattr, $srv);
-                if (! $ldap['disable'])
+                if (empty($ldap['disable']))
                     $cfg['attrhash'][$objtype][$ldapattr] = 1;
             }
 
@@ -530,6 +559,10 @@ function setup_all_attrs () {
     }
 }
 
+
+////////////////////////////////////////////////////////
+//       Objects
+//
 
 function & get_attr_node ($obj, $name) {
     if (!isset($obj['a'][$name]))
@@ -718,6 +751,101 @@ function init_attr ($obj, $name, $val) {
     #if (isset($at['entry']))
     #    $at['entry']->set_text($at->{val});
     return $at;
+}
+
+
+////////////////////////////////////////////////////////
+//       Visualization
+//
+
+
+function conv_none ($x) {
+    return $x;
+}
+
+function bkslash_front ($x) {
+    return preg_replace_callback(
+                "!\\([8-9A-F][0-9A-F])!",
+                create_function (
+                    '$p',
+                    'return chr(hexdec($p[1]));'
+                ), $x);
+}
+
+function bkslash_back ($x) {
+    return preg_replace_callback(
+                "!([\x80-\xFF])!",
+                create_function (
+                    '$p',
+                    'return sprintf("\\%02X",ord($p[1]));'
+			    ), $x);
+}
+
+function binary_front ($x) {
+    return preg_replace_callback(
+                "!([\x80-\xFF])!",
+                create_function (
+                    '$p',
+                    'return sprintf("%02x",ord($p[1]));'
+			    ), $x);
+}
+
+function binary_back ($x) {
+    return preg_replace_callback(
+                "!([0-9a-f]{1,2})!",
+                create_function (
+                    '$p',
+                    'return chr(hexdec($p[1]));'
+                ), $x);
+}
+
+function monotime_front ($x) {
+    if (preg_match("!^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\.0Z$!", $x, $p))
+        return $p[1]."-".$p[2]."-".$p[3].";".$p[4].":".$p[5].":".$p[6].".000000;0";
+    return $x;
+}
+
+function monotime_back ($x) {
+    if (preg_match("!^(\d{4})\-(\d\d)\-(\d\d)\;(\d\d)\:(\d\d)\:(\d\d)\.000000\;0$!", $x, $p))
+        return $p[1].$p[2].$p[3].$p[4].$p[5].$p[6].".0Z";
+}
+
+function decihex_front ($x) {
+    return sprintf("0x%04x",$_[0]);
+}
+
+function decihex_back ($x) {
+    $x = hexdec($x);
+    if ($x >= 0x80000000)
+        $x = -1 - ~$x;
+    return $x;
+}
+
+function adjtime_front ($x) {
+    if ($x == NO_EXPIRE)
+        return -1;
+    if ($x == 0)
+        return 0;
+    $ns100ep = $x;
+    if (! preg_match('/(\d{6})\d$/', $ns100ep, $parts))     // FIXME: no math since rounding problems !
+        return $x;
+    $us = $parts[1];
+    $windsec = floor(($ns100ep - $us * 10) / 1e+7 + 0.5);
+    $unixsec = $windsec - SECS1610TO1970; 
+    $t = localtime($unixsec);
+	return sprintf("%04d-%02d-%02d;%02d:%02d:%02d.%06d;%d",
+                    $y+1900,$mo+1,$d,$h,$mi,$s,$us,$dst);
+}
+
+function adjtime_back ($x) {
+    if ($x == -1)
+        return NO_EXPIRE;
+    if (preg_match('/^(\d{4})-(\d\d)-(\d\d);(\d\d):(\d\d):(\d\d)\.(\d{6});(\d)$/', $x, $p)) {
+        $unixsec = mktime($p[4]/*h*/,$p[5]/*mi*/,$p[6]/*s*/,$p[2]/*mo*/,$p[3]/*d*/,$p[1]/*y*/,$p[8]/*dst*/);
+        $windsec = $unixsec + SECS1610TO1970;
+        return sprintf("%.0f%06d0", $windsec, $us);
+    }
+    return $x;
 }
 
 

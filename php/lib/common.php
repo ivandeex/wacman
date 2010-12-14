@@ -67,6 +67,7 @@ if (get_magic_quotes_gpc() && (! isset($slashes_stripped) || ! $slashes_stripped
 
 configure();
 setup_language();
+setup_all_attrs();
 #pla_session_start();
 
 ?>

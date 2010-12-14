@@ -24,6 +24,7 @@ ob_end_clean();
   <script type="text/javascript" src="js/ext/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="js/ext/ext-all-debug-w-comments.js"></script>
   <script type="text/javascript" src="translations.php"></script>
+  <script type="text/javascript" src="attributes.php"></script>
   <script type="text/javascript" src="js/main.js"></script>
 </head>
 <body>

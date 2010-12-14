@@ -47,17 +47,26 @@ function error_page ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = tru
     }
 }
 
+
+/////////////////////////////////
+// List functions
+//
+
 function nvl ($str) {
     return empty($str) ? '' : trim($str);
 }
 
 function split_list ($str, $asstring = false) {
-    $arr = sort(preg_split('/(?:\s*[,;: ]\s*)+/', nvl($str)));
+    $arr = preg_split('!(?:\s*[,;: ]\s*)+!', nvl($str));
+    sort($arr);
     return $asstring ? implode(',', $arr) : $arr;
 }
 
 function join_list ($arr) {
-    return empty($arr) ? '' : nvl(implode(',', sort($arr)));
+    if (empty($arr))
+        return '';
+    sort($arr);
+    return nvl(implode(',', $arr));
 }
 
 
@@ -67,7 +76,11 @@ function append_list ($a, $b, $asstring = false) {
     $r = array();
     foreach ($a as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
     foreach ($b as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
-    return $asstring ? join_list(array_keys($r)) : sort(array_keys($r));
+    $r = array_keys($r);
+    if ($asstring)
+        return join_list($r);
+    sort($r);
+    return $r;
 }
 
 
@@ -77,7 +90,11 @@ function remove_list ($a, $b, $asstring = false) {
     $r = array();
     foreach ($a as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
     foreach ($b as $x)  unset($r[$x]);  // FIXME: gotta clean undefined values
-    return $asstring ? join_list(array_keys($r)) : sort(array_keys($r));
+    $r = array_keys($r);
+    if ($asstring)
+        return join_list($r);
+    sort($r);
+    return $r;
 }
 
 
