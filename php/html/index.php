@@ -23,7 +23,7 @@ ob_end_clean();
   <link rel="stylesheet" type="text/css" href="js/ext/resources/css/ext-all.css" />
   <script type="text/javascript" src="js/ext/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="js/ext/ext-all-debug-w-comments.js"></script>
-  <script type="text/javascript" src="js/translations.js"></script>
+  <script type="text/javascript" src="translations.php"></script>
   <script type="text/javascript" src="js/main.js"></script>
 </head>
 <body>

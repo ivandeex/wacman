@@ -26,7 +26,7 @@ error_reporting(E_ALL);
 
 // Include all function libraries
 $includes = array(
-    'translations.php',
+    'language.php',
     'logging.php',
     'config.php',
     'http.php',

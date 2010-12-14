@@ -1,5 +1,16 @@
 // $Id$
 
+// translations are loaded dynamically
+
+function _T() {
+	var args = arguments;
+	var format = args[0];
+	var message = trans && trans[format] ? trans[format] : format;
+	for (i = 1; i < arguments.length; i++)
+	    message = message.replace('%s', arguments[i]);
+	return message;
+};
+
 function test_msg(e) {
     Ext.Msg.alert('hihi','hohoho');
 }
