@@ -315,25 +315,30 @@ function main() {
             {
 		        text: _T('Create'),
 		        icon: 'images/add.png',
+		        scale: 'medium',
 		        handler: user_add,
 		        id: 'btn_usr_add'
 		    },{
 		        text: _T('Delete'),
 		        icon: 'images/delete.png',
+		        scale: 'medium',
 		        handler: user_delete,
 		        id: 'btn_usr_delete'
 		    },{
 		        text: _T('Refresh'),
 		        icon: 'images/refresh.png',
+		        scale: 'medium',
 		        handler: users_refresh,
 		        id: 'btn_usr_refresh'
 		    },'->',{
 		        text: _T('Exit'),
 		        icon: 'images/exit.png',
+		        scale: 'medium',
 		        handler: gui_exit
 		    }]
         }
     };
+
     var groups_tab = {
         title: _T(' Groups '),
         layout: 'border',
@@ -348,25 +353,30 @@ function main() {
             {
 		        text: _T('Create'),
 		        icon: 'images/add.png',
+		        scale: 'medium',
 		        handler: group_add,
 		        id: 'btn_grp_add'
 		    },{
 		        text: _T('Delete'),
 		        icon: 'images/delete.png',
+		        scale: 'medium',
 		        handler: group_delete,
 		        id: 'btn_grp_delete'
 		    },{
 		        text: _T('Refresh'),
 		        icon: 'images/refresh.png',
+		        scale: 'medium',
 		        handler: groups_refresh,
 		        id: 'btn_grp_refresh'
 		    },'->',{
 		        text: _T('Exit'),
 		        icon: 'images/exit.png',
+		        scale: 'medium',
 		        handler: gui_exit
 		    }]
         }
     };
+
     var mailgroups_tab = {
         title: _T(' Mail groups '),
         layout: 'border',
@@ -381,21 +391,25 @@ function main() {
             {
 		        text: _T('Create'),
 		        icon: 'images/add.png',
+		        scale: 'medium',
 		        handler: mailgroup_add,
 		        id: 'btn_mgrp_add'
 		    },{
 		        text: _T('Delete'),
 		        icon: 'images/delete.png',
+		        scale: 'medium',
 		        handler: mailgroup_delete,
 		        id: 'btn_mgrp_delete'
 		    },{
 		        text: _T('Refresh'),
 		        icon: 'images/refresh.png',
+		        scale: 'medium',
 		        handler: mailgroups_refresh,
 		        id: 'btn_mgrp_refresh'
 		    },'->',{
 		        text: _T('Exit'),
 		        icon: 'images/exit.png',
+		        scale: 'medium',
 		        handler: gui_exit
 		    }]
         }
