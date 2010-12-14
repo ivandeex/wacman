@@ -231,6 +231,44 @@ function create_mailgroup_desc() {
     };
 }
 
+// AJAX indicator
+
+AjaxIndicator = Ext.extend(Ext.Button, {
+        disabled: true,
+        scale: 'large',
+        ajax_urls : new Array(),
+
+        initComponent : function() {
+            Ext.Ajax.on('beforerequest', function(conn, o) {
+                if (this.ajax_urls.indexOf(o.url) == -1) {
+                    this.ajax_urls.push(o.url);
+                    this.showProgress();
+                }
+            }, this);
+
+            Ext.Ajax.on('requestcomplete', function(conn, response, o) {
+                this.ajax_urls.remove(o.url);
+                if (this.ajax_urls.length <= 0)
+                    this.hideProgress();
+            }, this);
+
+            Ext.Ajax.on('requestexception', function(conn, response, o) {
+                if (this.ajax_urls.length <= 0)
+                    this.hideProgress();
+            }, this);
+
+            this.hideProgress();
+        },
+
+        showProgress: function() {
+            this.setIcon('images/throbber-32.gif');
+        },
+	
+        hideProgress: function() {
+            this.setIcon('images/userman-32.png');
+        },
+});
+
 // main
 
 function gui_exit() {
@@ -263,13 +301,6 @@ function center_region(w) {
 function main() {
     hide_preloader();
 
-    var tb_icon = {
-        xtype: 'box',
-        autoEl: {
-            tag: 'img',
-            src: 'images/userman_32x32.png'
-        }
-    };
     var users_tab = {
         title: _T(' Users '),
         layout: 'border',
@@ -280,7 +311,7 @@ function main() {
         bbar: {
             xtype: 'toolbar',
             items: [
-            tb_icon,' ',
+            new AjaxIndicator(), ' ',
             {
 		        text: _T('Create'),
 		        icon: 'images/add.png',
@@ -313,7 +344,7 @@ function main() {
         bbar: {
             xtype: 'toolbar',
             items: [
-            tb_icon,' ',
+            new AjaxIndicator(), ' ',
             {
 		        text: _T('Create'),
 		        icon: 'images/add.png',
@@ -346,7 +377,7 @@ function main() {
         bbar: {
             xtype: 'toolbar',
             items: [
-            tb_icon,' ',
+            new AjaxIndicator(), ' ',
             {
 		        text: _T('Create'),
 		        icon: 'images/add.png',
@@ -394,6 +425,8 @@ function main() {
 	group_unselect();
 	mailgroup_unselect();
 };
+
+// preloader
 
 function hide_preloader() {
     var pre_mask = Ext.get('preloading-mask');
