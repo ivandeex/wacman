@@ -462,7 +462,7 @@ function setup_all_attrs () {
 
         foreach ($descs as $name => &$desc) {
 
-            $all_lc_attrs[$objtype][strtolower($name)] = $desc;
+            $all_lc_attrs[$objtype][strtolower($name)] =& $desc;
 
             $desc['name'] = $name;
             if (empty($desc['type']))
@@ -491,7 +491,7 @@ function setup_all_attrs () {
             if (! isset($desc['conv']))
                 $desc['conv'] = 'none';
 
-            foreach (array(0, 1) as $dir) {
+            foreach (array(0,1) as $dir) {
                 $sub = null;
                 if (isset($convtype2subs[$desc['conv']]));
                     $sub = $convtype2subs[$desc['conv']][$dir];
@@ -511,8 +511,7 @@ function setup_all_attrs () {
             if (! is_array($ldap)) {
                 $arr = split_list($ldap);
                 $ldap = array();
-                foreach ($arr as $x)
-                    $ldap[$x] = '';
+                foreach ($arr as $x)  $ldap[$x] = '';
             }
 
             foreach (array_keys($ldap) as $srv) {
@@ -520,29 +519,30 @@ function setup_all_attrs () {
 				// 'ntuser' is a special set of unix attributes
 				// they can be either supported as 'uni' or unsupported
 				if ($srv == 'ntuser') {
-					if (get_config('ntuser_support', false)) {
+                    if (get_config('ntuser_support', false)) {
                         $ldap[$srv = 'uni'] = $ldap['ntuser'];
                         unset($ldap['ntuser']);
                     } else {
                         unset($ldap['ntuser']);
                         continue;
-					}
+                    }
                 }
 
                 if (! isset($servers[$srv])) {
                     log_error('wrong server "%s" in objtype "%s" descriptor "%s"',
-                                $srv, $objtype, $name);
+                                print_r($srv, 1), $objtype, $name);
                     continue;
                 }
 
-                if (! isset($ldap[$srv]))
+                if (empty($ldap[$srv]))
                     $ldap[$srv] = $name;
 
                 $ldapattr = $ldap[$srv];
-				$cfg = &$servers[$srv];
+				$cfg =& $servers[$srv];
                 if (isset($cfg['attrhash'][$objtype][$ldapattr])) {
-                    log_debug('duplicate attribute "%s" as "%s" for server "%s"',
-                                $name, $ldapattr, $srv);
+                    if (! empty($desc['is_duplicate']))
+                        log_error('duplicate attribute "%s" as "%s" for server "%s"',
+                                    $name, $ldapattr, $srv);
                 } else if (empty($ldap['disable'])) {
                     $cfg['attrhash'][$objtype][$ldapattr] = 1;
                 }
@@ -550,7 +550,7 @@ function setup_all_attrs () {
 
             $desc['ldap'] = $ldap;
             if (empty($ldap) || ! attribute_enabled($objtype, $name))
-    			$desc['disable'] = 1;
+                $desc['disable'] = 1;
 
             $subs = $ldap_rw_subs[ $desc['disable'] ? 'none' : $desc['type'] ];
             if (! $subs)
@@ -565,6 +565,7 @@ function setup_all_attrs () {
             $arr = array_keys($cfg['attrhash'][$objtype]);
             sort($arr);
             $cfg['attrlist'][$objtype] = $arr;
+            unset($cfg['attrhash']);
         }
     }
 }

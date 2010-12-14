@@ -57,6 +57,9 @@ function nvl ($str) {
 }
 
 function split_list ($str, $asstring = false) {
+    $str = nvl($str);
+    if (empty($str))
+        return array();
     $arr = preg_split('!(?:\s*[,;: ]\s*)+!', nvl($str));
     sort($arr);
     return $asstring ? implode(',', $arr) : $arr;
