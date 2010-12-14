@@ -1,6 +1,8 @@
 // $Id$
 
+/////////////////////////////////////////////////////////
 // translations are loaded dynamically
+//
 
 function _T() {
 	var args = arguments;
@@ -15,9 +17,26 @@ function test_msg(e) {
     Ext.Msg.alert('hihi','hohoho');
 }
 
+/////////////////////////////////////////////////////////
 // users
+//
 
 var user_obj = { changed: false };
+
+var user_rec = Ext.data.Record.create([
+    'uid',
+    'cn',
+    'dn'
+    ]);
+
+var user_store = new Ext.data.Store({
+    url: 'user-list.php',
+    autoLoad: true,
+    reader: new Ext.data.JsonReader({
+        root: 'rows',
+        idProperty: 'uid'
+    }, user_rec)
+});
 
 function user_add() {
     test_msg();
@@ -43,23 +62,6 @@ function user_load(user_sm, row_idx, rec) {
 }
 
 function create_user_list() {
-    var user_test_data = new Array(20);
-    for (i = 0; i < user_test_data.length; i++) {
-        user_test_data[i] = [ 'u'+(i+10), 'User #'+(i+10) ];
-    }
-    var user_rec = Ext.data.Record.create([
-        'uid',
-        'cn',
-        'dn'
-    ]);
-    var user_store = new Ext.data.Store({
-        url: 'user-list.php',
-        autoLoad: true,
-        reader: new Ext.data.JsonReader({
-            root: 'rows',
-            idProperty: 'uid'
-        }, user_rec)
-    });
     return {
         xtype: 'grid',
         store: user_store,
@@ -92,9 +94,25 @@ function create_user_desc() {
     };
 }
 
+/////////////////////////////////////////////////////////
 // groups
+//
 
 var group_obj = { changed: false };
+
+var group_rec = Ext.data.Record.create([
+    'cn',
+    'dn'
+]);
+
+var group_store = new Ext.data.Store({
+    url: 'group-list.php',
+    autoLoad: true,
+    reader: new Ext.data.JsonReader({
+        root: 'rows',
+        idProperty: 'dn'
+    }, group_rec)
+});
 
 function group_add() {
     test_msg();
@@ -120,22 +138,6 @@ function group_load(user_sm, row_idx, rec) {
 }
 
 function create_group_list() {
-    var group_test_data = new Array(20);
-    for (i = 0; i < group_test_data.length; i++) {
-        group_test_data[i] = [ 'grp'+(i+10) ];
-    }
-    var group_rec = Ext.data.Record.create([
-        'cn',
-        'dn'
-    ]);
-    var group_store = new Ext.data.Store({
-        url: 'group-list.php',
-        autoLoad: true,
-        reader: new Ext.data.JsonReader({
-            root: 'rows',
-            idProperty: 'dn'
-        }, group_rec)
-    });
     return {
         xtype: 'grid',
         store: group_store,
@@ -163,7 +165,22 @@ function create_group_desc() {
     };
 }
 
+/////////////////////////////////////////////////////////
 // mailgroups
+//
+
+var mailgroup_rec = Ext.data.Record.create([
+    'cn'
+]);
+
+var mailgroup_store = new Ext.data.Store({
+    url: 'mailgroup-list.php',
+    autoLoad: true,
+    reader: new Ext.data.JsonReader({
+        root: 'rows',
+        idProperty: 'cn'
+    }, mailgroup_rec)
+});
 
 function mailgroup_add() {
     test_msg();
@@ -189,21 +206,6 @@ function mailgroup_load(user_sm, row_idx, rec) {
 }
 
 function create_mailgroup_list() {
-    var mailgroup_test_data = new Array(20);
-    for (i = 0; i < mailgroup_test_data.length; i++) {
-        mailgroup_test_data[i] = [ 'grp'+(i+10) ];
-    }
-    var mailgroup_rec = Ext.data.Record.create([
-        'cn'
-    ]);
-    var mailgroup_store = new Ext.data.Store({
-        url: 'mailgroup-list.php',
-        autoLoad: true,
-        reader: new Ext.data.JsonReader({
-            root: 'rows',
-            idProperty: 'cn'
-        }, mailgroup_rec)
-    });
     return {
         xtype: 'grid',
         store: mailgroup_store,
@@ -231,45 +233,45 @@ function create_mailgroup_desc() {
     };
 }
 
+/////////////////////////////////////////////////////////
 // AJAX indicator
+//
 
 AjaxIndicator = Ext.extend(Ext.Button, {
-        disabled: true,
-        scale: 'large',
-        ajax_urls : new Array(),
+    disabled: true,
+    scale: 'large',
+    ajax_urls : new Array(),
 
-        initComponent : function() {
-            Ext.Ajax.on('beforerequest', function(conn, o) {
-                if (this.ajax_urls.indexOf(o.url) == -1) {
-                    this.ajax_urls.push(o.url);
-                    this.showProgress();
-                }
-            }, this);
+    initComponent : function() {
+        Ext.Ajax.on('beforerequest', function(conn, o) {
+            if (this.ajax_urls.indexOf(o.url) == -1) {
+                this.ajax_urls.push(o.url);
+                this.showProgress();
+            }
+        }, this);
 
-            Ext.Ajax.on('requestcomplete', function(conn, response, o) {
-                this.ajax_urls.remove(o.url);
-                if (this.ajax_urls.length <= 0)
-                    this.hideProgress();
-            }, this);
+        Ext.Ajax.on('requestcomplete', function(conn, response, o) {
+            this.ajax_urls.remove(o.url);
+            if (this.ajax_urls.length <= 0)
+                this.hideProgress();
+        }, this);
 
-            Ext.Ajax.on('requestexception', function(conn, response, o) {
-                if (this.ajax_urls.length <= 0)
-                    this.hideProgress();
-            }, this);
+        Ext.Ajax.on('requestexception', function(conn, response, o) {
+            if (this.ajax_urls.length <= 0)
+                this.hideProgress();
+        }, this);
 
-            this.hideProgress();
-        },
+        this.hideProgress();
+    },
 
-        showProgress: function() {
-            this.setIcon('images/throbber-32.gif');
-        },
-	
-        hideProgress: function() {
-            this.setIcon('images/userman-32.png');
-        },
+    showProgress: function() { this.setIcon('images/throbber-32.gif'); },
+
+    hideProgress: function() { this.setIcon('images/userman-32.png');  },
 });
 
+/////////////////////////////////////////////////////////
 // main
+//
 
 function gui_exit() {
 	if (user_obj.changed || group_obj.changed) {
@@ -440,7 +442,9 @@ function main() {
 	mailgroup_unselect();
 };
 
+/////////////////////////////////////////////////////////
 // preloader
+//
 
 function hide_preloader() {
     var pre_mask = Ext.get('preloading-mask');
