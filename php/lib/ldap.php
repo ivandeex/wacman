@@ -15,7 +15,7 @@ function get_server_names () {
     return array_keys($servers);
 }
 
-function &get_server ($srv, $allow_disabled = false) {
+function & get_server ($srv, $allow_disabled = false) {
     global $servers;
     if (! isset($servers[$srv]))
         error_page(_T('unknown ldap server "%s"', $srv));
@@ -27,7 +27,7 @@ function &get_server ($srv, $allow_disabled = false) {
 
 function uldap_connect ($srv) {
     global $servers;
-    $cfg = &get_server($srv, true);
+    $cfg = &$servers[$srv];
     $cfg['name'] = $srv;
     $cfg['connected'] = 0;
     if ($srv == 'cli')
@@ -85,7 +85,7 @@ function uldap_disconnect_all () {
     }
 }
 
-function uldap_convert_array ($src) {
+function uldap_convert_array (&$src) {
     if (! is_array($src) || ! isset($src['count']))
         return $src;
     $got_named = 0;
@@ -96,44 +96,124 @@ function uldap_convert_array ($src) {
         }
     }
     if ($src['count'] == 1 && ! $got_named)
-        return $src[0];
+        return uldap_convert_array($src[0]);
     $dst = array();
-    foreach ($src as $key => $val) {
+    foreach ($src as $key => &$val) {
         if ($key == 'count' || ($got_named && is_int($key)))
             continue;
-        $dst[$key] = convert_ldap_array($val);
+        if ($got_named)
+            $dst[$key] = uldap_convert_array($val);
+        else
+            $dst[] = uldap_convert_array($val);
     }
     return $dst;
 }
 
-function uldap_encode_json ($res) {
-    $msg = get_error();
-    if (empty($res) && !empty($msg)) {
-        return "{success:false,message:" . json_encode($msg) . "}\n";
-    } else {
-        return "{success:true,rows:" . uldap_convert_array(json_encode($res)) . "}\n";
-    }
+function uldap_json_encode ($res) {
+    if ($res['code'])
+        return json_error($res['error']);
+    return "{success:true,rows:" . json_encode(uldap_convert_array($res['data'])) . "}\n";
 }
 
 function uldap_search ($srv, $filter, $attrs = null, $params = null)
 {
     $cfg = &get_server($srv, true);
-    $result = array();
-    if ($cfg['connected']) {
-        $res = @ldap_search($cfg['ldap'], $cfg['base'], $filter, $attrs);
-        if ($res !== FALSE) {
-            $entries = @ldap_get_entries($cfg['ldap'], $res);
-            if ($entries === FALSE) {
-                log_error('ldap_search for "%s" on "%s" failed: %s',
-                          $filter, $srv, ldap_error($cfg['ldap']));
-            } else {
-                set_error();
-                $result = $entries;
-            }
-        }
+    if (! $cfg['connected'])
+        return array('code' => -1, 'error' => 'not connected', 'data' => array('count' => 0));
+    $conn = $cfg['ldap'];
+    $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
+    if ($handle === FALSE)
+        return array('code' => ldap_errno($conn), 'error' => ldap_error($conn), 'data' => array('count' => 0));
+    $res = array();
+    $res['data'] = @ldap_get_entries($conn, $handle);
+    if ($res['data'] === FALSE) {
+        $res['code'] = ldap_errno($conn);
+        $res['error'] = ldap_error($conn);
+        $res['data'] = array('count' => 0);
+        log_error('ldap_search for "%s" on "%s" failed: %s', $filter, $srv, $res['code']);
+        return $res;
     }
-    return $result;
+    $res['code'] = 0;
+    $res['error'] = '';
+    set_error();
+    return $res;
 }
+
+
+function uldap_obj_read (&$obj, $srv, $filter) {
+    global $servers;
+
+    if ($servers[$srv]['disable']) {
+        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
+        return undef;
+    }
+
+    $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
+    if ($res['code'] || $res['data']['count'] == 0) {
+        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
+        log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
+        return $res['error'] ? $res['error'] : 'not found';
+    }
+    $ldap = $obj['ldap'][$srv] = $res['data'];
+
+    foreach ($obj['attrs'] as $at) {
+        if ($at['state'] != 'empty')
+            continue;
+        $name = $at['desc']['ldap'][$srv];
+        if (! $name)
+            continue;
+        $func = $at['desc']['ldap_read'];
+        $val = call_user_func ($func, $at, $srv, $ldap, $name);
+        init_attr($obj, $at['name'], $val);
+    }
+
+    return 0;
+}
+
+
+function ldap_obj_write ($obj, $srv) {
+    global $servers;
+
+    if ($servers[$srv]['disable'])
+        return null;
+
+    $ldap = $obj['ldap'][$srv];
+    $changed = false;
+    $msg = null;
+
+    log_debug('start writing to "%s"...', $srv);
+
+    foreach ($obj['attrs'] as $at) {
+        $name = $at['desc']['ldap'][$srv];
+        if (! $name)
+            continue;
+        $func = $at['desc']['ldap_write'];
+        if (call_user_func ($func, $at, $srv, $ldap, $name, nvl($at['val'])))
+            $changed = true;
+	}
+
+    if ($changed) {
+        $res = uldap_update($srv, $ldap);
+        log_debug('writing to "%s" returns code %d', $srv, $res['code']);
+        // Note: code 82 = `no values to update'
+        if ($res['code'] && $res['code'] != 82)
+            $msg = $res['error'];
+    } else {
+        log_debug('no need to write to "%s"', $srv);		
+    }
+
+    foreach ($obj['attrs'] as $at) {
+        $name = $at['desc']['ldap'][$srv];
+        if (! $name)
+            continue;
+        $func = $at['desc']['ldap_write_final'];
+        if (call_user_func ($func, $at, $srv, $ldap, $name, nvl($at['val'])))
+            $changed = true;
+    }
+
+    return $msg;
+}
+
 
 //////////////////////////////////////////////////////////////
 // ================  ldap readers / writers  ================

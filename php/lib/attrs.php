@@ -516,6 +516,7 @@ function setup_all_attrs () {
             }
 
 			foreach (array_keys($ldap) as $srv) {
+
 				// 'ntuser' is a special set of unix attributes
 				// they can be either supported as 'uni' or unsupported
 				if ($srv == 'ntuser') {
@@ -528,16 +529,23 @@ function setup_all_attrs () {
 					}
                 }
 
+                if (! isset($servers[$srv])) {
+                    log_error('wrong server "%s" in objtype "%s" descriptor "%s"',
+                                $srv, $objtype, $name);
+                    continue;
+                }
+
                 if (! isset($ldap[$srv]))
                     $ldap[$srv] = $name;
 
                 $ldapattr = $ldap[$srv];
 				$cfg = &$servers[$srv];
-                if (isset($cfg['attrhash'][$objtype][$ldapattr]))
+                if (isset($cfg['attrhash'][$objtype][$ldapattr])) {
                     log_debug('duplicate attribute "%s" as "%s" for server "%s"',
                                 $name, $ldapattr, $srv);
-                if (empty($ldap['disable']))
+                } else if (empty($ldap['disable'])) {
                     $cfg['attrhash'][$objtype][$ldapattr] = 1;
+                }
             }
 
 			$desc['ldap'] = $ldap;
@@ -554,7 +562,9 @@ function setup_all_attrs () {
         }
 
         foreach ($servers as $srv => &$cfg) {
-            $cfg['attrlist'][$objtype] = sort(array_keys($cfg['attrhash'][$objtype]));
+            $arr = array_keys($cfg['attrhash'][$objtype]);
+            sort($arr);
+            $cfg['attrlist'][$objtype] = $arr;
         }
     }
 }
@@ -620,7 +630,7 @@ function clear_obj (&$obj) {
         $obj['ldap'][$srv] = array(); # FIXME: Net::LDAP::Entry->new;
     }
     $obj['changed'] = 0;
-    update_obj_gui($obj);
+    # update_obj_gui($obj); # FIXME
     return $obj;
 }
 
@@ -673,6 +683,14 @@ function obj_changed($obj) {
         if ($at['val'] != $at['old'])  return 1;
     }
     return 0;
+}
+
+
+function obj_json_encode ($obj) {
+    $ret = array();
+    foreach ($obj['ldap'] as $srv => &$data)
+        $ret[$srv] = uldap_convert_array($data);
+    return "{success:true,obj:" . json_encode($ret) . "}\n";            
 }
 
 
