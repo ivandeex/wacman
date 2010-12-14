@@ -21,13 +21,18 @@ ob_end_clean();
 <head>
   <title>Userman</title>
   <link rel="stylesheet" type="text/css" href="js/ext/resources/css/ext-all.css" />
+  <link rel="stylesheet" type="text/css" href="js/ext/resources/css/xtheme-gray.css" />
+  <link rel="stylesheet" type="text/css" href="css/userman.css" />
   <script type="text/javascript" src="js/ext/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="js/ext/ext-all-debug-w-comments.js"></script>
   <script type="text/javascript" src="config-config.php"></script>
   <script type="text/javascript" src="js/main.js"></script>
 </head>
 <body>
-  <div id="no-js">You should have Javascript enabled!</div>
+  <div id="preloading-mask"></div>
+  <div id="preloading-box">
+    <span id="preloading-message">Loading. Please wait...</span>
+  </div>
 </body>
 </html>
 

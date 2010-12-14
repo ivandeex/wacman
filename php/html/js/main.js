@@ -261,7 +261,8 @@ function center_region(w) {
 }
 
 function main() {
-    Ext.get('no-js').hide();
+    hide_preloader();
+
     var tb_icon = {
         xtype: 'box',
         autoEl: {
@@ -393,6 +394,24 @@ function main() {
 	group_unselect();
 	mailgroup_unselect();
 };
+
+function hide_preloader() {
+    var pre_mask = Ext.get('preloading-mask');
+    var pre_box = Ext.get('preloading-box');
+    //	Hide loading message			
+    pre_box.fadeOut({ duration: 0.2, remove: true });
+    //	Hide loading mask
+    pre_mask.setOpacity(0.9);
+    pre_mask.shift({
+        xy: pre_box.getXY(),
+        width: pre_box.getWidth(),
+        height: pre_box.getHeight(),
+        remove: true,
+        duration: 0.7,
+        opacity: 0.1,
+        easing: 'bounceOut'
+    });
+}
 
 Ext.onReady(main);
 
