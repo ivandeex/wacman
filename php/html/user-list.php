@@ -5,8 +5,8 @@
 
 require '../lib/common.php';
 
-ldap_connect_all();
+uldap_connect_all();
 send_json_headers();
-echo ldap_encode_json(ldap_search_for('uni', "(objectClass=person)", array('uid', 'cn')));
-ldap_disconnect_all();
+echo uldap_encode_json(uldap_search('uni', "(objectClass=person)", array('uid', 'cn')));
+uldap_disconnect_all();
 ?>

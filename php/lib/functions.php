@@ -20,13 +20,13 @@ define('JSDIR',    'js/');
 
 function error_page ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = true) {
     @include_once HTDOCDIR.'header.php';
-    //if (function_exists('log_err'))  log_err('%s', $msg);
+    #if (function_exists('log_err'))  log_err('%s', $msg);  // FIXME
     ?>
-    <center>
+      <center>
         <h2><?php echo _('Error');?></h2>
         <?php echo $msg; ?>
         <br />
-        <?php
+    <?php
         if( $ldap_err_msg ) {
             echo sprintf(_('LDAP said: %s'), htmlspecialchars( $ldap_err_msg ));
             echo '<br />';
@@ -35,16 +35,65 @@ function error_page ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = tru
             $ldap_err_no = '0x' . str_pad(dechex( $ldap_err_no ), 2, 0, STR_PAD_LEFT);
             if (function_exists('log_err'))
                 log_err('Error number: %s<br /><br />', $ldap_err_no);
-	}
+        }
 	?>
         <br />
         </td></tr></table>
-    </center>
+      </center>
     <?php
     if ($fatal) {
         echo "</body>\n</html>";
         die();
     }
+}
+
+function nvl ($str) {
+    return empty($str) ? '' : trim($str);
+}
+
+function split_list ($str, $asstring = false) {
+    $arr = sort(preg_split('/(?:\s*[,;: ]\s*)+/', nvl($str)));
+    return $asstring ? implode(',', $arr) : $arr;
+}
+
+function join_list ($arr) {
+    return empty($arr) ? '' : nvl(implode(',', sort($arr)));
+}
+
+
+function append_list ($a, $b, $asstring = false) {
+    if (! is_array($a))  $a = split_list($a);
+    if (! is_array($b))  $b = split_list($b);
+    $r = array();
+    foreach ($a as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
+    foreach ($b as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
+    return $asstring ? join_list(array_keys($r)) : sort(array_keys($r));
+}
+
+
+function remove_list ($a, $b, $asstring = false) {
+    if (! is_array($a))  $a = split_list($a);
+    if (! is_array($b))  $b = split_list($b);
+    $r = array();
+    foreach ($a as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
+    foreach ($b as $x)  unset($r[$x]);  // FIXME: gotta clean undefined values
+    return $asstring ? join_list(array_keys($r)) : sort(array_keys($r));
+}
+
+
+function compare_lists ($a, $b, $asstring = false) {
+    if (! is_array($a))  $a = split_list($a);
+    if (! is_array($b))  $b = split_list($b);
+    $h_a = array();
+    foreach ($a as $x)  { $h_a[$x] = 1; }
+    $h_b = array();
+    foreach ($b as $x)  { $h_b[$x] = 1; }
+    $onlya = array();
+    $onlyb = array();
+    $common = array();
+    foreach ($a as $x)  { $b[$x] ? ($common[$x] = 1) : ($onlya[$x] = 1); }
+    foreach ($b as $x)  { $a[$x] ? ($common[$x] = 1) : ($onlyb[$x] = 1); }
+    return array(join_list(array_keys(onlya)), join_list(array_keys(onlyb)), join_list(array_keys(common)));
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////

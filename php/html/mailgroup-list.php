@@ -5,7 +5,7 @@
 
 require '../lib/common.php';
 
-ldap_connect_all();
+uldap_connect_all();
 send_json_headers();
 
 $mgroups = cli_cmd('ListGroups', get_config('mail_domain'));
@@ -18,5 +18,5 @@ if (is_null($mgroups)) {
     echo "{success:true,rows:" . json_encode($arr) . "}\n";
 }
 
-ldap_disconnect_all();
+uldap_disconnect_all();
 ?>
