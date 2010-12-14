@@ -73,7 +73,7 @@ function create_user_list() {
                 width: 100,
             },{
                 header: _T('Full name'),
-                dataIndex: 'dn',
+                dataIndex: 'cn',
                 sortable: true,
                 width: 190
             }]
@@ -239,7 +239,7 @@ function create_mailgroup_desc() {
 
 AjaxIndicator = Ext.extend(Ext.Button, {
     disabled: true,
-    scale: 'large',
+    scale: 'medium',
     ajax_urls : new Array(),
 
     initComponent : function() {
@@ -264,7 +264,7 @@ AjaxIndicator = Ext.extend(Ext.Button, {
         this.hideProgress();
     },
 
-    showProgress: function() { this.setIcon('images/throbber-32.gif'); },
+    showProgress: function() { this.setIcon('images/throbber-24.gif'); },
 
     hideProgress: function() { this.setIcon('images/userman-32.png');  },
 });
