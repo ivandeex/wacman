@@ -1,7 +1,7 @@
 <?php
 // $Id$
 
-// Return list of users from LDAP
+// Retrieve user object
 
 require '../lib/common.php';
 
