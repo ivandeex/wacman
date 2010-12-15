@@ -31,7 +31,6 @@ unset($data['Members']);
 init_attr($mgrp, 'params', dict2str($data));
 
 echo obj_json_encode($mgrp);
-//print_r($res['data']);
 uldap_disconnect_all();
 
 ?>
