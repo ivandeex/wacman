@@ -575,10 +575,10 @@ function setup_all_attrs () {
 //       Objects
 //
 
-function & get_attr_node ($obj, $name) {
-    if (!isset($obj['a'][$name]))
+function & get_attr_node (&$obj, $name) {
+    if (!isset($obj['attrs'][$name]))
         error_page(_T('attribute "%s" undefined in object "%s"', $name, $obj['type']));
-    return $obj['a'][$name];
+    return $obj['attrs'][$name];
 }
 
 
@@ -590,15 +590,13 @@ function & create_obj ($objtype) {
     $obj = array(
         'type' => $objtype,
         'changed' => 0,
-        'a' => array(),
+        'attrs' => array(),
         'ldap' => array(),
         'attrlist' => array(),
         );
-    $obj['names'] = array();
-    $obj['attrs'] = array();
 
     foreach ($all_attrs[$objtype] as $name => &$desc) {
-        $at = array(
+        $obj['attrs'][$name] = array(
             'name' => $name,
             'type' => $desc['type'],
             'state' => null,
@@ -608,9 +606,6 @@ function & create_obj ($objtype) {
             'obj' => &$obj,
             'desc' => &$desc,
         );
-        $obj['names'][] = $name;
-        $obj['a'][$name] = $at;
-        $obj['attrs'][] =& $obj['a'][$name];
     }
 
     foreach (array_keys($servers) as $srv)
@@ -621,7 +616,7 @@ function & create_obj ($objtype) {
 
 
 function & clear_obj (&$obj) {
-    foreach ($obj['attrs'] as &$at) {
+    foreach ($obj['attrs'] as $name => &$at) {
         $at['val'] = $at['old'] = '';
         $at['state'] = 'empty';
         #if ($at['entry'])
@@ -681,7 +676,7 @@ function & setup_attr (&$obj, $name, $visual) {
 
 
 function obj_changed (&$obj) {
-    foreach ($obj['attrs'] as &$at) {
+    foreach ($obj['attrs'] as $name => &$at) {
         if ($at['val'] != $at['old'])
             return true;
     }
@@ -752,7 +747,7 @@ function cond_set (&$obj, $name, $val) {
 }
 
 
-function & init_attr (&$obj, $name, $val) {
+function init_attr (&$obj, $name, $val) {
     $at =& get_attr_node($obj, $name);
     $val = nvl($val);
     if ($val == '') {
@@ -764,14 +759,13 @@ function & init_attr (&$obj, $name, $val) {
     }
     #if (isset($at['entry']))
     #    $at['entry']->set_text($at->{val});
-    return $at;
 }
 
 
 function obj_json_encode (&$obj) {
     $ret = array();
-    foreach ($obj['attrs'] as &$at)
-        $ret[$at['name']] = $at['val'];
+    foreach ($obj['attrs'] as $name => &$at)
+        $ret[$name] = $at['val'];
     return "{success:true,obj:" . json_encode($ret) . "}\n";            
 }
 
@@ -793,11 +787,11 @@ function obj_read (&$obj, $srv, $filter) {
     $obj['ldap'][$srv] = $res['data'];
     $ldap =& $obj['ldap'][$srv];
 
-    foreach ($obj['attrs'] as &$at) {
+    foreach ($obj['attrs'] as $name => &$at) {
         if ($at['state'] == 'empty' && isset($at['desc']['ldap'][$srv])) {
             $val = call_user_func ($at['desc']['ldap_read'], $at, $srv,
                                     $obj['ldap'][$srv], $at['desc']['ldap'][$srv]);
-            init_attr($obj, $at['name'], $val);
+            init_attr($obj, $name, $val);
         }
     }
 
@@ -817,7 +811,7 @@ function obj_write (&$obj, $srv) {
 
     log_debug('start writing to "%s"...', $srv);
 
-    foreach ($obj['attrs'] as &$at) {
+    foreach ($obj['attrs'] as $name => &$at) {
         if (isset($at['desc']['ldap'][$srv])) {
             if (call_user_func ($at['desc']['ldap_write'], $at, $srv, $ldap,
                                 $at['desc']['ldap'][$srv], nvl($at['val'])))
@@ -835,13 +829,12 @@ function obj_write (&$obj, $srv) {
         log_debug('no need to write to "%s"', $srv);		
     }
 
-    foreach ($obj['attrs'] as $at) {
-        $name = $at['desc']['ldap'][$srv];
-        if (! $name)
-            continue;
-        $func = $at['desc']['ldap_write_final'];
-        if (call_user_func ($func, $at, $srv, $ldap, $name, nvl($at['val'])))
-            $changed = true;
+    foreach ($obj['attrs'] as $name => $at) {
+        if (isset($at['desc']['ldap'][$srv])) {
+            if (call_user_func ($at['desc']['ldap_write_final'], $at, $srv, $ldap,
+                                $at['desc']['ldap'][$srv], nvl($at['val'])))
+                $changed = true;
+        }
     }
 
     return $msg;

@@ -3,6 +3,7 @@
 
 // Interface with CommuniGate server
 
+
 function cli_connect () {
     $cfg = &get_server('cli');
     $uri = $cfg['uri'];
@@ -31,22 +32,25 @@ function cli_connect () {
     return 0;
 }
 
-function &get_cli () {
-    $cfg = &get_server('cli');
+
+function & get_cli () {
+    $cfg =& get_server('cli');
     return $cfg['cli'];
 }
 
+
 function cli_disconnect () {
-    $cfg = &get_server('cli');
+    $cfg =& get_server('cli');
     if ($cfg['connected']) {
-        $cli = $cfg['cli'];
+        $cli =& $cfg['cli'];
         $cli->Logout();
         $cfg['connected'] = 0;
     }
 }
 
+
 function cli_cmd () {
-    $cfg = &get_server('cli');
+    $cfg =& get_server('cli');
     if (! $cfg['connected']) {
         set_error("server CLI is not connected");
         return null;
@@ -55,14 +59,47 @@ function cli_cmd () {
     $args = func_get_args();
     $func = array_shift($args);
     $ret = call_user_func_array(array($cli, $func), $args);
-    log_info("args=".print_r($args,1)." func=$func ret=".print_r($ret,1));
+
     if ($cli->isSuccess()) {
         set_error();
-    } else {
-        log_error("CLI error in $func: " . $cli->getErrMessage());
-        return null;
+        return array('code' => 0, 'error' => '', 'data' => $ret);
     }
-    return $ret;
+
+    log_error("CLI error in $func: " . $cli->getErrMessage());
+    return array('code' => $cli->getErrCode(), 'error' => $cli->getErrMessage(), 'data' => null);
 }
+
+
+function dict2str ($d)
+{
+    return __dict2str($d);
+}
+
+
+function __dict2str ($d)
+{
+	$s = '{ ';
+	$keys = array_keys($d);
+	sort($keys);
+	foreach ($keys as $k) {
+		$v = $d[$k];
+		$s .= $k . ' = ';
+		if (is_array($v)) {
+			$s .= __dict2str($v);
+		} else {
+            $x = preg_replace('/[0-9a-xA-Z_\@]/', '', $v);
+			$q = empty($x) ? '' : '"';
+			if (preg_match('/^\".*?\"$/', $v) || preg_match('/^\(.*?\)$/', $v)) {
+				$q = '';
+			} else {
+				$v = preg_replace('/\"/', '\\\"', $v);
+			}
+			$s .= $q.$v.$q;
+		}
+		$s .= '; ';
+	}
+	return $s . '}';
+}
+
 
 ?>
