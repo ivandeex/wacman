@@ -9,6 +9,7 @@ uldap_connect_all();
 send_json_headers();
 
 $mgroups = cli_cmd('ListGroups', get_config('mail_domain'));
+# FIXME error is not returned if not connected
 if ($mgroups['code']) {
     echo json_error($mgroups['error']);
 } else {

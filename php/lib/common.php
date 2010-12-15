@@ -37,6 +37,7 @@ $includes = array(
     );
 
 foreach ($includes as $file) {
+    # FIXME check for existance of files
     require_once realpath(LIBDIR . $file);
 }
 
@@ -65,6 +66,7 @@ if (get_magic_quotes_gpc() && (! isset($slashes_stripped) || ! $slashes_stripped
     $slashes_stripped = true;
 }
 
+# FIXME: check for existance of userman.ini and userman.secret
 configure();
 setup_language();
 setup_all_attrs();
