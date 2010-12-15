@@ -888,7 +888,7 @@ function binary_back ($x) {
 
 function monotime_front ($x) {
     if (preg_match("!^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\.0Z$!", $x, $p))
-        return $p[1]."-".$p[2]."-".$p[3].";".$p[4].":".$p[5].":".$p[6].".000000;0";
+        return sprintf("%s-%s-%s.%s:%s:%s.000000;0",$p[1],$p[2],$p[3],$p[4],$p[5],$p[6]);
     return $x;
 }
 
@@ -919,8 +919,8 @@ function adjtime_front ($x) {
     $us = $parts[1];
     $windsec = floor(($ns100ep - $us * 10) / 1e+7 + 0.5);
     $unixsec = $windsec - SECS1610TO1970; 
-    $t = localtime($unixsec);
-	return sprintf("%04d-%02d-%02d;%02d:%02d:%02d.%06d;%d",
+    list($y,$mo,$d,$h,$mi,$s,$us,$dst) = localtime($unixsec);
+    return sprintf("%04d-%02d-%02d;%02d:%02d:%02d.%06d;%d",
                     $y+1900,$mo+1,$d,$h,$mi,$s,$us,$dst);
 }
 
@@ -928,7 +928,8 @@ function adjtime_back ($x) {
     if ($x == -1)
         return NO_EXPIRE;
     if (preg_match('/^(\d{4})-(\d\d)-(\d\d);(\d\d):(\d\d):(\d\d)\.(\d{6});(\d)$/', $x, $p)) {
-        $unixsec = mktime($p[4]/*h*/,$p[5]/*mi*/,$p[6]/*s*/,$p[2]/*mo*/,$p[3]/*d*/,$p[1]/*y*/,$p[8]/*dst*/);
+        list($all,$y,$mo,$d,$h,$mi,$s,$us,$dst) = $p;
+        $unixsec = mktime($h,$mi,$s,$mo,$d,$y,$dst);
         $windsec = $unixsec + SECS1610TO1970;
         return sprintf("%.0f%06d0", $windsec, $us);
     }
