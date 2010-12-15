@@ -15,7 +15,7 @@ uldap_connect_all();
 $cn = $_GET['cn'];
 $grp = create_obj('group');
 
-$msg = uldap_obj_read($grp, 'uni', "(&(objectClass=posixGroup)(cn=$cn))");
+$msg = obj_read($grp, 'uni', "(&(objectClass=posixGroup)(cn=$cn))");
 if ($msg) {
     echo json_error($msg);
     uldap_disconnect_all();

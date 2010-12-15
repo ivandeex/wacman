@@ -462,8 +462,6 @@ function setup_all_attrs () {
 
         foreach ($descs as $name => &$desc) {
 
-            $all_lc_attrs[$objtype][strtolower($name)] =& $desc;
-
             $desc['name'] = $name;
             if (empty($desc['type']))
                 $desc['type'] = 'string';
@@ -559,6 +557,8 @@ function setup_all_attrs () {
             $desc['ldap_read'] = $subs[0];
             $desc['ldap_write'] = $subs[1];
             $desc['ldap_write_final'] = $subs[2];
+
+            $all_lc_attrs[$objtype][strtolower($name)] =& $desc;
         }
 
         foreach ($servers as $srv => &$cfg) {
@@ -582,12 +582,11 @@ function & get_attr_node ($obj, $name) {
 }
 
 
-function create_obj ($objtype) {
+function & create_obj ($objtype) {
     global $all_attrs;
     global $servers;
     if (! isset($all_attrs[$objtype]))
         log_error('unknown object type "%s"', $objtype);
-    $descs = &$all_attrs[$objtype];
     $obj = array(
         'type' => $objtype,
         'changed' => 0,
@@ -597,34 +596,36 @@ function create_obj ($objtype) {
         );
     $obj['names'] = array();
     $obj['attrs'] = array();
-    foreach ($descs as $name => &$desc) {
+
+    foreach ($all_attrs[$objtype] as $name => &$desc) {
         $at = array(
-            'obj' => &$obj,
             'name' => $name,
-            'desc' => &$desc,
             'type' => $desc['type'],
             'state' => null,
             'visual' => 0,
             'entry' => null,
             'bulb' => null,
+            'obj' => &$obj,
+            'desc' => &$desc,
         );
-        $obj['a'][$name] = &$at;
         $obj['names'][] = $name;
-        $obj['attrs'][] = &$at;
+        $obj['a'][$name] = $at;
+        $obj['attrs'][] =& $obj['a'][$name];
     }
-    foreach (array_keys($servers) as $srv) {
-        $obj['attrlist'][$srv] = &$servers[$srv]['attrlist'][$objtype];
-    }
+
+    foreach (array_keys($servers) as $srv)
+        $obj['attrlist'][$srv] =& $servers[$srv]['attrlist'][$objtype];
+
     return clear_obj($obj);
 }
 
 
-function clear_obj (&$obj) {
+function & clear_obj (&$obj) {
     foreach ($obj['attrs'] as &$at) {
         $at['val'] = $at['old'] = '';
+        $at['state'] = 'empty';
         #if ($at['entry'])
         #    $at['entry']->set_text('');
-        $at['state'] = 'empty';
     }
     global $servers;
     foreach (array_keys($servers) as $srv) {
@@ -636,10 +637,10 @@ function clear_obj (&$obj) {
 }
 
 
-function &setup_attr (&$obj, $name, $visual) {
-    $at = &get_attr_node($obj, $name);
+function & setup_attr (&$obj, $name, $visual) {
+    $at =& get_attr_node($obj, $name);
     $at['label'] = $at['entry'] = $at['bulb'] = $at['popup'] = null;
-    $desc = &$at['desc'];
+    $desc =& $at['desc'];
     $at['visual'] = $visual;
     if ($visual) {
         if (! $desc['visual'])
@@ -679,19 +680,12 @@ function &setup_attr (&$obj, $name, $visual) {
 }
 
 
-function obj_changed($obj) {
+function obj_changed (&$obj) {
     foreach ($obj['attrs'] as &$at) {
-        if ($at['val'] != $at['old'])  return 1;
+        if ($at['val'] != $at['old'])
+            return true;
     }
-    return 0;
-}
-
-
-function obj_json_encode ($obj) {
-    $ret = array();
-    foreach ($obj['ldap'] as $srv => &$data)
-        $ret[$srv] = uldap_convert_array($data);
-    return "{success:true,obj:" . json_encode($ret) . "}\n";            
+    return false;
 }
 
 
@@ -703,8 +697,8 @@ $state2has = array(
 	'calc'  => 0
     );
 
-function has_attr ($obj, $name) {
-    $at = &get_attr_node($obj, $name);
+function has_attr (&$obj, $name) {
+    $at =& get_attr_node($obj, $name);
     $state = nvl($at['state']);
     global $state2has;
     if (isset($state2has[$state]))
@@ -713,15 +707,15 @@ function has_attr ($obj, $name) {
 }
 
 
-function get_attr ($obj, $name, $param = array()) {
-    $at = &get_attr_node($obj, $name);
+function get_attr (&$obj, $name, $param = array()) {
+    $at =& get_attr_node($obj, $name);
     $which = (isset($param['orig']) && $param['orig']) ? 'old' : 'val';
     return nvl($at[$which]);
 }
 
 
-function set_attr ($obj, $name, $val, $param = array()) {
-    $at = &get_attr_node($obj, $name);
+function & set_attr (&$obj, $name, $val, $param = array()) {
+    $at =& get_attr_node($obj, $name);
     $val = nvl($val);
     if ($at->{val} == $val)
         return $at;
@@ -747,7 +741,7 @@ function set_attr ($obj, $name, $val, $param = array()) {
 }
 
 
-function cond_set ($obj, $name, $val) {
+function cond_set (&$obj, $name, $val) {
     $has = has_attr($obj, $name);
     $node = get_attr_node($obj, $name);
     if ($node['desc']['disable'])
@@ -758,11 +752,12 @@ function cond_set ($obj, $name, $val) {
 }
 
 
-function init_attr ($obj, $name, $val) {
-    $at = &get_attr_node($obj, $name);
+function & init_attr (&$obj, $name, $val) {
+    $at =& get_attr_node($obj, $name);
     $val = nvl($val);
     if ($val == '') {
         $at['state'] = 'empty';
+        $at['val'] = $at['old'] = ''; # FIXME Dangerous?
     } else {
         $at['val'] = $at['old'] = $val;
         $at['state'] = 'orig';
@@ -770,6 +765,86 @@ function init_attr ($obj, $name, $val) {
     #if (isset($at['entry']))
     #    $at['entry']->set_text($at->{val});
     return $at;
+}
+
+
+function obj_json_encode (&$obj) {
+    $ret = array();
+    foreach ($obj['attrs'] as &$at)
+        $ret[$at['name']] = $at['val'];
+    return "{success:true,obj:" . json_encode($ret) . "}\n";            
+}
+
+
+function obj_read (&$obj, $srv, $filter) {
+    global $servers;
+
+    if ($servers[$srv]['disable']) {
+        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
+        return null;
+    }
+
+    $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
+    if ($res['code'] || $res['data']['count'] == 0) {
+        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
+        log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
+        return $res['error'] ? $res['error'] : 'not found';
+    }
+    $obj['ldap'][$srv] = $res['data'];
+    $ldap =& $obj['ldap'][$srv];
+
+    foreach ($obj['attrs'] as &$at) {
+        if ($at['state'] == 'empty' && isset($at['desc']['ldap'][$srv])) {
+            $val = call_user_func ($at['desc']['ldap_read'], $at, $srv,
+                                    $obj['ldap'][$srv], $at['desc']['ldap'][$srv]);
+            init_attr($obj, $at['name'], $val);
+        }
+    }
+
+    return 0;
+}
+
+
+function obj_write (&$obj, $srv) {
+    global $servers;
+
+    if ($servers[$srv]['disable'])
+        return null;
+
+    $ldap =& $obj['ldap'][$srv];
+    $changed = false;
+    $msg = null;
+
+    log_debug('start writing to "%s"...', $srv);
+
+    foreach ($obj['attrs'] as &$at) {
+        if (isset($at['desc']['ldap'][$srv])) {
+            if (call_user_func ($at['desc']['ldap_write'], $at, $srv, $ldap,
+                                $at['desc']['ldap'][$srv], nvl($at['val'])))
+                $changed = true;
+        }
+	}
+
+    if ($changed) {
+        $res = uldap_update($srv, $ldap);
+        log_debug('writing to "%s" returns code %d', $srv, $res['code']);
+        // Note: code 82 = `no values to update'
+        if ($res['code'] && $res['code'] != 82)
+            $msg = $res['error'];
+    } else {
+        log_debug('no need to write to "%s"', $srv);		
+    }
+
+    foreach ($obj['attrs'] as $at) {
+        $name = $at['desc']['ldap'][$srv];
+        if (! $name)
+            continue;
+        $func = $at['desc']['ldap_write_final'];
+        if (call_user_func ($func, $at, $srv, $ldap, $name, nvl($at['val'])))
+            $changed = true;
+    }
+
+    return $msg;
 }
 
 

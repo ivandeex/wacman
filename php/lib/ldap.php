@@ -139,6 +139,10 @@ function uldap_get_value ($data, $name, $asarray = false) {
 }
 
 
+function uldap_get_dn (&$ldap) {
+    return isset($ldap[0]['dn']) ? $ldap[0]['dn'] : null;
+}
+
 function uldap_json_encode ($res) {
     if ($res['code'])
         return json_error($res['error']);
@@ -168,81 +172,6 @@ function uldap_search ($srv, $filter, $attrs = null, $params = null)
     $res['error'] = '';
     set_error();
     return $res;
-}
-
-
-function uldap_obj_read (&$obj, $srv, $filter) {
-    global $servers;
-
-    if ($servers[$srv]['disable']) {
-        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
-        return null;
-    }
-
-    $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
-    if ($res['code'] || $res['data']['count'] == 0) {
-        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
-        log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
-        return $res['error'] ? $res['error'] : 'not found';
-    }
-    $obj['ldap'][$srv] = $res['data'];
-
-    foreach ($obj['attrs'] as $at) {
-        if ($at['state'] != 'empty')
-            continue;
-        $name = $at['desc']['ldap'][$srv];
-        if (! $name)
-            continue;
-        $func = $at['desc']['ldap_read'];
-        $val = call_user_func ($func, $at, $srv, $obj['ldap'][$srv], $name);
-        init_attr($obj, $at['name'], $val);
-    }
-
-    return 0;
-}
-
-
-function uldap_obj_write ($obj, $srv) {
-    global $servers;
-
-    if ($servers[$srv]['disable'])
-        return null;
-
-    $ldap = $obj['ldap'][$srv];
-    $changed = false;
-    $msg = null;
-
-    log_debug('start writing to "%s"...', $srv);
-
-    foreach ($obj['attrs'] as $at) {
-        $name = $at['desc']['ldap'][$srv];
-        if (! $name)
-            continue;
-        $func = $at['desc']['ldap_write'];
-        if (call_user_func ($func, $at, $srv, $ldap, $name, nvl($at['val'])))
-            $changed = true;
-	}
-
-    if ($changed) {
-        $res = uldap_update($srv, $ldap);
-        log_debug('writing to "%s" returns code %d', $srv, $res['code']);
-        // Note: code 82 = `no values to update'
-        if ($res['code'] && $res['code'] != 82)
-            $msg = $res['error'];
-    } else {
-        log_debug('no need to write to "%s"', $srv);		
-    }
-
-    foreach ($obj['attrs'] as $at) {
-        $name = $at['desc']['ldap'][$srv];
-        if (! $name)
-            continue;
-        $func = $at['desc']['ldap_write_final'];
-        if (call_user_func ($func, $at, $srv, $ldap, $name, nvl($at['val'])))
-            $changed = true;
-    }
-
-    return $msg;
 }
 
 
