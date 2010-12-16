@@ -33,7 +33,8 @@ $includes = array(
     'ldap.php',
     'CLI.php',
     'communigate.php',
-    'attrs.php'
+    'attrs.php',
+    'objects.php'
     );
 
 foreach ($includes as $file) {

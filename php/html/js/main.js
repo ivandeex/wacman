@@ -7,7 +7,7 @@
 function _T() {
 	var args = arguments;
 	var format = args[0];
-	var message = trans && trans[format] ? trans[format] : format;
+	var message = translations && translations[format] ? translations[format] : format;
 	for (i = 1; i < arguments.length; i++)
 	    message = message.replace('%s', arguments[i]);
 	return message;
@@ -248,6 +248,39 @@ function create_mailgroup_desc() {
     };
     tabs = [ tab1 ];
 
+    //for (var tabname in gui_attrs
+/*
+	for (@{$gui_attrs{mailgroup}}) {
+		my ($tab_name, @tab_attrs) = @$_;
+		my $scroll = Gtk2::ScrolledWindow->new(undef, undef);
+		$tabs->append_page($scroll, _T($tab_name));
+		$scroll->set_policy('automatic', 'automatic');
+		$scroll->set_border_width(0);
+
+		my $abox = Gtk2::Table->new($#tab_attrs + 1, 3);
+		$scroll->add_with_viewport($abox);
+
+		for my $r (0 .. $#tab_attrs) {
+			next unless attribute_enabled('mailgroup', $tab_attrs[$r]);
+			my $at = setup_attr($mgrp, $tab_attrs[$r], 1);
+			$at->{tab_book} = $tabs;
+			$at->{tab_page} = $tab_no;
+			$abox->attach($at->{bulb}, 0, 1, $r, $r+1, [], [], 1, 1) if $at->{bulb};
+			$abox->attach($at->{label}, 1, 2, $r, $r+1, [], [], 1, 1);
+			my $right = 4;
+			if ($at->{popup}) {
+				$abox->attach($at->{popup}, 3, 4, $r, $r+1, [], [], 1, 1);
+				$right = 3;
+			}
+			$abox->attach($at->{entry}, 2, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
+			$at->{entry}->signal_connect(key_release_event => sub { mailgroup_entry_edited($at) });
+		}
+
+		$tab_no++;
+	}
+*/
+
+
     return {
         layout: 'border',
         items: [{
@@ -293,66 +326,6 @@ function create_mailgroup_desc() {
             }]
         }]
     };
-/*
-	my $vbox = Gtk2::VBox->new(0, 0);
-	my $frame;
-
-	my $mgrp = $mailgroup_obj = create_obj('mailgroup');
-
-	$mailgroup_name = Gtk2::Label->new;
-	my $bname = Gtk2::Button->new;
-	$bname->add($mailgroup_name);
-	$bname->set_sensitive(0);
-	$vbox->pack_start($bname, 0, 1, 4);
-
-	my $tabs = Gtk2::Notebook->new;
-	my $tab_no = 0;
-	$tabs->set_tab_pos("top");
-	$frame = Gtk2::Frame->new(_T('Attributes'));
-	$frame->add($tabs);
-	$mailgroup_attr_frame = $frame;
-	$vbox->pack_start($frame, 1, 1, 0);
-
-	for (@{$gui_attrs{mailgroup}}) {
-		my ($tab_name, @tab_attrs) = @$_;
-		my $scroll = Gtk2::ScrolledWindow->new(undef, undef);
-		$tabs->append_page($scroll, _T($tab_name));
-		$scroll->set_policy('automatic', 'automatic');
-		$scroll->set_border_width(0);
-
-		my $abox = Gtk2::Table->new($#tab_attrs + 1, 3);
-		$scroll->add_with_viewport($abox);
-
-		for my $r (0 .. $#tab_attrs) {
-			next unless attribute_enabled('mailgroup', $tab_attrs[$r]);
-			my $at = setup_attr($mgrp, $tab_attrs[$r], 1);
-			$at->{tab_book} = $tabs;
-			$at->{tab_page} = $tab_no;
-			$abox->attach($at->{bulb}, 0, 1, $r, $r+1, [], [], 1, 1) if $at->{bulb};
-			$abox->attach($at->{label}, 1, 2, $r, $r+1, [], [], 1, 1);
-			my $right = 4;
-			if ($at->{popup}) {
-				$abox->attach($at->{popup}, 3, 4, $r, $r+1, [], [], 1, 1);
-				$right = 3;
-			}
-			$abox->attach($at->{entry}, 2, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
-			$at->{entry}->signal_connect(key_release_event => sub { mailgroup_entry_edited($at) });
-		}
-
-		$tab_no++;
-	}
-
-	my $buttons = create_button_bar(
-		[],
-		[ _T('Save'), "apply.png", \&mailgroup_save, \$btn_mgrp_apply ],
-		[ _T('Revert'), "revert.png", \&mailgroup_revert,\$btn_mgrp_revert ],
-	);
-	$vbox->pack_end($buttons, 0, 0, 2);
-
-	$btn_mgrp_apply->can_default(1);
-
-	return $vbox;
-*/
 }
 
 /////////////////////////////////////////////////////////
@@ -437,29 +410,29 @@ function main() {
             items: [
             new AjaxIndicator(), ' ',
             {
-		        text: _T('Create'),
-		        icon: 'images/add.png',
-		        scale: 'medium',
-		        handler: user_add,
-		        id: 'btn_usr_add'
-		    },{
-		        text: _T('Delete'),
-		        icon: 'images/delete.png',
-		        scale: 'medium',
-		        handler: user_delete,
-		        id: 'btn_usr_delete'
-		    },{
-		        text: _T('Refresh'),
-		        icon: 'images/refresh.png',
-		        scale: 'medium',
-		        handler: users_refresh,
-		        id: 'btn_usr_refresh'
-		    },'->',{
-		        text: _T('Exit'),
-		        icon: 'images/exit.png',
-		        scale: 'medium',
-		        handler: gui_exit
-		    }]
+                text: _T('Create'),
+                icon: 'images/add.png',
+                scale: 'medium',
+                handler: user_add,
+                id: 'btn_usr_add'
+            },{
+                text: _T('Delete'),
+                icon: 'images/delete.png',
+                scale: 'medium',
+                handler: user_delete,
+                id: 'btn_usr_delete'
+            },{
+                text: _T('Refresh'),
+                icon: 'images/refresh.png',
+                scale: 'medium',
+                handler: users_refresh,
+                id: 'btn_usr_refresh'
+            },'->',{
+                text: _T('Exit'),
+                icon: 'images/exit.png',
+                scale: 'medium',
+                handler: gui_exit
+            }]
         }
     };
 
