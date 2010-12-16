@@ -261,6 +261,7 @@ my %all_attrs = (
 			label => 'Again password',
 			ldap => { uni => 'userPassword', ads => 'unicodePwd', cgp => 'userPassword' },
 			verify => 1,
+			is_duplicate => 1,
 		},
 		mail => {
 			label => 'Mail',
