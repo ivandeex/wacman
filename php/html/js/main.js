@@ -205,6 +205,12 @@ function mailgroup_load(user_sm, row_idx, rec) {
     Ext.Msg.alert('hihi','group load');
 }
 
+function mailgroup_save() {
+}
+
+function mailgroup_revert() {
+}
+
 function create_mailgroup_list() {
     return {
         xtype: 'grid',
@@ -228,9 +234,125 @@ function create_mailgroup_list() {
 }
 
 function create_mailgroup_desc() {
-    return {
-        html: 'mailgroup desc'
+
+    items1 = [{
+        xtype: 'textfield',
+        name: 'cn',
+        fieldLabel: _T('Mailgroup name')
+    }];
+    tab1 = {
+        title: _T('Attributes'),
+        autoScroll: true,
+        defaults: { anchor: '-20' },
+        items: items1
     };
+    tabs = [ tab1 ];
+
+    return {
+        layout: 'border',
+        items: [{
+            region: 'north',
+            margins: '5 5 5 5',
+            xtype: 'label',
+            text: '?',
+            style: 'font-weight: bold; text-align: center',
+            id: 'title_mailgroup_name'
+        },{
+            region: 'center',
+            margins: '0 0 0 0',
+            xtype: 'form',
+            layout: 'fit',
+            url: 'mailgroup-write.php',
+            frame: true,
+            items: [{
+                xtype: 'tabpanel',
+                activeItem: 0,
+                anchor: '100% 100%',
+                deferredRender: false,
+                defaults: {
+                    layout: 'form',
+                    labelWidth: 160,
+                    defaultType: 'textfield',
+                    bodyStyle: 'padding:5px',
+                    hideMode: 'offsets'
+                },
+                items: tabs
+            }],
+            buttons: [{
+		        text: _T('Save'),
+		        icon: 'images/apply.png',
+		        scale: 'medium',
+		        handler: mailgroup_save,
+		        id: 'btn_mgrp_save'
+		    },{
+		        text: _T('Revert'),
+		        icon: 'images/revert.png',
+		        scale: 'medium',
+		        handler: mailgroup_revert,
+		        id: 'btn_mgrp_revert'
+            }]
+        }]
+    };
+/*
+	my $vbox = Gtk2::VBox->new(0, 0);
+	my $frame;
+
+	my $mgrp = $mailgroup_obj = create_obj('mailgroup');
+
+	$mailgroup_name = Gtk2::Label->new;
+	my $bname = Gtk2::Button->new;
+	$bname->add($mailgroup_name);
+	$bname->set_sensitive(0);
+	$vbox->pack_start($bname, 0, 1, 4);
+
+	my $tabs = Gtk2::Notebook->new;
+	my $tab_no = 0;
+	$tabs->set_tab_pos("top");
+	$frame = Gtk2::Frame->new(_T('Attributes'));
+	$frame->add($tabs);
+	$mailgroup_attr_frame = $frame;
+	$vbox->pack_start($frame, 1, 1, 0);
+
+	for (@{$gui_attrs{mailgroup}}) {
+		my ($tab_name, @tab_attrs) = @$_;
+		my $scroll = Gtk2::ScrolledWindow->new(undef, undef);
+		$tabs->append_page($scroll, _T($tab_name));
+		$scroll->set_policy('automatic', 'automatic');
+		$scroll->set_border_width(0);
+
+		my $abox = Gtk2::Table->new($#tab_attrs + 1, 3);
+		$scroll->add_with_viewport($abox);
+
+		for my $r (0 .. $#tab_attrs) {
+			next unless attribute_enabled('mailgroup', $tab_attrs[$r]);
+			my $at = setup_attr($mgrp, $tab_attrs[$r], 1);
+			$at->{tab_book} = $tabs;
+			$at->{tab_page} = $tab_no;
+			$abox->attach($at->{bulb}, 0, 1, $r, $r+1, [], [], 1, 1) if $at->{bulb};
+			$abox->attach($at->{label}, 1, 2, $r, $r+1, [], [], 1, 1);
+			my $right = 4;
+			if ($at->{popup}) {
+				$abox->attach($at->{popup}, 3, 4, $r, $r+1, [], [], 1, 1);
+				$right = 3;
+			}
+			$abox->attach($at->{entry}, 2, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
+			$at->{entry}->signal_connect(key_release_event => sub { mailgroup_entry_edited($at) });
+		}
+
+		$tab_no++;
+	}
+
+	my $buttons = create_button_bar(
+		[],
+		[ _T('Save'), "apply.png", \&mailgroup_save, \$btn_mgrp_apply ],
+		[ _T('Revert'), "revert.png", \&mailgroup_revert,\$btn_mgrp_revert ],
+	);
+	$vbox->pack_end($buttons, 0, 0, 2);
+
+	$btn_mgrp_apply->can_default(1);
+
+	return $vbox;
+*/
 }
 
 /////////////////////////////////////////////////////////
@@ -432,7 +554,7 @@ function main() {
             region: 'center',
             margins: '0 0 0 0',
             xtype: 'tabpanel',
-            activeTab: 0,
+            activeTab: 2,
             items: [ users_tab, groups_tab, mailgroups_tab ]
         }]
     });
