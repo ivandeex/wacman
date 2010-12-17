@@ -1,23 +1,6 @@
 // $Id$
 
 /////////////////////////////////////////////////////////
-// translations are loaded dynamically
-//
-
-function _T() {
-	var args = arguments;
-	var format = args[0];
-	var message = translations && translations[format] ? translations[format] : format;
-	for (i = 1; i < arguments.length; i++)
-	    message = message.replace('%s', arguments[i]);
-	return message;
-};
-
-function test_msg(e) {
-    Ext.Msg.alert('hihi','hohoho');
-}
-
-/////////////////////////////////////////////////////////
 // users
 //
 
@@ -65,45 +48,6 @@ function user_save() {
 }
 
 function user_revert() {
-}
-
-function create_user_list() {
-    return {
-        xtype: 'grid',
-        store: user_store,
-        colModel: new Ext.grid.ColumnModel({
-            columns: [{
-                header: _T('Identifier'),
-                dataIndex: 'uid',
-                sortable: true,
-                width: 100,
-            },{
-                header: _T('Full name'),
-                dataIndex: 'cn',
-                sortable: true,
-                width: 190
-            }]
-        }),
-        selModel: new Ext.grid.RowSelectionModel({
-            singleSelect: true,
-            listeners: {
-                rowdeselect: user_change, // FIXME
-                rowselect: user_load
-            }
-        })
-    };
-}
-
-function create_user_desc() {
-    return create_obj_desc({
-        obj_name: 'user',
-        url: 'user-write.php',
-        label_id: 'title_user_name',
-        save_handler: user_save,
-        save_id: 'btn_usr_save',
-        revert_handler: user_revert,
-        revert_id: 'btn_usr_revert'
-    });
 }
 
 /////////////////////////////////////////////////////////
@@ -155,40 +99,6 @@ function group_save() {
 function group_revert() {
 }
 
-function create_group_list() {
-    return {
-        xtype: 'grid',
-        store: group_store,
-        colModel: new Ext.grid.ColumnModel({
-            columns: [{
-                header: _T('Group name'),
-                dataIndex: 'cn',
-                sortable: true,
-                width: 120
-            }]
-        }),
-        selModel: new Ext.grid.RowSelectionModel({
-            singleSelect: true,
-            listeners: {
-                rowdeselect: group_change, // FIXME
-                rowselect: group_load
-            }
-        })
-    };
-}
-
-function create_group_desc() {
-    return create_obj_desc({
-        obj_name: 'group',
-        url: 'group-write.php',
-        label_id: 'title_group_name',
-        save_handler: group_save,
-        save_id: 'btn_grp_save',
-        revert_handler: group_revert,
-        revert_id: 'btn_grp_revert'
-    });
-}
-
 /////////////////////////////////////////////////////////
 // mailgroups
 //
@@ -235,40 +145,47 @@ function mailgroup_save() {
 function mailgroup_revert() {
 }
 
-function create_mailgroup_list() {
-    return {
-        xtype: 'grid',
-        store: mailgroup_store,
-        colModel: new Ext.grid.ColumnModel({
-            columns: [{
-                header: _T('Mail group name'),
-                dataIndex: 'cn',
-                sortable: true,
-                width: 140
-            }]
-        }),
-        selModel: new Ext.grid.RowSelectionModel({
-            singleSelect: true,
-            listeners: {
-                rowdeselect: mailgroup_change, // FIXME
-                rowselect: mailgroup_load
-            }
-        })
-    };
-}
+/////////////////////////////////////////////////////////
+// Custom fields
+//
 
-function create_mailgroup_desc(cfg) {
-    return create_obj_desc({
-        obj_name: 'mailgroup',
-        url: 'mailgroup-write.php',
-        label_id: 'title_mailgroup_name',
-        save_handler: mailgroup_save,
-        save_id: 'btn_mgrp_save',
-        revert_handler: mailgroup_revert,
-        revert_id: 'btn_mgrp_revert'
-    });
-}
+Ext.form.FillerField = Ext.extend(Ext.form.TextField, {
+});
+Ext.reg('fillerfield', Ext.form.FillerField);
 
+popup_functions = {
+    yesno: 'create_yesno_chooser',
+    gid: 'create_group_chooser',
+    groups: 'create_user_groups_editor',
+    users: 'create_group_users_editor',
+    mgroups: 'create_user_mail_groups_editor',
+    mailusers: 'create_mailgroup_users_editor'
+};
+
+Ext.form.PopupField = Ext.extend(Ext.form.TriggerField, {
+    onTriggerClick: function() {
+        func = popup_functions[this._desc.popup];
+        Ext.Msg.alert('popup', func);
+    }
+});
+Ext.reg('popupfield', Ext.form.PopupField);
+
+/////////////////////////////////////////////////////////
+// Translations (loaded dynamically)
+//
+
+function _T() {
+	var args = arguments;
+	var format = args[0];
+	var message = translations && translations[format] ? translations[format] : format;
+	for (i = 1; i < arguments.length; i++)
+	    message = message.replace('%s', arguments[i]);
+	return message;
+};
+
+function test_msg(e) {
+    Ext.Msg.alert('hihi','hohoho');
+}
 
 /////////////////////////////////////////////////////////
 // AJAX indicator
@@ -307,41 +224,58 @@ AjaxIndicator = Ext.extend(Ext.Button, {
 });
 
 /////////////////////////////////////////////////////////
-// main
+// GUI
 //
 
-Ext.form.FillerField = Ext.extend(Ext.form.TextField, {
-});
-Ext.reg('fillerfield', Ext.form.FillerField);
+function btn_id (cfg, op) {
+    return 'btn_' + cfg.short_name + '_' + op;
+}
 
-popup_functions = {
-    yesno: 'create_yesno_chooser',
-    gid: 'create_group_chooser',
-    groups: 'create_user_groups_editor',
-    users: 'create_group_users_editor',
-    mgroups: 'create_user_mail_groups_editor',
-    mailusers: 'create_mailgroup_users_editor'
-};
+function west_region (w, width) {
+    w.region = 'west';
+    w.split = true;
+    w.collapsible = true;
+    w.collapseMode = 'mini';
+    w.width = width;
+    w.minSize = 50;
+    return w;
+}
 
-Ext.form.PopupField = Ext.extend(Ext.form.TriggerField, {
-    onTriggerClick: function() {
-        func = popup_functions[this._desc.popup];
-        Ext.Msg.alert('popup', func);
-    }
-});
-Ext.reg('popupfield', Ext.form.PopupField);
+function center_region (w) {
+    w.region = 'center';
+    return w;
+}
 
+function create_obj_list (cfg) {
+    var list = {
+        xtype: 'grid',
+        store: cfg.store,
+        colModel: new Ext.grid.ColumnModel({
+            columns: cfg.list_columns
+        }),
+        selModel: new Ext.grid.RowSelectionModel({
+            singleSelect: true,
+            listeners: {
+                rowdeselect: cfg.list_handler_change,
+                rowselect: cfg.list_handler_select
+            }
+        })
+    };
+    return list;
+}
 
-function create_obj_desc(cfg) {
+function create_obj_desc (cfg) {
 
-    form_attrs = gui_attrs[cfg.obj_name];
-    tabs = [];
+    var form_attrs = gui_attrs[cfg.obj_name];
+    if (! form_attrs)
+        return {};
+    var tabs = [];
 
     for (i = 0; i < form_attrs.length; i++) {
-        tab_name = form_attrs[i][0];
-        tab_attrs = form_attrs[i][1];
-        items = [];
-        tab = {
+        var tab_name = form_attrs[i][0];
+        var tab_attrs = form_attrs[i][1];
+        var items = [];
+        var tab = {
             title: _T(tab_name),
             autoScroll: true,
             defaults: { anchor: '-20' },
@@ -349,15 +283,15 @@ function create_obj_desc(cfg) {
         };
         tabs.push(tab);
         for (j = 0; j < tab_attrs.length; j++) {
-            attr_name = tab_attrs[j];
-            desc = all_attrs[cfg.obj_name][attr_name];
+            var attr_name = tab_attrs[j];
+            var desc = all_attrs[cfg.obj_name][attr_name];
             if (desc.disable)
                 continue;
             if (!desc) {
                 Ext.Msg.alert(_T('attribute "%s" in object "%s" not defined', attr_name, cfg.obj_name));
                 continue;
             }
-            field = {
+            var field = {
                 xtype: desc.popup ? 'popupfield' : 'fillerfield',
                 fieldLabel: desc.label,
                 readonly: desc.readonly,
@@ -370,7 +304,7 @@ function create_obj_desc(cfg) {
 		}
 	}
 
-    panel = {
+    var panel = {
         layout: 'border',
         items: [{
             region: 'north',
@@ -405,19 +339,64 @@ function create_obj_desc(cfg) {
 		        icon: 'images/apply.png',
 		        scale: 'medium',
 		        handler: cfg.save_handler,
-		        id: cfg.save_id
+		        id: btn_id(cfg, 'save')
 		    },{
 		        text: _T('Revert'),
 		        icon: 'images/revert.png',
 		        scale: 'medium',
 		        handler: cfg.revert_handler,
-		        id: cfg.revert_id
+		        id: btn_id(cfg, 'load')
             }]
         }]
     };
 
     return panel;
 }
+
+function create_obj_tab (cfg) {
+    var tab = {
+        title: _T(cfg.tab_title),
+        layout: 'border',
+        items: [
+            west_region(create_obj_list(cfg), cfg.list_width),
+            center_region(create_obj_desc(cfg))
+        ],
+        bbar: {
+            xtype: 'toolbar',
+            items: [
+            new AjaxIndicator(), ' ',
+            {
+                text: _T('Create'),
+                icon: 'images/add.png',
+                scale: 'medium',
+                handler: user_add,
+                id: btn_id(cfg, 'add')
+            },{
+                text: _T('Delete'),
+                icon: 'images/delete.png',
+                scale: 'medium',
+                handler: user_delete,
+                id: btn_id(cfg, 'delete')
+            },{
+                text: _T('Refresh'),
+                icon: 'images/refresh.png',
+                scale: 'medium',
+                handler: users_refresh,
+                id: btn_id(cfg, 'refresh')
+            },'->',{
+                text: _T('Exit'),
+                icon: 'images/exit.png',
+                scale: 'medium',
+                handler: gui_exit
+            }]
+        }
+    };
+    return tab;
+}
+
+/////////////////////////////////////////////////////////
+// Main
+//
 
 function gui_exit() {
 	if (user_obj.changed || group_obj.changed) {
@@ -431,137 +410,79 @@ function gui_exit() {
     Ext.Msg.alert('exit','Exit');
 }
 
-function west_region(w,width) {
-    w.region = 'west';
-    w.split = true;
-    w.collapsible = true;
-    w.collapseMode = 'mini';
-    w.width = width;
-    w.minSize = 50;
-    return w;
-}
-
-function center_region(w) {
-    w.region = 'center';
-    return w;
-}
-
 function main() {
     hide_preloader();
 
-    var users_tab = {
-        title: _T(' Users '),
-        layout: 'border',
-        items: [
-            west_region(create_user_list(), 300),
-            center_region(create_user_desc())
-        ],
-        bbar: {
-            xtype: 'toolbar',
-            items: [
-            new AjaxIndicator(), ' ',
-            {
-                text: _T('Create'),
-                icon: 'images/add.png',
-                scale: 'medium',
-                handler: user_add,
-                id: 'btn_usr_add'
-            },{
-                text: _T('Delete'),
-                icon: 'images/delete.png',
-                scale: 'medium',
-                handler: user_delete,
-                id: 'btn_usr_delete'
-            },{
-                text: _T('Refresh'),
-                icon: 'images/refresh.png',
-                scale: 'medium',
-                handler: users_refresh,
-                id: 'btn_usr_refresh'
-            },'->',{
-                text: _T('Exit'),
-                icon: 'images/exit.png',
-                scale: 'medium',
-                handler: gui_exit
-            }]
-        }
-    };
+    var user_tab = create_obj_tab({
+        obj_name: 'user',
+        tab_title: ' User ',
+        store: user_store,
+        url: 'user-write.php',
+        label_id: 'title_user_name',
+        save_handler: user_save,
+        revert_handler: user_revert,
+        list_width: 300,
+        list_columns: [{
+            header: _T('Identifier'),
+            dataIndex: 'uid',
+            sortable: true,
+            width: 100,
+        },{
+            header: _T('Full name'),
+            dataIndex: 'cn',
+            sortable: true,
+            width: 190
+        }],
+        list_handler_change: user_change,
+        list_handler_select: user_load,
+        handler_add: user_add,
+        handler_delete: user_delete,
+        handler_refresh: users_refresh
+    });
 
-    var groups_tab = {
-        title: _T(' Groups '),
-        layout: 'border',
-        items: [
-            west_region(create_group_list(), 150),
-            center_region(create_group_desc())
-        ],
-        bbar: {
-            xtype: 'toolbar',
-            items: [
-            new AjaxIndicator(), ' ',
-            {
-		        text: _T('Create'),
-		        icon: 'images/add.png',
-		        scale: 'medium',
-		        handler: group_add,
-		        id: 'btn_grp_add'
-		    },{
-		        text: _T('Delete'),
-		        icon: 'images/delete.png',
-		        scale: 'medium',
-		        handler: group_delete,
-		        id: 'btn_grp_delete'
-		    },{
-		        text: _T('Refresh'),
-		        icon: 'images/refresh.png',
-		        scale: 'medium',
-		        handler: groups_refresh,
-		        id: 'btn_grp_refresh'
-		    },'->',{
-		        text: _T('Exit'),
-		        icon: 'images/exit.png',
-		        scale: 'medium',
-		        handler: gui_exit
-		    }]
-        }
-    };
+    var group_tab = create_obj_tab({
+        obj_name: 'group',
+        tab_title: ' Group ',
+        store: group_store,
+        url: 'group-write.php',
+        label_id: 'title_group_name',
+        save_handler: group_save,
+        revert_handler: group_revert,
+        list_width: 150,
+        list_columns: [{
+            header: _T('Group name'),
+            dataIndex: 'cn',
+            sortable: true,
+            width: 120
+        }],
+        list_handler_change: group_change,
+        list_handler_select: group_load,
+        handler_add: group_add,
+        handler_delete: group_delete,
+        handler_refresh: groups_refresh
+    });
 
-    var mailgroups_tab = {
-        title: _T(' Mail groups '),
-        layout: 'border',
-        items: [
-            west_region(create_mailgroup_list(), 150),
-            center_region(create_mailgroup_desc())
-        ],
-        bbar: {
-            xtype: 'toolbar',
-            items: [
-            new AjaxIndicator(), ' ',
-            {
-		        text: _T('Create'),
-		        icon: 'images/add.png',
-		        scale: 'medium',
-		        handler: mailgroup_add,
-		        id: 'btn_mgrp_add'
-		    },{
-		        text: _T('Delete'),
-		        icon: 'images/delete.png',
-		        scale: 'medium',
-		        handler: mailgroup_delete,
-		        id: 'btn_mgrp_delete'
-		    },{
-		        text: _T('Refresh'),
-		        icon: 'images/refresh.png',
-		        scale: 'medium',
-		        handler: mailgroups_refresh,
-		        id: 'btn_mgrp_refresh'
-		    },'->',{
-		        text: _T('Exit'),
-		        icon: 'images/exit.png',
-		        scale: 'medium',
-		        handler: gui_exit
-		    }]
-        }
-    };
+    var mailgroup_tab = create_obj_tab({
+        obj_name: 'group',
+        tab_title: ' Mail Group ',
+        store: mailgroup_store,
+        url: 'mailgroup-write.php',
+        label_id: 'title_group_name',
+        save_handler: mailgroup_save,
+        revert_handler: mailgroup_revert,
+        list_width: 150,
+        list_columns: [{
+                header: _T('Mailgroup name'),
+                dataIndex: 'cn',
+                sortable: true,
+                width: 140
+        }],
+        list_handler_change: mailgroup_change,
+        list_handler_select: mailgroup_load,
+        handler_add: mailgroup_add,
+        handler_delete: mailgroup_delete,
+        handler_refresh: mailgroups_refresh
+    });
 
     new Ext.Viewport({
         defaults: {
@@ -572,14 +493,14 @@ function main() {
             region: 'north',
             margins: '5 5 5 5',
             xtype: 'label',
-            text: _T('Manage Users'),
+            text: _T('Userman'),
             style: 'font-weight: bold; text-align: center'
         } , {
             region: 'center',
             margins: '0 0 0 0',
             xtype: 'tabpanel',
             activeTab: 0,
-            items: [ users_tab, groups_tab, mailgroups_tab ]
+            items: [ user_tab, group_tab, mailgroup_tab ]
         }]
     });
 
