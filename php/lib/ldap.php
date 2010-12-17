@@ -190,12 +190,12 @@ function ldap_write_none () {
 }
 
 
-function ldap_read_string ($at, $srv, $ldap, $name) {
+function ldap_read_string (&$at, $srv, $ldap, $name) {
     return nvl(uldap_get_value($ldap, $name));
 }
 
 
-function ldap_write_string ($at, $srv, $ldap, $name, $val) {
+function ldap_write_string (&$at, $srv, $ldap, $name, $val) {
     $changed = 0;
     if ($val == '') {
 		if (uldap_exists($ldap, $name)) {
@@ -223,12 +223,12 @@ function ldap_write_string ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_dn ($at, $srv, $ldap, $name) {
+function ldap_read_dn (&$at, $srv, $ldap, $name) {
 	return nvl(uldap_get_dn($ldap));
 }
 
 
-function ldap_write_dn ($at, $srv, $ldap, $name, $val) {
+function ldap_write_dn (&$at, $srv, $ldap, $name, $val) {
     $prev = nvl(uldap_get_dn($ldap));
     $val = nvl($val);
     log_debug('ldap_write_dn(%s): attr="%s" dn="%s", prev="%s"',
@@ -240,12 +240,12 @@ function ldap_write_dn ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_class ($at, $srv, $ldap, $name) {
+function ldap_read_class (&$at, $srv, $ldap, $name) {
     return join_list(uldap_get_value($ldap, $name));
 }
 
 
-function ldap_write_class ($at, $srv, $ldap, $name, $val) {
+function ldap_write_class (&$at, $srv, $ldap, $name, $val) {
     $changed = 0;
     $ca = array();
     foreach (uldap_get_value($ldap, $name) as $c)
@@ -262,7 +262,7 @@ function ldap_write_class ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_unix_gidn ($at, $srv, $ldap, $name) {
+function ldap_read_unix_gidn (&$at, $srv, $ldap, $name) {
     $val = nvl(uldap_get_value($ldap, $at['name']));
 	if (is_int($val)) {
         $res = uldap_search($ldap, 'uni', "(&(objectClass=posixGroup)(gidNumber=$val))");
@@ -279,21 +279,21 @@ function ldap_read_unix_gidn ($at, $srv, $ldap, $name) {
 }
 
 
-function ldap_read_real_uidn ($at, $srv, $ldap, $name) {
+function ldap_read_real_uidn (&$at, $srv, $ldap, $name) {
     $username = nvl(uldap_get_value($ldap, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['uid'];
 }
 
 
-function ldap_read_real_gidn ($at, $srv, $ldap, $name) {
+function ldap_read_real_gidn (&$at, $srv, $ldap, $name) {
     $username = nvl(uldap_get_value($ldap, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['gid'];
 }
 
 
-function ldap_write_unix_gidn ($at, $srv, $ldap, $name, $val) {
+function ldap_write_unix_gidn (&$at, $srv, $ldap, $name, $val) {
     if (!empty($val) && !is_int($val)) { // /^\d*$/
         $cn = $val;
         $val = 0;
@@ -336,7 +336,7 @@ function decode_ad_pass ($pass) {
 }
 
 
-function ldap_read_pass ($at, $srv, $ldap, $name) {
+function ldap_read_pass (&$at, $srv, $ldap, $name) {
     global $servers;
     $val = '';
     if (! get_config('show_password') || $servers['cgp']['disable']) {
@@ -348,7 +348,7 @@ function ldap_read_pass ($at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_pass ($at, $srv, $ldap, $name, $val) {
+function ldap_write_pass (&$at, $srv, $ldap, $name, $val) {
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return 0;
     if ($srv == 'ads') {
@@ -361,19 +361,19 @@ function ldap_write_pass ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_write_pass_final ($at, $srv, $ldap, $name, $val) {
+function ldap_write_pass_final (&$at, $srv, $ldap, $name, $val) {
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return 0;
     global $servers;
     if ($srv == 'uni') {
-        $conf = &$servers[$srv];
-        $ldap = &$conf['ldap'];
+        $conf =& $servers[$srv];
+        $ldap =& $conf['ldap'];
         if (! isset($conf['extop'])) {
             $conf['extop'] = false; # FIXME $ldap->root_dse->supported_extension('1.3.6.1.4.1.4203.1.11.1');
         }
         $extop = $conf['extop'];
 
-        $obj = $at['obj'];
+        $obj =& $at['obj'];
         $dn = get_attr($obj, 'dn');
         if ($extop) {
             // set_password() without 'oldpasswd' works only for administrator
@@ -395,8 +395,8 @@ function ldap_write_pass_final ($at, $srv, $ldap, $name, $val) {
         return 1;
     }
     if ($srv == 'cgp') {
-        $ldap = &$servers[$srv]['ldap'];
-        $obj = $at['obj'];
+        $ldap =& $servers[$srv]['ldap'];
+        $obj =& $at['obj'];
         $dn = get_attr($obj, 'cgpDn');
 
         $alg = get_config('cgp_password');
@@ -455,7 +455,7 @@ function ldap_write_pass_final ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_unix_groups ($at, $srv, $ldap, $name) {
+function ldap_read_unix_groups (&$at, $srv, $ldap, $name) {
     $uid = nvl(uldap_get_value($ldap, $name));
     if (!isset($uid) || !$uid)
         $uid = get_attr($at['obj'], $name);
@@ -541,11 +541,9 @@ function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
 }
 
 
-function ldap_write_unix_groups_final ($at, $srv, $ldap, $name, $val) {
-    if ($at['old'] == $at['val'])
-        return 0;
+function ldap_write_unix_groups_final (&$at, $srv, $ldap, $name, $val) {
     $uid = get_attr($at['obj'], $name);
-    $old = ldap_get_unix_group_ids($srv, $at['old'], 'nowarn');
+    $old = ldap_get_unix_group_ids($srv, $at['old'], 'nowarn'); # FIXME!!!
     $new = ldap_get_unix_group_ids($srv, $at['val'], 'warn');
     log_debug('write_unix_groups(1): old=(%s) new=(%s)', $old, $new);
     $arr = compare_lists($old, $new);
@@ -562,7 +560,7 @@ function ldap_write_unix_groups_final ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_unix_members ($at, $srv, $ldap, $name) {
+function ldap_read_unix_members (&$at, $srv, $ldap, $name) {
     // RHDS returns uid numbers, OpenLDAP returns usernames. We handle both cases.
     $uidns = uldap_get_value($ldap, $name, true);
     log_debug('ldap_read_unix_members: "%s" is (%s)', $name, join_list($uidns));
@@ -583,7 +581,7 @@ function ldap_read_unix_members ($at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_unix_members ($at, $srv, $ldap, $name, $val) {
+function ldap_write_unix_members (&$at, $srv, $ldap, $name, $val) {
     $h_uids = array();
     $touched_uids = array();
     foreach (split_list($val) as $uidn) {
@@ -630,7 +628,7 @@ function ldap_write_unix_members ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_write_unix_members_final ($at, $srv, $ldap, $name, $val) {
+function ldap_write_unix_members_final (&$at, $srv, $ldap, $name, $val) {
     $sel_usr = $user_obj;
     if ($sel_usr['refresh_request']) {
         // refresh gui for this user
@@ -642,7 +640,7 @@ function ldap_write_unix_members_final ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_aliases ($at, $srv, $ldap, $name) {
+function ldap_read_aliases (&$at, $srv, $ldap, $name) {
     $dn = nvl(uldap_get_dn($ldap));
     if ($dn == '')
         return '';
@@ -666,9 +664,9 @@ function ldap_read_aliases ($at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_aliases_final ($at, $srv, $ldap, $name, $val) {
-    $obj = $at['obj'];
-    $old = append_list(nvl($at['old']), get_attr($obj, 'telnum', array('orig' => 1)));
+function ldap_write_aliases_final (&$at, $srv, $ldap, $name, $val) {
+    $obj =& $at['obj'];
+    $old = append_list(nvl($at['old']), get_attr($obj, 'telnum', array('orig' => 1))); # FIXME!!!
     $new = append_list(nvl($at['val']), get_attr($obj, 'telnum'));
     log_debug('write_aliases_final: old="%s" new="%s"', $old, $new);
     if ($old == $new)
@@ -704,7 +702,7 @@ function ldap_write_aliases_final ($at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_mail_groups ($at, $srv, $ldap, $name) {
+function ldap_read_mail_groups (&$at, $srv, $ldap, $name) {
     $uid = nvl(uldap_get_value($ldap, 'uid'));
     if ($uid == '')
         return '';
