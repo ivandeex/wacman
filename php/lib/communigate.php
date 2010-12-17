@@ -5,7 +5,7 @@
 
 
 function cli_connect () {
-    $cfg = &get_server('cli');
+    $cfg =& get_server('cli');
     $uri = $cfg['uri'];
     if (! preg_match('!^\s*(?:\w+\://)?([\w\.\-]+)(?:\s*\:\s*(\d+))[\s/]*$!', $uri, $parts)) {
         log_error('invalid uri for server CLI');
@@ -17,8 +17,8 @@ function cli_connect () {
     $cfg['user'] = $creds['user'];
     $cfg['pass'] = $creds['pass'];
     $cfg['connected'] = 0;
-    log_debug('connecting to CLI: host %s port %s as user %s pass %s',
-              $cfg['host'], $cfg['port'], $cfg['user'], $cfg['pass']);
+    #log_debug('connecting to CLI: host %s port %s as user %s pass %s',
+    #          $cfg['host'], $cfg['port'], $cfg['user'], $cfg['pass']);
     $cfg['cli'] = $cli = new CLI;
     if ($cfg['debug'])
         $cli->SetDebug(1);
@@ -27,7 +27,7 @@ function cli_connect () {
         log_error('cannot bind to CLI: ' . $cli->getErrMessage());
         return -1;
     }
-    log_debug('successfully connected to CLI');
+    #log_debug('successfully connected to CLI');
     $cfg['connected'] = 1;
     return 0;
 }
