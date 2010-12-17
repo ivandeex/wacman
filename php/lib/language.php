@@ -29,10 +29,11 @@ function setup_language () {
         $language = 'en';
     }
 
-    $filename = LIBDIR . 'lang_' . $language . '.php';
+    $filename = realpath(LIBDIR . 'lang_' . $language . '.php');
     if (is_readable($filename)) {
-        log_debug("%s: loading translations", $filename);
-        require_once($filename);
+        global $translations;
+        require($filename);
+        log_debug("%s: %s translations loaded", $filename, count($translations));
     } else {
         log_error("%s: cannot read translation file", $filename);
     }
