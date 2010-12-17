@@ -45,7 +45,6 @@ function setup_all_attrs () {
             $desc['name'] = $name;
             if (empty($desc['type']))
                 $desc['type'] = 'string';
-            $desc['visual'] = isset($desc['label']);
             if (isset($desc['label']))
 			    $desc['label'] = _T($desc['label']);
             if (! isset($desc['readonly']))
@@ -155,12 +154,6 @@ function setup_all_attrs () {
 //       Objects
 //
 
-function & get_attr_node (&$obj, $name) {
-    if (!isset($obj['attrs'][$name]))
-        error_page(_T('attribute "%s" undefined in object "%s"', $name, $obj['type']));
-    return $obj['attrs'][$name];
-}
-
 
 function & create_obj ($objtype) {
     global $all_attrs;
@@ -179,167 +172,26 @@ function & create_obj ($objtype) {
         $obj['attrs'][$name] = array(
             'name' => $name,
             'type' => $desc['type'],
-            'state' => null,
-            'visual' => 0,
-            'entry' => null,
-            'bulb' => null,
             'obj' => &$obj,
             'desc' => &$desc,
+            'ldap' => array(),
+            'val' => ''
         );
     }
 
-    foreach (array_keys($servers) as $srv)
-        $obj['attrlist'][$srv] =& $servers[$srv]['attrlist'][$objtype];
-
-    return clear_obj($obj);
-}
-
-
-function & clear_obj (&$obj) {
-    foreach ($obj['attrs'] as $name => &$at) {
-        $at['val'] = $at['old'] = '';
-        $at['state'] = 'empty';
-        #if ($at['entry'])
-        #    $at['entry']->set_text('');
-    }
-    global $servers;
     foreach (array_keys($servers) as $srv) {
-        $obj['ldap'][$srv] = array(); # FIXME: Net::LDAP::Entry->new;
+        $obj['attrlist'][$srv] =& $servers[$srv]['attrlist'][$objtype];
+        $obj['ldap'][$srv] = array();
     }
-    $obj['changed'] = 0;
-    # update_obj_gui($obj); # FIXME
+
     return $obj;
 }
 
 
-function & setup_attr (&$obj, $name, $visual) {
-    $at =& get_attr_node($obj, $name);
-    $at['label'] = $at['entry'] = $at['bulb'] = $at['popup'] = null;
-    $desc =& $at['desc'];
-    $at['visual'] = $visual;
-    if ($visual) {
-        if (! $desc['visual'])
-            log_error('%s attribute "%s" cannot be visual', $obj['type'], $name);
-        #$at['label'] = Gtk2::Label->new($desc->{label});
-        #$at['label']->set_justify('left');
-        #$at['entry'] = Gtk2::Entry->new;
-        #$at['entry']->set_editable(!$desc['disable'] && !$desc['readonly']);
-        if ($at['type'] == 'pass' && !get_config('show_password')) {
-            #$at['entry']->set_visibility(0);
-            #$at['entry']->set_invisible_char('*');
-        }
-        $puptype = $desc['popup'];
-        /*
-        if ($puptype) {
-            my $popup = create_button(undef, 'popup.png');
-            $at->{popup} = $popup;
-            $sub = sub { create_yesno_chooser($at) } if $puptype eq 'yesno';
-            $sub = sub { create_group_chooser($at) } if $puptype eq 'gid';
-            $sub = sub { create_user_groups_editor($at) } if $puptype eq 'groups'; 
-            $sub = sub { create_group_users_editor($at) } if $puptype eq 'users'; 
-            $sub = sub { create_user_mail_groups_editor($at) } if $puptype eq 'mgroups';
-            $sub = sub { create_mailgroup_users_editor($at) } if $puptype eq 'mailusers'; 
-            log_error('unknown popup type "%s"', $puptype) unless $sub; 
-            $popup->signal_connect(clicked => $sub);
-            $popup->set_relief('none');
-            $popup->can_focus(0);
-        }
-        */
-        if (get_config('show_bulbs')) {
-            #$at['bulb'] = Gtk2::Image->new;
-        }
-    }
-    $at['val'] = $at['old'] = '';
-    $at['state'] = 'empty';
-    return $at;
-}
-
-
-function obj_changed (&$obj) {
-    foreach ($obj['attrs'] as $name => &$at) {
-        if ($at['val'] != $at['old'])
-            return true;
-    }
-    return false;
-}
-
-
-$state2has = array(
-	'force' => 0,
-	'user'  => 1,
-	'empty' => 0,
-	'orig'  => 1,
-	'calc'  => 0
-    );
-
-
-function has_attr (&$obj, $name) {
-    $at =& get_attr_node($obj, $name);
-    $state = nvl($at['state']);
-    global $state2has;
-    if (isset($state2has[$state]))
-        return $state2has[$state];
-    return nvl($at['val']) != '' ? 1 : 0;
-}
-
-
 function get_attr (&$obj, $name, $param = array()) {
-    $at =& get_attr_node($obj, $name);
-    $which = (isset($param['orig']) && $param['orig']) ? 'old' : 'val';
-    return nvl($at[$which]);
-}
-
-
-function & set_attr (&$obj, $name, $val, $param = array()) {
-    $at =& get_attr_node($obj, $name);
-    $val = nvl($val);
-    if ($at->{val} == $val)
-        return $at;
-    $at['val'] = $val;
-
-    if ($val == '') {
-        $state = 'empty';
-    } else if ($val == $at['old']) {
-        $state = 'orig';
-    #} else if (isset($at['entry']) && ($val == nvl($at['entry']->get_text())) ) {
-    #    $state = 'user';
-    } else {
-        $state = 'calc';
-    }
-    $at['state'] = $state;
-
-    $sdn = nvl(get_attr($obj, 'dn'));
-    $parts = array();
-    $sdn = preg_match('/^\s*(.*?)\s*,/', $sdn, $parts) ? $parts[1] : '???';
-    log_debug('(%s): [%s] := (%s)', $sdn, $name, $val);
-
-    return $at;
-}
-
-
-function cond_set (&$obj, $name, $val) {
-    $has = has_attr($obj, $name);
-    $node = get_attr_node($obj, $name);
-    if ($node['desc']['disable'])
-        return 0;
-    if (! $has)
-        set_attr($obj, $name, $val);
-    return $has;
-}
-
-
-function init_attr (&$obj, $name, $val) {
-    $at =& get_attr_node($obj, $name);
-    $val = nvl($val);
-    if ($val == '') {
-        $at['state'] = 'empty';
-        $at['val'] = $at['old'] = ''; # FIXME Dangerous?
-    } else {
-        $at['val'] = $at['old'] = $val;
-        $at['state'] = 'orig';
-    }
-    #if (isset($at['entry']))
-    #    $at['entry']->set_text($at->{val});
+    if (!isset($obj['attrs'][$name]))
+        error_page(_T('attribute "%s" undefined in object "%s"', $name, $obj['type']));
+    return nvl($obj['attrs'][$name]['val']);
 }
 
 
@@ -366,13 +218,12 @@ function obj_read (&$obj, $srv, $filter) {
         return $res['error'] ? $res['error'] : 'not found';
     }
     $obj['ldap'][$srv] = $res['data'];
-    $ldap =& $obj['ldap'][$srv];
 
     foreach ($obj['attrs'] as $name => &$at) {
-        if ($at['state'] == 'empty' && isset($at['desc']['ldap'][$srv])) {
+        if (isset($at['desc']['ldap'][$srv])) {
             $val = call_user_func ($at['desc']['ldap_read'], $at, $srv,
                                     $obj['ldap'][$srv], $at['desc']['ldap'][$srv]);
-            init_attr($obj, $name, $val);
+            $at['val'] = nvl($val);
         }
     }
 
