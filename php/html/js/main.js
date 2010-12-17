@@ -61,6 +61,12 @@ function user_load(user_sm, row_idx, rec) {
     Ext.Msg.alert('hihi','user load');
 }
 
+function user_save() {
+}
+
+function user_revert() {
+}
+
 function create_user_list() {
     return {
         xtype: 'grid',
@@ -89,9 +95,15 @@ function create_user_list() {
 }
 
 function create_user_desc() {
-    return {
-        html: 'user desc'
-    };
+    return create_obj_desc({
+        obj_name: 'user',
+        url: 'user-write.php',
+        label_id: 'title_user_name',
+        save_handler: user_save,
+        save_id: 'btn_usr_save',
+        revert_handler: user_revert,
+        revert_id: 'btn_usr_revert'
+    });
 }
 
 /////////////////////////////////////////////////////////
@@ -137,6 +149,12 @@ function group_load(user_sm, row_idx, rec) {
     Ext.Msg.alert('hihi','group load');
 }
 
+function group_save() {
+}
+
+function group_revert() {
+}
+
 function create_group_list() {
     return {
         xtype: 'grid',
@@ -160,9 +178,15 @@ function create_group_list() {
 }
 
 function create_group_desc() {
-    return {
-        html: 'group desc'
-    };
+    return create_obj_desc({
+        obj_name: 'group',
+        url: 'group-write.php',
+        label_id: 'title_group_name',
+        save_handler: group_save,
+        save_id: 'btn_grp_save',
+        revert_handler: group_revert,
+        revert_id: 'btn_grp_revert'
+    });
 }
 
 /////////////////////////////////////////////////////////
@@ -233,100 +257,18 @@ function create_mailgroup_list() {
     };
 }
 
-function create_mailgroup_desc() {
-
-    items1 = [{
-        xtype: 'textfield',
-        name: 'cn',
-        fieldLabel: _T('Mailgroup name')
-    }];
-    tab1 = {
-        title: _T('Attributes'),
-        autoScroll: true,
-        defaults: { anchor: '-20' },
-        items: items1
-    };
-    tabs = [ tab1 ];
-
-    //for (var tabname in gui_attrs
-/*
-	for (@{$gui_attrs{mailgroup}}) {
-		my ($tab_name, @tab_attrs) = @$_;
-		my $scroll = Gtk2::ScrolledWindow->new(undef, undef);
-		$tabs->append_page($scroll, _T($tab_name));
-		$scroll->set_policy('automatic', 'automatic');
-		$scroll->set_border_width(0);
-
-		my $abox = Gtk2::Table->new($#tab_attrs + 1, 3);
-		$scroll->add_with_viewport($abox);
-
-		for my $r (0 .. $#tab_attrs) {
-			next unless attribute_enabled('mailgroup', $tab_attrs[$r]);
-			my $at = setup_attr($mgrp, $tab_attrs[$r], 1);
-			$at->{tab_book} = $tabs;
-			$at->{tab_page} = $tab_no;
-			$abox->attach($at->{bulb}, 0, 1, $r, $r+1, [], [], 1, 1) if $at->{bulb};
-			$abox->attach($at->{label}, 1, 2, $r, $r+1, [], [], 1, 1);
-			my $right = 4;
-			if ($at->{popup}) {
-				$abox->attach($at->{popup}, 3, 4, $r, $r+1, [], [], 1, 1);
-				$right = 3;
-			}
-			$abox->attach($at->{entry}, 2, $right, $r, $r+1, [ 'fill', 'expand' ], [], 1, 1);
-			$at->{entry}->signal_connect(key_release_event => sub { mailgroup_entry_edited($at) });
-		}
-
-		$tab_no++;
-	}
-*/
-
-
-    return {
-        layout: 'border',
-        items: [{
-            region: 'north',
-            margins: '5 5 5 5',
-            xtype: 'label',
-            text: '?',
-            style: 'font-weight: bold; text-align: center',
-            id: 'title_mailgroup_name'
-        },{
-            region: 'center',
-            margins: '0 0 0 0',
-            xtype: 'form',
-            layout: 'fit',
-            url: 'mailgroup-write.php',
-            frame: true,
-            items: [{
-                xtype: 'tabpanel',
-                activeItem: 0,
-                anchor: '100% 100%',
-                deferredRender: false,
-                defaults: {
-                    layout: 'form',
-                    labelWidth: 160,
-                    defaultType: 'textfield',
-                    bodyStyle: 'padding:5px',
-                    hideMode: 'offsets'
-                },
-                items: tabs
-            }],
-            buttons: [{
-		        text: _T('Save'),
-		        icon: 'images/apply.png',
-		        scale: 'medium',
-		        handler: mailgroup_save,
-		        id: 'btn_mgrp_save'
-		    },{
-		        text: _T('Revert'),
-		        icon: 'images/revert.png',
-		        scale: 'medium',
-		        handler: mailgroup_revert,
-		        id: 'btn_mgrp_revert'
-            }]
-        }]
-    };
+function create_mailgroup_desc(cfg) {
+    return create_obj_desc({
+        obj_name: 'mailgroup',
+        url: 'mailgroup-write.php',
+        label_id: 'title_mailgroup_name',
+        save_handler: mailgroup_save,
+        save_id: 'btn_mgrp_save',
+        revert_handler: mailgroup_revert,
+        revert_id: 'btn_mgrp_revert'
+    });
 }
+
 
 /////////////////////////////////////////////////////////
 // AJAX indicator
@@ -367,6 +309,115 @@ AjaxIndicator = Ext.extend(Ext.Button, {
 /////////////////////////////////////////////////////////
 // main
 //
+
+Ext.form.FillerField = Ext.extend(Ext.form.TextField, {
+});
+Ext.reg('fillerfield', Ext.form.FillerField);
+
+popup_functions = {
+    yesno: 'create_yesno_chooser',
+    gid: 'create_group_chooser',
+    groups: 'create_user_groups_editor',
+    users: 'create_group_users_editor',
+    mgroups: 'create_user_mail_groups_editor',
+    mailusers: 'create_mailgroup_users_editor'
+};
+
+Ext.form.PopupField = Ext.extend(Ext.form.TriggerField, {
+    onTriggerClick: function() {
+        func = popup_functions[this._desc.popup];
+        Ext.Msg.alert('popup', func);
+    }
+});
+Ext.reg('popupfield', Ext.form.PopupField);
+
+
+function create_obj_desc(cfg) {
+
+    form_attrs = gui_attrs[cfg.obj_name];
+    tabs = [];
+
+    for (i = 0; i < form_attrs.length; i++) {
+        tab_name = form_attrs[i][0];
+        tab_attrs = form_attrs[i][1];
+        items = [];
+        tab = {
+            title: _T(tab_name),
+            autoScroll: true,
+            defaults: { anchor: '-20' },
+            items: items
+        };
+        tabs.push(tab);
+        for (j = 0; j < tab_attrs.length; j++) {
+            attr_name = tab_attrs[j];
+            desc = all_attrs[cfg.obj_name][attr_name];
+            if (desc.disable)
+                continue;
+            if (!desc) {
+                Ext.Msg.alert(_T('attribute "%s" in object "%s" not defined', attr_name, cfg.obj_name));
+                continue;
+            }
+            field = {
+                xtype: desc.popup ? 'popupfield' : 'fillerfield',
+                fieldLabel: desc.label,
+                readonly: desc.readonly,
+                _desc: desc
+            };
+            if (desc.type == 'pass' && !config.show_password)
+                field.inputType = 'password';
+			//signal_connect(key_release_event => sub { mailgroup_entry_edited($at) });
+			items.push(field);
+		}
+	}
+
+    panel = {
+        layout: 'border',
+        items: [{
+            region: 'north',
+            margins: '5 5 5 5',
+            xtype: 'label',
+            text: '?',
+            style: 'font-weight: bold; text-align: center',
+            id: cfg.label_id
+        },{
+            region: 'center',
+            margins: '0 0 0 0',
+            xtype: 'form',
+            layout: 'fit',
+            url: cfg.url,
+            frame: true,
+            items: [{
+                xtype: 'tabpanel',
+                activeItem: 0,
+                anchor: '100% 100%',
+                deferredRender: false,
+                defaults: {
+                    layout: 'form',
+                    labelWidth: 160,
+                    defaultType: 'textfield',
+                    bodyStyle: 'padding:5px',
+                    hideMode: 'offsets'
+                },
+                items: tabs
+            }],
+            buttons: [{
+		        text: _T('Save'),
+		        icon: 'images/apply.png',
+		        scale: 'medium',
+		        handler: cfg.save_handler,
+		        id: cfg.save_id
+		    },{
+		        text: _T('Revert'),
+		        icon: 'images/revert.png',
+		        scale: 'medium',
+		        handler: cfg.revert_handler,
+		        id: cfg.revert_id
+            }]
+        }]
+    };
+
+    return panel;
+}
 
 function gui_exit() {
 	if (user_obj.changed || group_obj.changed) {
@@ -527,7 +578,7 @@ function main() {
             region: 'center',
             margins: '0 0 0 0',
             xtype: 'tabpanel',
-            activeTab: 2,
+            activeTab: 0,
             items: [ users_tab, groups_tab, mailgroups_tab ]
         }]
     });

@@ -367,17 +367,17 @@ $gui_attrs = array(
                 'givenName', 'sn', 'cn', 'uid', 'mail', 'password', 'password2',
                 'uidNumber', 'gidNumber', 'moreGroups', 'homeDirectory', 'telnum'
 		)),
-		array( 'Windows', array(
+		/*array( 'Windows', array(
                 'ntUserHomeDir', 'ntUserHomeDirDrive',
                 'ntUserProfile', 'ntUserScriptPath',
                 'userPrincipalName'
 		)),
-		array( 'Extended', array(
+		array( 'Extended', array(/*
                 'telephoneNumber', 'facsimileTelephoneNumber',
                 'aliases', 'mailgroups',
                 'domainIntercept', 'userIntercept',
                 'real_uidn', 'real_gidn', 'loginShell'
-		)),
+		))*/
 	),
 	'group' => array(
 		array( 'Common', array(
