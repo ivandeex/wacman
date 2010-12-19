@@ -231,57 +231,17 @@ function btn_id (cfg, op) {
     return 'btn_' + cfg.short_name + '_' + op;
 }
 
-function west_region (w, width) {
-    w.region = 'west';
-    w.split = true;
-    w.collapsible = true;
-    w.collapseMode = 'mini';
-    w.width = width;
-    w.minSize = 50;
-    return w;
-}
-
-function center_region (w) {
-    w.region = 'center';
-    return w;
-}
-
-function create_obj_list (cfg) {
-    var list = {
-        xtype: 'grid',
-        store: cfg.store,
-        colModel: new Ext.grid.ColumnModel({
-            columns: cfg.list_columns
-        }),
-        selModel: new Ext.grid.RowSelectionModel({
-            singleSelect: true,
-            listeners: {
-                rowdeselect: cfg.list_handler_change,
-                rowselect: cfg.list_handler_select
-            }
-        })
-    };
-    return list;
-}
-
-function create_obj_desc (cfg) {
+function create_obj_tab (cfg) {
 
     var form_attrs = gui_attrs[cfg.obj_name];
     if (! form_attrs)
-        return {};
-    var tabs = [];
+        return null;
+    var desc_tabs = [];
 
     for (i = 0; i < form_attrs.length; i++) {
         var tab_name = form_attrs[i][0];
         var tab_attrs = form_attrs[i][1];
-        var items = [];
-        var tab = {
-            title: _T(tab_name),
-            autoScroll: true,
-            defaults: { anchor: '-20' },
-            items: items
-        };
-        tabs.push(tab);
+        var fields = [];
         for (j = 0; j < tab_attrs.length; j++) {
             var attr_name = tab_attrs[j];
             var desc = all_attrs[cfg.obj_name][attr_name];
@@ -292,7 +252,7 @@ function create_obj_desc (cfg) {
                 continue;
             }
             var field = {
-                xtype: desc.popup ? 'popupfield' : 'fillerfield',
+                xtype: 'textfield', //desc.popup ? 'popupfield' : 'fillerfield',
                 fieldLabel: desc.label,
                 readonly: desc.readonly,
                 _desc: desc
@@ -300,12 +260,24 @@ function create_obj_desc (cfg) {
             if (desc.type == 'pass' && !config.show_password)
                 field.inputType = 'password';
 			//signal_connect(key_release_event => sub { mailgroup_entry_edited($at) });
-			items.push(field);
+			fields.push(field);
 		}
+		if (fields.length) {
+            desc_tabs.push({
+                title: _T(tab_name),
+                autoScroll: true,
+                defaults: { anchor: '-20' },
+                items: fields
+            });
+        }
 	}
 
-    var panel = {
+    if (! desc_tabs.length)
+        return null;
+
+    var desc_panel = {
         layout: 'border',
+        region: 'center',
         items: [{
             region: 'north',
             margins: '5 5 5 5',
@@ -328,11 +300,12 @@ function create_obj_desc (cfg) {
                 defaults: {
                     layout: 'form',
                     labelWidth: 160,
+                    labelSeparator: '',
                     defaultType: 'textfield',
                     bodyStyle: 'padding:5px',
                     hideMode: 'offsets'
                 },
-                items: tabs
+                items: desc_tabs
             }],
             buttons: [{
 		        text: _T('Save'),
@@ -345,22 +318,36 @@ function create_obj_desc (cfg) {
 		        icon: 'images/revert.png',
 		        scale: 'medium',
 		        handler: cfg.revert_handler,
-		        id: btn_id(cfg, 'load')
+		        id: btn_id(cfg, 'revert')
             }]
         }]
     };
 
-    return panel;
-}
+    var list_panel = {
+        xtype: 'grid',
+        store: cfg.store,
+        colModel: new Ext.grid.ColumnModel({
+            columns: cfg.list_columns
+        }),
+        selModel: new Ext.grid.RowSelectionModel({
+            singleSelect: true,
+            listeners: {
+                rowdeselect: cfg.list_handler_change,
+                rowselect: cfg.list_handler_select
+            }
+        }),
+        region: 'west',
+        split: true,
+        collapsible: true,
+        collapseMode: 'mini',
+        width: cfg.list_width,
+        minSize: 50
+    };
 
-function create_obj_tab (cfg) {
-    var tab = {
+    var obj_tab = {
         title: _T(cfg.tab_title),
         layout: 'border',
-        items: [
-            west_region(create_obj_list(cfg), cfg.list_width),
-            center_region(create_obj_desc(cfg))
-        ],
+        items: [ list_panel, desc_panel ],
         bbar: {
             xtype: 'toolbar',
             items: [
@@ -391,7 +378,8 @@ function create_obj_tab (cfg) {
             }]
         }
     };
-    return tab;
+
+    return obj_tab;
 }
 
 /////////////////////////////////////////////////////////
@@ -412,10 +400,11 @@ function gui_exit() {
 
 function main() {
     hide_preloader();
+    var tabs = [];
 
     var user_tab = create_obj_tab({
         obj_name: 'user',
-        tab_title: ' User ',
+        tab_title: ' Users ',
         store: user_store,
         url: 'user-write.php',
         label_id: 'title_user_name',
@@ -439,10 +428,12 @@ function main() {
         handler_delete: user_delete,
         handler_refresh: users_refresh
     });
+    if (user_tab != null)
+        tabs.push(user_tab);
 
     var group_tab = create_obj_tab({
         obj_name: 'group',
-        tab_title: ' Group ',
+        tab_title: ' Groups ',
         store: group_store,
         url: 'group-write.php',
         label_id: 'title_group_name',
@@ -461,10 +452,12 @@ function main() {
         handler_delete: group_delete,
         handler_refresh: groups_refresh
     });
+    if (group_tab != null)
+        tabs.push(group_tab);
 
     var mailgroup_tab = create_obj_tab({
-        obj_name: 'group',
-        tab_title: ' Mail Group ',
+        obj_name: 'mailgroup',
+        tab_title: ' Mail groups ',
         store: mailgroup_store,
         url: 'mailgroup-write.php',
         label_id: 'title_group_name',
@@ -483,6 +476,8 @@ function main() {
         handler_delete: mailgroup_delete,
         handler_refresh: mailgroups_refresh
     });
+    if (mailgroup_tab != null)
+        tabs.push(mailgroup_tab);
 
     new Ext.Viewport({
         defaults: {
@@ -500,7 +495,7 @@ function main() {
             margins: '0 0 0 0',
             xtype: 'tabpanel',
             activeTab: 0,
-            items: [ user_tab, group_tab, mailgroup_tab ]
+            items: tabs
         }]
     });
 
