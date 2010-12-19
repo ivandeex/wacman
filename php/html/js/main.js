@@ -238,23 +238,25 @@ function create_obj_tab (cfg) {
         return null;
     var desc_tabs = [];
 
-    for (i = 0; i < form_attrs.length; i++) {
+    for (var i = 0; i < form_attrs.length; i++) {
         var tab_name = form_attrs[i][0];
         var tab_attrs = form_attrs[i][1];
         var fields = [];
-        for (j = 0; j < tab_attrs.length; j++) {
+        for (var j = 0; j < tab_attrs.length; j++) {
             var attr_name = tab_attrs[j];
             var desc = all_attrs[cfg.obj_name][attr_name];
-            if (desc.disable)
-                continue;
             if (!desc) {
                 Ext.Msg.alert(_T('attribute "%s" in object "%s" not defined', attr_name, cfg.obj_name));
                 continue;
             }
+            if (desc.disable)
+                continue;
             var field = {
                 xtype: 'textfield', //desc.popup ? 'popupfield' : 'fillerfield',
+                name: desc.name,
                 fieldLabel: desc.label,
                 readonly: desc.readonly,
+                //anchor: '-20',
                 _desc: desc
             };
             if (desc.type == 'pass' && !config.show_password)
@@ -265,8 +267,12 @@ function create_obj_tab (cfg) {
 		if (fields.length) {
             desc_tabs.push({
                 title: _T(tab_name),
+                layout: 'form',
                 autoScroll: true,
-                defaults: { anchor: '-20' },
+                //autoHeight: true,
+                bodyStyle: 'padding: 10px',
+                labelWidth: 150,
+                labelSeparator: '',
                 items: fields
             });
         }
@@ -275,52 +281,49 @@ function create_obj_tab (cfg) {
     if (! desc_tabs.length)
         return null;
 
+    var desc_form = {
+        region: 'center',
+        margins: '0 0 0 0',
+        layout: 'fit',
+
+        xtype: 'form',
+        url: cfg.url,
+        border: false,
+
+        items: [{
+            xtype: 'tabpanel',
+            activeItem: 0,
+            items: desc_tabs
+        }],
+
+        buttons: [{
+            text: _T('Save'),
+            icon: 'images/apply.png',
+            scale: 'medium',
+            handler: cfg.save_handler,
+            id: btn_id(cfg, 'save')
+        },{
+            text: _T('Revert'),
+            icon: 'images/revert.png',
+            scale: 'medium',
+            handler: cfg.revert_handler,
+            id: btn_id(cfg, 'revert')
+        }]
+    };
+
     var desc_panel = {
         layout: 'border',
         region: 'center',
-        items: [{
-            region: 'north',
+        items: [
+            {region: 'north',
             margins: '5 5 5 5',
             xtype: 'label',
             text: '?',
             style: 'font-weight: bold; text-align: center',
             id: cfg.label_id
-        },{
-            region: 'center',
-            margins: '0 0 0 0',
-            xtype: 'form',
-            layout: 'fit',
-            url: cfg.url,
-            frame: true,
-            items: [{
-                xtype: 'tabpanel',
-                activeItem: 0,
-                anchor: '100% 100%',
-                deferredRender: false,
-                defaults: {
-                    layout: 'form',
-                    labelWidth: 160,
-                    labelSeparator: '',
-                    defaultType: 'textfield',
-                    bodyStyle: 'padding:5px',
-                    hideMode: 'offsets'
-                },
-                items: desc_tabs
-            }],
-            buttons: [{
-		        text: _T('Save'),
-		        icon: 'images/apply.png',
-		        scale: 'medium',
-		        handler: cfg.save_handler,
-		        id: btn_id(cfg, 'save')
-		    },{
-		        text: _T('Revert'),
-		        icon: 'images/revert.png',
-		        scale: 'medium',
-		        handler: cfg.revert_handler,
-		        id: btn_id(cfg, 'revert')
-            }]
-        }]
+            }
+            ,desc_form
+        ]
     };
 
     var list_panel = {
@@ -400,7 +403,7 @@ function gui_exit() {
 
 function main() {
     hide_preloader();
-    var tabs = [];
+    var obj_tabs = [];
 
     var user_tab = create_obj_tab({
         obj_name: 'user',
@@ -429,7 +432,7 @@ function main() {
         handler_refresh: users_refresh
     });
     if (user_tab != null)
-        tabs.push(user_tab);
+        obj_tabs.push(user_tab);
 
     var group_tab = create_obj_tab({
         obj_name: 'group',
@@ -453,7 +456,7 @@ function main() {
         handler_refresh: groups_refresh
     });
     if (group_tab != null)
-        tabs.push(group_tab);
+        obj_tabs.push(group_tab);
 
     var mailgroup_tab = create_obj_tab({
         obj_name: 'mailgroup',
@@ -477,7 +480,7 @@ function main() {
         handler_refresh: mailgroups_refresh
     });
     if (mailgroup_tab != null)
-        tabs.push(mailgroup_tab);
+        obj_tabs.push(mailgroup_tab);
 
     new Ext.Viewport({
         defaults: {
@@ -495,7 +498,7 @@ function main() {
             margins: '0 0 0 0',
             xtype: 'tabpanel',
             activeTab: 0,
-            items: tabs
+            items: obj_tabs
         }]
     });
 
