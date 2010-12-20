@@ -202,7 +202,7 @@ function cond_set(obj, name, val) {
 
 function set_attr(obj, name, val) {
     if (!(name in obj.attr)) {
-        console.log(name + ": undefined attribute in set_attr()");
+        //console.log(name + ": undefined attribute in set_attr()");
         return;
     }
     val = trim(val);
