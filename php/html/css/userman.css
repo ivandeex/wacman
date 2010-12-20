@@ -28,3 +28,22 @@
     display: block;
 }
 
+.btm-button-class {
+    border-right: 1px solid  #fff;
+    border-bottom: 1px solid #fff;
+    border-radius-bottomleft: 8px;
+    -moz-border-radius-bottomleft: 8px;
+    -webkit-border-radius-bottomleft: 8px;
+    border-radius-bottomright: 8px;
+    -moz-border-radius-bottomright: 8px;
+    -webkit-border-radius-bottomright: 8px;
+    border-radius-topright: 8px;
+    -moz-border-radius-topright: 8px;
+    -webkit-border-radius-topright: 8px;
+}
+
+.btm-button-class:hover {
+    border-right: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+}
+

@@ -715,18 +715,21 @@ function create_obj_tab (cfg) {
             text: _T('Create'),
             icon: 'images/add.png',
             scale: 'medium',
+            ctCls: config.btm_button_class,
             handler: cfg.handler_add,
             id: btn_id(cfg, 'add')
         },{
             text: _T('Delete'),
             icon: 'images/delete.png',
             scale: 'medium',
+            ctCls: config.btm_button_class,
             handler: cfg.handler_delete,
             id: btn_id(cfg, 'delete')
         },{
             text: _T('Refresh'),
             icon: 'images/refresh.png',
             scale: 'medium',
+            ctCls: config.btm_button_class,
             handler: cfg.handler_refresh,
             id: btn_id(cfg, 'refresh')
         },'->',{

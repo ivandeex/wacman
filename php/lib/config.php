@@ -24,7 +24,8 @@ $config = array(
     'language'          => 'en',
     'locale'            => 'en_US.utf8',
     'show_splash'       => 0,
-    'theme_css'         => 'js/ext/resources/css/ext-all.css'
+    'theme_css'         => 'js/ext/resources/css/ext-all.css',
+    'btm_button_class'  => ''
 );
 
 function get_config($name, $defval = null) {
