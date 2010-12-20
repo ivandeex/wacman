@@ -50,9 +50,6 @@ function user_save() {
 function user_revert() {
 }
 
-function user_rework() {
-}
-
 function user_entry_edited (entry, ev) {
     if (trim(entry.getValue()) != entry._attr.val) {
         var obj = entry._attr.obj;
@@ -110,9 +107,6 @@ function group_save() {
 }
 
 function group_revert() {
-}
-
-function group_rework(obj) {
 }
 
 function group_entry_edited (entry, ev) {
@@ -173,9 +167,6 @@ function mailgroup_save() {
 function mailgroup_revert() {
 }
 
-function mailgroup_rework(obj) {
-}
-
 function mailgroup_entry_edited (entry, ev) {
     if (trim(entry.getValue()) != entry._attr.val) {
         var obj = entry._attr.obj;
@@ -184,6 +175,95 @@ function mailgroup_entry_edited (entry, ev) {
         obj_put_form(obj);
         Ext.getCmp('mailgroup_label').setText(obj.attr['uid'].val);
     }
+}
+
+/////////////////////////////////////////////////////////
+// Rework
+//
+
+function get_attr(obj, name) {
+    return obj.attr[name].val;
+}
+
+function set_attr(obj, name, val) {
+    val = trim(val);
+    at = obj.attr[name];
+    if (at.val == val || at.desc.disable)
+        return;
+    at.val = val;
+	if (val == '') {
+		at.state = 'empty';
+	} else if (val == at.old) {
+		at.state = 'orig';
+	} else if (val == at.entry.getValue()) {
+		at.state = 'user';
+	} else {
+		at.state = 'calc';
+	}
+}
+
+function has_attr(obj, name) {
+    at = obj.attr[name];
+    switch (at.state) {
+        case 'force':
+        case 'empty':
+        case 'calc':
+            return false;
+        case 'user':
+        case 'orig':
+            return true;
+        default:
+            return trim(at.val) != '';
+    }
+}
+
+function cond_set(obj, name, val) {
+    at = obj.attr[name];
+    if (at.desc.disable)
+        return false;
+    has = has_attr(obj, name);
+    if (! has)
+        set_attr(obj, name, val);
+	return $has;
+}
+
+function trim(s) {
+    return s.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
+}
+
+String.prototype.translate = function(from,to) {
+    var sl = this.length;
+    var tl = to.length;
+    var xlat = new Array();
+    var str = '';
+    if (sl<1 || tl<1) return this;
+    for (var i=0; i<256; xlat[i]=i, i++);
+    for (var i=0; i<tl; i++)
+        xlat[ from.charCodeAt(i) ] = to.charCodeAt(i);
+    for (var i=0; i<sl; i++)
+        str += String.fromCharCode( xlat[ this.charCodeAt(i) ] );
+    return str;
+}
+
+function string2id(s) {
+    //tr/\x{410}\x{411}\x{412}\x{413}\x{414}\x{415}\x{416}\x{417}\x{418}\x{419}\x{41a}\x{41b}\x{41c}\x{41d}\x{41e}\x{41f}\x{420}\x{421}\x{422}\x{423}\x{424}\x{425}\x{426}\x{427}\x{428}\x{429}\x{42a}\x{42b}\x{42c}\x{42d}\x{42e}\x{42f}/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
+    //tr/\x{430}\x{431}\x{432}\x{433}\x{434}\x{435}\x{436}\x{437}\x{438}\x{439}\x{43a}\x{43b}\x{43c}\x{43d}\x{43e}\x{43f}\x{440}\x{441}\x{442}\x{443}\x{444}\x{445}\x{446}\x{447}\x{448}\x{449}\x{44a}\x{44b}\x{44c}\x{44d}\x{44e}\x{44f}/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
+	s = s.toLowerCase(trim(s));
+    //s/\s+/ /g;
+	//tr/0-9a-z/_/cs;
+	var maxlen = 16;
+	if (s.length > maxlen)
+	    s = s.substr(0, maxlen);
+	return s;
+}
+
+function user_rework(obj) {
+}
+
+function group_rework(obj) {
+}
+
+function mailgroup_rework(obj) {
 }
 
 /////////////////////////////////////////////////////////
@@ -226,10 +306,6 @@ function _T() {
 
 function test_msg(e) {
     Ext.Msg.alert('hihi','hohoho');
-}
-
-function trim(str) {
-    return str.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
 }
 
 /////////////////////////////////////////////////////////
