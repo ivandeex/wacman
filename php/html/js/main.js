@@ -54,8 +54,8 @@ function user_entry_edited (entry, ev) {
     var val = trim(entry.getValue());
     if (val != entry._attr.val) {
         var obj = entry._attr.obj;
+        obj_setup_form(obj);
         set_attr(obj, entry._attr.desc.name, val);
-        obj_get_form(obj);
         user_rework(obj);
         obj_put_form(obj);
         Ext.getCmp('user_label').setText(obj.attr['uid'].val + ' (' + obj.attr['cn'].val + ')');
@@ -112,9 +112,11 @@ function group_revert() {
 }
 
 function group_entry_edited (entry, ev) {
-    if (trim(entry.getValue()) != entry._attr.val) {
+    var val = trim(entry.getValue());
+    if (val != entry._attr.val) {
         var obj = entry._attr.obj;
-        obj_get_form(obj);
+        obj_setup_form(obj);
+        set_attr(obj, entry._attr.desc.name, val);
         group_rework(obj);
         obj_put_form(obj);
         Ext.getCmp('group_label').setText(obj.attr['cn'].val);
@@ -170,9 +172,11 @@ function mailgroup_revert() {
 }
 
 function mailgroup_entry_edited (entry, ev) {
-    if (trim(entry.getValue()) != entry._attr.val) {
+    var val = trim(entry.getValue());
+    if (val != entry._attr.val) {
         var obj = entry._attr.obj;
-        obj_get_form(obj);
+        obj_setup_form(obj);
+        set_attr(obj, entry._attr.desc.name, val);
         mailgroup_rework(obj);
         obj_put_form(obj);
         Ext.getCmp('mailgroup_label').setText(obj.attr['uid'].val);
@@ -340,7 +344,9 @@ function get_obj_config (obj, what, override) {
 	return dn;
 }
 
-function obj_get_form (obj) {
+function obj_setup_form (obj) {
+    if (obj.form_is_setup)
+        return;
     for (var name in obj.attr) {
         attr = obj.attr[name];
         if (attr.desc.disable)
@@ -349,13 +355,15 @@ function obj_get_form (obj) {
             attr.entry = Ext.getCmp(attr.id);
         attr.val = trim(attr.entry.getValue());
     }
+    obj.form_is_setup = true;
 }
 
 function obj_put_form (obj) {
     for (var name in obj.attr) {
         var attr = obj.attr[name];
         if (! attr.desc.disable && ('entry' in attr)) {
-            attr.entry.setValue(attr.val);
+            if (attr.val != trim(attr.entry.getValue()))
+                attr.entry.setValue(attr.val);
         }
     }
 }
@@ -575,6 +583,7 @@ function create_obj_tab (cfg) {
         return null;
     cfg.obj.name = cfg.obj_name;
     cfg.obj.attr = {};
+    cfg.obj.form_is_setup = false;
     var desc_tabs = [];
 
     for (var i = 0; i < form_attrs.length; i++) {
