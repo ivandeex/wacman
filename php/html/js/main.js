@@ -22,11 +22,9 @@ var user_store = new Ext.data.Store({
 });
 
 function user_add() {
-    test_msg();
 }
 
 function user_delete() {
-    test_msg();
 }
 
 function users_refresh() {
@@ -57,8 +55,9 @@ function user_entry_edited (entry, ev) {
         obj_setup_form(obj);
         set_attr(obj, entry._attr.desc.name, val);
         user_rework(obj);
-        obj_put_form(obj);
-        Ext.getCmp('user_label').setText(obj.attr['uid'].val + ' (' + obj.attr['cn'].val + ')');
+        update_obj_gui(obj);
+        Ext.getCmp('user_panel').setTitle(
+                get_attr(obj, 'uid') + ' (' + get_attr(obj, 'cn') + ')');
     }
 }
 
@@ -83,11 +82,9 @@ var group_store = new Ext.data.Store({
 });
 
 function group_add() {
-    test_msg();
 }
 
 function group_delete() {
-    test_msg();
 }
 
 function groups_refresh() {
@@ -118,8 +115,8 @@ function group_entry_edited (entry, ev) {
         obj_setup_form(obj);
         set_attr(obj, entry._attr.desc.name, val);
         group_rework(obj);
-        obj_put_form(obj);
-        Ext.getCmp('group_label').setText(obj.attr['cn'].val);
+        update_obj_gui(obj);
+        Ext.getCmp('group_panel').setTitle(get_attr(obj, 'cn'));
     }
 }
 
@@ -143,11 +140,9 @@ var mailgroup_store = new Ext.data.Store({
 });
 
 function mailgroup_add() {
-    test_msg();
 }
 
 function mailgroup_delete() {
-    test_msg();
 }
 
 function mailgroups_refresh() {
@@ -178,8 +173,8 @@ function mailgroup_entry_edited (entry, ev) {
         obj_setup_form(obj);
         set_attr(obj, entry._attr.desc.name, val);
         mailgroup_rework(obj);
-        obj_put_form(obj);
-        Ext.getCmp('mailgroup_label').setText(obj.attr['uid'].val);
+        update_obj_gui(obj);
+        Ext.getCmp('mailgroup_panel').setTitle(get_attr(obj, 'uid'));
     }
 }
 
@@ -358,7 +353,7 @@ function obj_setup_form (obj) {
     obj.form_is_setup = true;
 }
 
-function obj_put_form (obj) {
+function update_obj_gui (obj) {
     for (var name in obj.attr) {
         var attr = obj.attr[name];
         if (! attr.desc.disable && ('entry' in attr)) {
@@ -528,10 +523,6 @@ function _T() {
 	return message;
 };
 
-function test_msg(e) {
-    Ext.Msg.alert('hihi','hohoho');
-}
-
 /////////////////////////////////////////////////////////
 // AJAX indicator
 //
@@ -572,8 +563,8 @@ AjaxIndicator = Ext.extend(Ext.Button, {
 // GUI
 //
 
-function btn_id (cfg, op) {
-    return 'btn_' + cfg.short_name + '_' + op;
+function btn_id (obj, op) {
+    return 'btn_' + obj.short_name + '_' + op;
 }
 
 function create_obj_tab (cfg) {
@@ -582,6 +573,7 @@ function create_obj_tab (cfg) {
     if (! form_attrs)
         return null;
     cfg.obj.name = cfg.obj_name;
+    cfg.obj.short_name = cfg.short_name;
     cfg.obj.attr = {};
     cfg.obj.form_is_setup = false;
     var desc_tabs = [];
@@ -677,24 +669,22 @@ function create_obj_tab (cfg) {
     };
 
     var desc_panel = {
-        layout: 'border',
         region: 'center',
-        items: [{region: 'north',
-            margins: '5 5 5 5',
-            xtype: 'label',
-            text: '?',
-            style: 'font-weight: bold; text-align: center',
-            id: cfg.label_id
-        }, desc_form
-        ]
+        title: '...',
+        layout: 'fit',
+        id: cfg.obj_name + '_panel',
+        items: [ desc_form ]
     };
 
     var list_panel = {
         xtype: 'grid',
         store: cfg.store,
+        title: _T(cfg.tab_title),
+
         colModel: new Ext.grid.ColumnModel({
             columns: cfg.list_columns
         }),
+
         selModel: new Ext.grid.RowSelectionModel({
             singleSelect: true,
             listeners: {
@@ -702,6 +692,7 @@ function create_obj_tab (cfg) {
                 rowselect: cfg.list_handler_select
             }
         }),
+
         region: 'west',
         split: true,
         collapsible: true,
@@ -767,7 +758,6 @@ function main() {
         store: user_store,
         obj: user_obj,
         url: 'user-write.php',
-        label_id: 'user_label',
         save_handler: user_save,
         revert_handler: user_revert,
         list_width: 300,
@@ -798,7 +788,6 @@ function main() {
         store: group_store,
         obj: group_obj,
         url: 'group-write.php',
-        label_id: 'group_label',
         save_handler: group_save,
         revert_handler: group_revert,
         list_width: 150,
@@ -824,7 +813,6 @@ function main() {
         store: mailgroup_store,
         obj: mailgroup_obj,
         url: 'mailgroup-write.php',
-        label_id: 'mailgroup_label',
         save_handler: mailgroup_save,
         revert_handler: mailgroup_revert,
         list_width: 150,
