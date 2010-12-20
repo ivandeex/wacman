@@ -59,10 +59,10 @@ function setup_all_attrs () {
             if ($desc['checkbox'])
                 $desc['popup'] = 'yesno';
 			
-            if (! isset($desc['default'])) {
+            if (! isset($desc['defval'])) {
                 $cfg_def = "default_value_${objtype}_${name}";
                 if (isset($config[$cfg_def]))
-                    $desc['default'] = $config[$cfg_def];
+                    $desc['defval'] = $config[$cfg_def];
             }
 
             if (! isset($desc['conv']))

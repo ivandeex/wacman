@@ -51,8 +51,10 @@ function user_revert() {
 }
 
 function user_entry_edited (entry, ev) {
-    if (trim(entry.getValue()) != entry._attr.val) {
+    var val = trim(entry.getValue());
+    if (val != entry._attr.val) {
         var obj = entry._attr.obj;
+        set_attr(obj, entry._attr.desc.name, val);
         obj_get_form(obj);
         user_rework(obj);
         obj_put_form(obj);
@@ -182,29 +184,49 @@ function mailgroup_entry_edited (entry, ev) {
 //
 
 function get_attr(obj, name) {
+    if (!(name in obj.attr)) {
+        //console.log(name + ": undefined attribute in get_attr()");
+        return '';
+    }
     return obj.attr[name].val;
 }
 
+function cond_set(obj, name, val) {
+    if (!(name in obj.attr)) {
+        //console.log(name + ": undefined attribute in cond_set()");
+        return;
+    }
+    at = obj.attr[name];
+    if (! at.desc.disable && ! has_attr(obj, name))
+        set_attr(obj, name, val);
+}
+
 function set_attr(obj, name, val) {
+    if (!(name in obj.attr)) {
+        console.log(name + ": undefined attribute in set_attr()");
+        return;
+    }
     val = trim(val);
     at = obj.attr[name];
     if (at.val == val || at.desc.disable)
         return;
     at.val = val;
-	if (val == '') {
-		at.state = 'empty';
-	} else if (val == at.old) {
-		at.state = 'orig';
-	} else if (val == at.entry.getValue()) {
-		at.state = 'user';
-	} else {
-		at.state = 'calc';
-	}
+    if (val == '')
+        at.state = 'empty';
+    else if (val == at.old)
+        at.state = 'orig';
+    else if (('entry' in at) && (val == at.entry.getValue()))
+        at.state = 'user';
+    else
+        at.state = 'calc';
 }
 
 function has_attr(obj, name) {
-    at = obj.attr[name];
-    switch (at.state) {
+    if (!(name in obj.attr)) {
+        //console.log(name + ": undefined attribute in has_attr()");
+        return false;
+    }
+    switch (obj.attr[name].state) {
         case 'force':
         case 'empty':
         case 'calc':
@@ -213,57 +235,249 @@ function has_attr(obj, name) {
         case 'orig':
             return true;
         default:
-            return trim(at.val) != '';
+            return trim(obj.attr[name].val) != '';
     }
 }
 
-function cond_set(obj, name, val) {
-    at = obj.attr[name];
-    if (at.desc.disable)
-        return false;
-    has = has_attr(obj, name);
-    if (! has)
-        set_attr(obj, name, val);
-	return $has;
-}
-
 function trim(s) {
+    s = (s == undefined ? '' : '' + s);
     return s.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
 }
 
-String.prototype.translate = function(from,to) {
-    var sl = this.length;
+function str_translate(s, from, to) {
+    var sl = s.length;
     var tl = to.length;
-    var xlat = new Array();
-    var str = '';
-    if (sl<1 || tl<1) return this;
-    for (var i=0; i<256; xlat[i]=i, i++);
-    for (var i=0; i<tl; i++)
-        xlat[ from.charCodeAt(i) ] = to.charCodeAt(i);
-    for (var i=0; i<sl; i++)
-        str += String.fromCharCode( xlat[ this.charCodeAt(i) ] );
-    return str;
+    var xlat = [];
+    if (sl<1 || tl<1) return s;
+    var i;
+    for (i = 0; i < 256; i++)  xlat[i] = i;
+    for (i = 0; i < tl; i++)  xlat[ from.charCodeAt(i) ] = to.charCodeAt(i);
+    var r = '';
+    for (i = 0; i < sl; i++)
+        r += String.fromCharCode( xlat[ s.charCodeAt(i) ] );
+    return r.replace(/_+/g, '_');
+}
+
+function str2bool(s) {
+    if (s == undefined || s == null)
+        return false;
+    v = trim(s).toLowerCase();
+    switch (v) {
+   	    case 'y': case 'yes': case 't': case 'true': case 'on': case 'ok': case '1':
+   	        return true;
+   	}
+    return false;
+}
+
+function bool2str(v) {
+    return str2bool(v) ? 'Yes' : 'No';
 }
 
 function string2id(s) {
-    //tr/\x{410}\x{411}\x{412}\x{413}\x{414}\x{415}\x{416}\x{417}\x{418}\x{419}\x{41a}\x{41b}\x{41c}\x{41d}\x{41e}\x{41f}\x{420}\x{421}\x{422}\x{423}\x{424}\x{425}\x{426}\x{427}\x{428}\x{429}\x{42a}\x{42b}\x{42c}\x{42d}\x{42e}\x{42f}/ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ/;
-    //tr/\x{430}\x{431}\x{432}\x{433}\x{434}\x{435}\x{436}\x{437}\x{438}\x{439}\x{43a}\x{43b}\x{43c}\x{43d}\x{43e}\x{43f}\x{440}\x{441}\x{442}\x{443}\x{444}\x{445}\x{446}\x{447}\x{448}\x{449}\x{44a}\x{44b}\x{44c}\x{44d}\x{44e}\x{44f}/abvgdewzijklmnoprstufhc4wwxyxeuq/;		
-	s = s.toLowerCase(trim(s));
-    //s/\s+/ /g;
-	//tr/0-9a-z/_/cs;
-	var maxlen = 16;
-	if (s.length > maxlen)
-	    s = s.substr(0, maxlen);
-	return s;
+    var max_id_len = 16;
+
+    // initialize conversion tables
+    if (! string2id.rus2lat) {
+        // russian to latin
+        string2id.rus2lat = [];
+        var rus_b = "\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417\u0418\u0419\u041a\u041b\u041c\u041d\u041e\u041f\u0420\u0421\u0422\u0423\u0424\u0425\u0426\u0427\u0428\u0429\u042a\u042b\u042c\u042d\u042e\u042f";
+        var lat_b = "ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ";
+        var rus_s = "\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437\u0438\u0439\u043a\u043b\u043c\u043d\u043e\u043f\u0440\u0441\u0442\u0443\u0444\u0445\u0446\u0447\u0448\u0449\u044a\u044b\u044c\u044d\u044e\u044f";
+        var lat_s = "abvgdewzijklmnoprstufhc4wwxyxeuq";
+        var i;
+        for (i = 0; i < 0x450 - 0x400; i++)
+            string2id.rus2lat[i] = i;
+        for (i = 0; i < rus_b.length; i++)
+            string2id.rus2lat[rus_b.charCodeAt(i) - 0x400] = lat_b.charCodeAt(i);
+        for (i = 0; i < rus_s.length; i++)
+            string2id.rus2lat[rus_s.charCodeAt(i) - 0x400] = lat_s.charCodeAt(i);            
+
+        // convert uppercase to lowercase latin, leave only latin and digits
+        string2id.char2id = [];
+        for (i = 0; i < 256; i++) {
+            if (i >= '0'.charCodeAt(0) && i <= '9'.charCodeAt(0))
+                string2id.char2id[i] = i;
+            else if (i >= 'a'.charCodeAt(0) && i <= 'z'.charCodeAt(0))
+                string2id.char2id[i] = i;
+            else if (i >= 'A'.charCodeAt(0) && i <= 'Z'.charCodeAt(0))
+                string2id.char2id[i] = i + 'a'.charCodeAt(0) - 'A'.charCodeAt(0);
+            else
+                string2id.char2id[i] = '_'.charCodeAt(0);
+        }
+    }
+
+    s = trim(s);
+    var n = s.length;
+    if (n > max_id_len)
+        n = max_id_len;
+
+    var r = '';
+    for (var i = 0; i < n; i++) {
+        var c = s.charCodeAt(i);
+        c = (c >= 0x400 && c < 0x450) ? string2id.rus2lat[c - 0x400] : c;
+        c = (c > 0 && c < 256) ? string2id.char2id[c] : '_';
+        r += String.fromCharCode(c);
+    }
+	return r;
 }
 
-function user_rework(obj) {
+function get_obj_config (obj, what, override) {
+    var dn = trim(what in config ? config[what] : '');
+    var name;
+	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
+		name = name[0];
+		var val = '';
+		if (override != undefined && (name in override))
+		    val = trim(override[name]);
+		if (val == '')
+		    val = get_attr(obj, name);
+		if (val == '') {
+			dn = '';
+			break;
+		}
+		dn = dn.replace(/\$\((\w+)\)/, val);
+	}
+	return dn;
 }
 
-function group_rework(obj) {
+function obj_get_form (obj) {
+    for (var name in obj.attr) {
+        attr = obj.attr[name];
+        if (attr.desc.disable)
+            continue;
+        if (! attr.entry)
+            attr.entry = Ext.getCmp(attr.id);
+        attr.val = trim(attr.entry.getValue());
+    }
 }
 
-function mailgroup_rework(obj) {
+function obj_put_form (obj) {
+    for (var name in obj.attr) {
+        var attr = obj.attr[name];
+        if (! attr.desc.disable && ('entry' in attr)) {
+            attr.entry.setValue(attr.val);
+        }
+    }
+}
+
+function obj_fill_defs (obj) {
+    for (var name in obj.attr) {
+        var desc = obj.attr[name].desc;
+        if ('defval' in desc)
+            cond_set(obj, name, desc.defval);
+        if (('copyfrom' in desc) && has_attr(obj, desc.copyfrom))
+            cond_set(obj, name, get_attr(obj, desc.copyfrom));
+    }
+}
+
+function get_next_id (which) {
+    return 1;
+}
+
+function user_rework (usr) {
+    var uid = get_attr(usr, 'uid');
+    var cn = get_attr(usr, 'cn');
+    var gn = get_attr(usr, 'givenName');
+    var sn = get_attr(usr, 'sn');
+
+    // ############# POSIX ############
+
+    // name
+    if (! has_attr(usr, 'cn'))
+        cond_set(usr, 'cn', (cn = gn + (sn && gn ? ' ' : '') + sn));
+
+    // identifier
+    if (! has_attr(usr, 'uid'))
+        uid = sn == '' ? gn : gn.substr(0, 1) + sn;
+    set_attr(usr, 'uid', (uid = string2id(uid)));
+
+    //#set_attr(usr, 'objectClass', append_list(get_attr(usr, 'objectClass'), config.unix_user_classes));
+
+    cond_set(usr, 'dn', get_obj_config(usr, 'unix_user_dn'));
+    cond_set(usr, 'ntDn', get_obj_config(usr, 'ad_user_dn'));
+    cond_set(usr, 'cgpDn', get_obj_config(usr, 'cgp_user_dn'));
+
+    // assign next available UID number
+    var uidn;
+    if (has_attr(usr, 'uidNumber')) {
+        uidn = get_attr(usr, 'uidNumber');
+        uidn = uidn.replace(/[^0-9]/g, '');
+    } else {
+        uidn = get_next_id('unix_uidn');
+    }
+    set_attr(usr, 'uidNumber', uidn);
+
+    // mail
+    if (uid != '')
+        cond_set(usr, 'mail', uid + '@' + config.mail_domain);
+
+    // home directory
+    if (uid != '')
+        cond_set(usr, 'homeDirectory', config.home_root + '/' + uid);
+
+    // ############# Active Directory ############
+
+    //#set_attr($usr, 'ntObjectClass', append_list(get_attr($usr, 'ntObjectClass'), config.ad_user_classes));
+
+    //#cond_set($usr, 'objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
+
+    cond_set(usr, 'userPrincipalName', uid+'@'+config.ad_domain);
+
+    //#var pass = get_attr(usr, 'password');
+    //#if (pass == config.OLD_PASS) {
+    //#    set_attr($usr, 'userAccountControl', get_attr($usr, 'userAccountControl', orig => 1));
+    //#} else {
+    //#    my $uac = get_attr($usr, 'userAccountControl');
+    //#    $uac = ADS_UF_NORMAL_ACCOUNT unless $uac;
+    //#    $uac &= ~(ADS_UF_PASSWD_NOT_REQUIRED | ADS_UF_DONT_EXPIRE_PASSWD);
+    //#    $uac |= $pass eq '' ? ADS_UF_PASSWD_NOT_REQUIRED : ADS_UF_DONT_EXPIRE_PASSWD;
+    //#    set_attr($usr, 'userAccountControl', $uac);
+    //#}
+
+    // ######## CommuniGate Pro ########
+    //set_attr(usr, 'cgpObjectClass', append_list(get_attr($usr, 'cgpObjectClass'), config.cgp_user_classes));
+
+    var telnum;
+    if (has_attr(usr, 'telnum')) {
+        telnum = get_attr(usr, 'telnum');
+    } else {
+        telnum = get_next_id('cgp_telnum');
+    }
+    telnum = trim(telnum);
+    while (telnum.length < 3)  telnum = '0' + telnum;
+    telnum = telnum.substr(0, 3);
+    set_attr(usr, 'telnum', telnum);
+
+    set_attr(usr, 'domainIntercept', bool2str(get_attr(usr, 'domainIntercept')) );
+    set_attr(usr, 'userIntercept', bool2str(get_attr(usr, 'userIntercept')) );
+
+    // ###### constant and copy-from fields ########
+    obj_fill_defs(usr);
+}
+
+function group_rework (grp) {
+    set_attr(grp, 'objectClass', config.unix_group_classes);
+
+    var val;
+    val = get_attr(grp, 'cn');
+    set_attr(grp, 'cn', string2id(val));
+
+    val = get_attr(grp, 'gidNumber');
+    if (! val)
+        val = get_next_id('unix_gidn');
+    val = trim(val).replace(/[^0-9]/g, '');
+    set_attr(grp, 'gidNumber', val);
+
+    set_attr(grp, 'dn', get_obj_config(grp, 'unix_group_dn'));
+}
+
+function mailgroup_rework (mgrp) {
+    set_attr(mgrp, 'uid', string2id(get_attr(mgrp, 'uid')));
+    set_attr(mgrp, 'dn', get_obj_config(mgrp, 'cgp_user_dn'));
+    cond_set(mgrp, 'cn', get_attr(mgrp, 'uid'));
+
+    // ###### constant (& not copyfrom) fields ########
+    obj_fill_defs(mgrp);
 }
 
 /////////////////////////////////////////////////////////
@@ -285,8 +499,10 @@ popup_functions = {
 
 Ext.form.PopupField = Ext.extend(Ext.form.TriggerField, {
     onTriggerClick: function() {
-        func = popup_functions[this._desc.popup];
-        Ext.Msg.alert('popup', func);
+        if (this._attr.desc.popup in popup_functions) {
+            func = popup_functions[this._attr.desc.popup];
+            Ext.Msg.alert('popup', func);
+        }
     }
 });
 Ext.reg('popupfield', Ext.form.PopupField);
@@ -352,26 +568,6 @@ function btn_id (cfg, op) {
     return 'btn_' + cfg.short_name + '_' + op;
 }
 
-function obj_get_form (obj) {
-    for (var name in obj.attr) {
-        attr = obj.attr[name];
-        if (attr.desc.disable)
-            continue;
-        if (! attr.entry)
-            attr.entry = Ext.getCmp(attr.id);
-        attr.val = attr.entry.getValue();
-    }
-}
-
-function obj_put_form (obj) {
-    for (var name in obj.attr) {
-        attr = obj.attr[name];
-        if (attr.desc.disable)
-            continue;
-        attr.entry.setValue(attr.val);
-    }
-}
-
 function create_obj_tab (cfg) {
 
     var form_attrs = gui_attrs[cfg.obj_name];
@@ -412,7 +608,7 @@ function create_obj_tab (cfg) {
                 name: desc.name,
                 fieldLabel: desc.label,
                 readonly: desc.readonly,
-                //anchor: '-20',
+                anchor: '-20',
                 id: attr.id,
                 _attr: attr,
             };

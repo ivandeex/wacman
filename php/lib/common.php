@@ -69,6 +69,7 @@ if (get_magic_quotes_gpc() && (! isset($slashes_stripped) || ! $slashes_stripped
 
 # FIXME: check for existance of userman.ini and userman.secret
 configure();
+$config['OLD_PASS'] = OLD_PASS; // for javascript
 setup_language();
 setup_all_attrs();
 #pla_session_start();

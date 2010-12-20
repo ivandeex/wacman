@@ -114,7 +114,7 @@ $all_attrs = array(
         ),
         // ======== Active Directory... ========
         'accountExpires' => array(
-            'default' => NO_EXPIRE,
+            'defval' => NO_EXPIRE,
             'ldap' => 'ads',
             'conv' => 'adtime',
             'label' => 'Expires at',
@@ -128,7 +128,7 @@ $all_attrs = array(
             'copyfrom' => 'cn',
         ),
         'instanceType' => array(
-            'default' => '4',
+            'defval' => '4',
             'ldap' => 'ads',
         ),
         'userAccountControl' => array(
@@ -173,15 +173,15 @@ $all_attrs = array(
         ),
         // ======== ntUser... ========
         'ntUserCreateNewAccount' => array(
-            'default' => 'false',
+            'defval' => 'false',
             'ldap' => 'ntuser',
         ),
         'ntUserDeleteAccount' => array(
-            'default' => 'false',
+            'defval' => 'false',
             'ldap' => 'ntuser',
         ),
         'ntUserAcctExpires' => array(
-            'default' => NO_EXPIRE,
+            'defval' => NO_EXPIRE,
             'conv' => 'adtime',
             'ldap' => 'ntuser',
         ),
@@ -209,13 +209,13 @@ $all_attrs = array(
         'lastLogoff'	=> array( 'conv' => 'adtime', ),
         'logonHours'	=> array( 'conv' => 'binary', ),
         'userParameters'=> array( 'conv' => 'binary', ),
-        'codePage'      => array( 'default' => pack('c',0), ),
-        'countryCode'   => array( 'default' => '0', ),
-        'logonCount'    => array( 'default' => '0', ),
-        'pwdLastSet'    => array( 'default' => '0', ),
+        'codePage'      => array( 'defval' => pack('c',0), ),
+        'countryCode'   => array( 'defval' => '0', ),
+        'logonCount'    => array( 'defval' => '0', ),
+        'pwdLastSet'    => array( 'defval' => '0', ),
         'objectCategory'=> array( 'disable' => 1 ),
         'samAccountType'=> array(
-            'default' => SAM_USER_OBJECT,
+            'defval' => SAM_USER_OBJECT,
             'conv' => 'decihex',
             'disable' => 1,
         ),
@@ -225,7 +225,7 @@ $all_attrs = array(
         ),
         'storageLocation' => array(
             'ldap' => 'cgp',
-            'default' => '*',
+            'defval' => '*',
         ),
         'aliases' => array(
             'type' => 'aliases',
