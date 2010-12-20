@@ -57,7 +57,7 @@ function user_entry_edited (entry, ev) {
         user_rework(obj);
         update_obj_gui(obj);
         Ext.getCmp('user_panel').setTitle(
-                get_attr(obj, 'uid') + ' (' + get_attr(obj, 'cn') + ')');
+                get_attr(obj, 'uid') + ' (' + get_attr(obj, 'cn') + ') ...');
     }
 }
 
@@ -116,7 +116,7 @@ function group_entry_edited (entry, ev) {
         set_attr(obj, entry._attr.desc.name, val);
         group_rework(obj);
         update_obj_gui(obj);
-        Ext.getCmp('group_panel').setTitle(get_attr(obj, 'cn'));
+        Ext.getCmp('group_panel').setTitle(get_attr(obj, 'cn') + ' ...');
     }
 }
 
@@ -174,7 +174,7 @@ function mailgroup_entry_edited (entry, ev) {
         set_attr(obj, entry._attr.desc.name, val);
         mailgroup_rework(obj);
         update_obj_gui(obj);
-        Ext.getCmp('mailgroup_panel').setTitle(get_attr(obj, 'uid'));
+        Ext.getCmp('mailgroup_panel').setTitle(get_attr(obj, 'uid') + ' ...');
     }
 }
 
