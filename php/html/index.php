@@ -20,8 +20,9 @@ ob_end_clean();
 <html>
 <head>
   <title>Userman</title>
-  <link rel="stylesheet" type="text/css" href="js/ext/resources/css/ext-all.css" />
-  <link rel="stylesheet" type="text/css" href="js/ext/resources/css/xtheme-gray.css" />
+<?php foreach (split_list(get_config('theme_css')) as $css): ?>
+  <link rel="stylesheet" type="text/css" href="<?php echo $css ?>" />
+<?php endforeach ?>
   <link rel="stylesheet" type="text/css" href="css/userman.css" />
   <script type="text/javascript" src="js/ext/adapter/ext/ext-base.js"></script>
   <script type="text/javascript" src="js/ext/ext-all-debug-w-comments.js"></script>

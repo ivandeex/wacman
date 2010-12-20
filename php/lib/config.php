@@ -24,6 +24,7 @@ $config = array(
     'language'          => 'en',
     'locale'            => 'en_US.utf8',
     'show_splash'       => 0,
+    'theme_css'         => 'js/ext/resources/css/ext-all.css'
 );
 
 function get_config($name, $defval = null) {

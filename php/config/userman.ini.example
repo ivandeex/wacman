@@ -35,6 +35,8 @@ passfile = /etc/userman.secret
 skel_dir = /etc/skel
 prefer_nss_ids = 0
 reserved_names = 'public,office,pubadmin,pubwrite'
+language = en
+theme_css = js/ext/resources/css/ext-all.css,js/ext/resources/css/xtheme-gray.css
 
 create_homes  = 1
 remove_homes  = 1
