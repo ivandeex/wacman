@@ -24,8 +24,9 @@ ob_end_clean();
   <link rel="stylesheet" type="text/css" href="<?php echo $css ?>" />
 <?php endforeach ?>
   <link rel="stylesheet" type="text/css" href="css/userman.css" />
-  <script type="text/javascript" src="js/ext/adapter/ext/ext-base.js"></script>
-  <script type="text/javascript" src="js/ext/ext-all-debug-w-comments.js"></script>
+<?php foreach (split_list(get_config('ext_js')) as $js): ?>
+  <script type="text/javascript" src="<?php echo $js ?>"></script>
+<?php endforeach ?>
   <script type="text/javascript" src="config-config.php"></script>
   <script type="text/javascript" src="js/main.js"></script>
 </head>
