@@ -20,6 +20,7 @@ ob_end_clean();
 <html>
 <head>
   <title>Userman</title>
+  <link rel="shortcut icon" href="userman.ico" type="image/x-icon" />
 <?php foreach (split_list(get_config('theme_css')) as $css): ?>
   <link rel="stylesheet" type="text/css" href="<?php echo $css ?>" />
 <?php endforeach ?>
