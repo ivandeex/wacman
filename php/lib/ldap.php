@@ -116,10 +116,10 @@ function uldap_convert_array (&$src) {
 }
 
 
-function uldap_get_value ($data, $name, $asarray = false) {
+function uldap_value ($data, $name, $asarray = false) {
     $src = $data;
-    if (is_array($src) && isset($src['count']) && $src['count'] == 1)
-        $src = $data[0];
+    if (is_array($src) && isset($src['count']) && $src['count'] == 1 && is_array($src[0]))
+        $src = $src[0];
     $lcname = strtolower($name);
     if (isset($src[$lcname]))
         $val = $src[$lcname];
@@ -138,8 +138,15 @@ function uldap_get_value ($data, $name, $asarray = false) {
     return $val;
 }
 
+function uldap_entries ($res) {
+    $entries = array();
+    $count = isset($res['data']['count']) ? $res['data']['count'] : 0;
+    for ($i = 0; $i < $count; $i++)
+        $entries[] = $res['data'][$i];
+    return $entries;
+}
 
-function uldap_get_dn (&$ldap) {
+function uldap_dn (&$ldap) {
     return isset($ldap[0]['dn']) ? $ldap[0]['dn'] : null;
 }
 
@@ -191,7 +198,7 @@ function ldap_write_none () {
 
 
 function ldap_read_string (&$at, $srv, $ldap, $name) {
-    return nvl(uldap_get_value($ldap, $name));
+    return nvl(uldap_value($ldap, $name));
 }
 
 
@@ -206,7 +213,7 @@ function ldap_write_string (&$at, $srv, $ldap, $name, $val) {
 			#log_debug('ldap_write_string(%s): already removed', $name);
 		}
 	} else if (uldap_exists($ldap, $name)) {
-		$old = nvl(uldap_get_value($ldap, $name));
+		$old = nvl(uldap_value($ldap, $name));
 		if ($val != $old) {
 			uldap_replace($ldap, $name, $val);
 			$changed = 1;
@@ -224,12 +231,12 @@ function ldap_write_string (&$at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_dn (&$at, $srv, $ldap, $name) {
-	return nvl(uldap_get_dn($ldap));
+	return nvl(uldap_dn($ldap));
 }
 
 
 function ldap_write_dn (&$at, $srv, $ldap, $name, $val) {
-    $prev = nvl(uldap_get_dn($ldap));
+    $prev = nvl(uldap_dn($ldap));
     $val = nvl($val);
     log_debug('ldap_write_dn(%s): attr="%s" dn="%s", prev="%s"',
                 $srv, $at['name'], $val, $prev);
@@ -241,14 +248,14 @@ function ldap_write_dn (&$at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_class (&$at, $srv, $ldap, $name) {
-    return join_list(uldap_get_value($ldap, $name));
+    return join_list(uldap_value($ldap, $name));
 }
 
 
 function ldap_write_class (&$at, $srv, $ldap, $name, $val) {
     $changed = 0;
     $ca = array();
-    foreach (uldap_get_value($ldap, $name) as $c)
+    foreach (uldap_value($ldap, $name) as $c)
         $ca[strtolower($c)] = 1;
     foreach (split_list($val) as $c) {
         if (isset($ca[strtolower($c)]))
@@ -263,12 +270,12 @@ function ldap_write_class (&$at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_unix_gidn (&$at, $srv, $ldap, $name) {
-    $val = nvl(uldap_get_value($ldap, $at['name']));
+    $val = nvl(uldap_value($ldap, $at['name']));
 	if (is_int($val)) {
         $res = uldap_search($ldap, 'uni', "(&(objectClass=posixGroup)(gidNumber=$val))");
         $grp = $res[0];
         if ($grp) {
-            $cn = uldap_get_value($grp, 'cn');
+            $cn = uldap_value($grp, 'cn');
             if (! empty($cn))
                 $val = $cn;
         } else {
@@ -280,14 +287,14 @@ function ldap_read_unix_gidn (&$at, $srv, $ldap, $name) {
 
 
 function ldap_read_real_uidn (&$at, $srv, $ldap, $name) {
-    $username = nvl(uldap_get_value($ldap, 'uid'));
+    $username = nvl(uldap_value($ldap, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['uid'];
 }
 
 
 function ldap_read_real_gidn (&$at, $srv, $ldap, $name) {
-    $username = nvl(uldap_get_value($ldap, 'uid'));
+    $username = nvl(uldap_value($ldap, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['gid'];
 }
@@ -300,7 +307,7 @@ function ldap_write_unix_gidn (&$at, $srv, $ldap, $name, $val) {
         $res = uldap_search('uni', "(&(objectClass=posixGroup)(cn=$cn))", array('gidNumber'));
         $grp = $res[0];
         if ($grp) {
-            $gidn = uldap_get_value($grp, 'gidNumber');
+            $gidn = uldap_value($grp, 'gidNumber');
             if ($gidn)
                 $val = $gidn;
         }
@@ -456,13 +463,13 @@ function ldap_write_pass_final (&$at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_unix_groups (&$at, $srv, $ldap, $name) {
-    $uid = nvl(uldap_get_value($ldap, $name));
+    $uid = nvl(uldap_value($ldap, $name));
     if (!isset($uid) || !$uid)
         $uid = get_attr($at['obj'], $name);
     $entries = uldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$uid))", array('cn'));
     $arr = array();
     foreach ($entries as $e)
-        $arr[] = uldap_get_value($e, 'cn');
+        $arr[] = uldap_value($e, 'cn');
     return join_list($arr);
 }
 
@@ -485,8 +492,8 @@ function ldap_get_unix_group_ids ($srv, $val, $warn, $asstring = false) {
     log_debug('request for "%s" is "%s"', $val, $s);
     $entries = uldap_search($srv, $s, array('cn', 'gidNumber'));
     foreach ($entries as $grp) {
-        $gidn = uldap_get_value($grp, 'gidNumber');
-        $cn = uldap_get_value($grp, 'cn');
+        $gidn = uldap_value($grp, 'gidNumber');
+        $cn = uldap_value($grp, 'cn');
         unset($h_ids[$gidn]);
         unset($h_ids[$cn]);
         $gidns[] = $gidn;
@@ -509,7 +516,7 @@ function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
         return $res['error'];
     }
     $exists = uldap_exists($grp, 'memberUid');
-    $old = $exists ? join_list(uldap_get_value($grp, 'memberUid')) : '';
+    $old = $exists ? join_list(uldap_value($grp, 'memberUid')) : '';
     $new = $action == 'add' ? append_list($old, $uid) : remove_list($old, $uid);
     $a_new = split_list($new);
     if ($old == $new) {
@@ -562,14 +569,14 @@ function ldap_write_unix_groups_final (&$at, $srv, $ldap, $name, $val) {
 
 function ldap_read_unix_members (&$at, $srv, $ldap, $name) {
     // RHDS returns uid numbers, OpenLDAP returns usernames. We handle both cases.
-    $uidns = uldap_get_value($ldap, $name, true);
+    $uidns = uldap_value($ldap, $name, true);
     log_debug('ldap_read_unix_members: "%s" is (%s)', $name, join_list($uidns));
     $uids = array();
     foreach ($uidns as $uidn) {
         if (preg_match('!^\d+$!', $uidn)) {
             $res = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
             $ue = $res['data'];
-            $uid = $ue ? nvl(uldap_get_value($ue, 'uid')) : '';
+            $uid = $ue ? nvl(uldap_value($ue, 'uid')) : '';
             $uids[] = empty($uid) ? $uidn : $uid;
         } else {
             $uids[] = $uidn;
@@ -591,7 +598,7 @@ function ldap_write_unix_members (&$at, $srv, $ldap, $name, $val) {
         }
         $entries = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
         $ue = $entries[0];
-        $uid = isset($ue) ? nvl(uldap_get_value($ue, 'uid')) : '';
+        $uid = isset($ue) ? nvl(uldap_value($ue, 'uid')) : '';
         log_debug('search for uidn="%d" returns uid="%s" (code=%s)', $uidn, $uid, $res['code']);
         if ($uid != '') {
             $h_uids[$uid] = $touched_uids[$uid] = 1;
@@ -605,12 +612,12 @@ function ldap_write_unix_members (&$at, $srv, $ldap, $name, $val) {
                 $name, $val, join_list($a_uids));
     if (empty($a_uids)) {
         if (uldap_exists($ldap, $name)) {
-            foreach (uldap_get_value($ldap, $name) as $x)
+            foreach (uldap_value($ldap, $name) as $x)
                 $touched_uids[$x] = 1;
 			uldap_delete($ldap, $name);
         }
     } else if (uldap_exists($ldap, $name)) {
-        foreach (uldap_get_value($ldap, $name) as $x)
+        foreach (uldap_value($ldap, $name) as $x)
             $touched_uids{$x} = 1;
         uldap_replace($ldap, $name, $a_uids);
     } else {
@@ -641,7 +648,7 @@ function ldap_write_unix_members_final (&$at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_aliases (&$at, $srv, $ldap, $name) {
-    $dn = nvl(uldap_get_dn($ldap));
+    $dn = nvl(uldap_dn($ldap));
     if ($dn == '')
         return '';
     $aliases = array();
@@ -649,7 +656,7 @@ function ldap_read_aliases (&$at, $srv, $ldap, $name) {
     $old_telnum = get_attr($at['obj'], 'telnum', array('orig' => 1));
     $entries = uldap_search($srv, "(&(objectClass=alias)(aliasedObjectName=$dn))", array('uid'));
     foreach ($entries as $e) {
-        $alias = uldap_get_value($e, 'uid');
+        $alias = uldap_value($e, 'uid');
         if ($old_telnum == '' && $telnum == '' && preg_match('/^\d{3}$/', $alias)) {
 			$telnum = $alias;
         } else {
@@ -703,13 +710,13 @@ function ldap_write_aliases_final (&$at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_mail_groups (&$at, $srv, $ldap, $name) {
-    $uid = nvl(uldap_get_value($ldap, 'uid'));
+    $uid = nvl(uldap_value($ldap, 'uid'));
     if ($uid == '')
         return '';
     $entries = uldap_search($srv, "(&(objectClass=CommuniGateGroup)(groupMember=$uid))", array('uid'));
     $arr = array();
     foreach ($entries as $ue)
-        $arr[] = uldap_get_value($ue, 'uid');
+        $arr[] = uldap_value($ue, 'uid');
     return join_list($arr);
 }
 
