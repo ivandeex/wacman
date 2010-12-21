@@ -306,9 +306,9 @@ function get_obj_config (obj, what, override) {
     var dn = trim(what in config ? config[what] : '');
     var name;
 	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
-		name = name[0];
+		name = name[1];
 		var val = '';
-		if (override != undefined && (name in override))
+		if (override != undefined && override != null && (name in override))
 		    val = trim(override[name]);
 		if (val == '')
 		    val = get_attr(obj, name);
@@ -570,7 +570,6 @@ AjaxIndicator = Ext.extend(Ext.Button, {
         Ext.Ajax.on('requestcomplete', function(c,r,o) { this.remReq(c,r,o); }, this);
         Ext.Ajax.on('requestexception', function(c,r,o) { this.remReq(c,r,o); }, this);
         this.hideProgress();
-        log_debug('%s: init', this.idid);
     },
 
     addReq: function (conn, o) {
