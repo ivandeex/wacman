@@ -723,15 +723,18 @@ function create_obj_tab (obj) {
             text: form_btn_prefix + _T('Save'),
             icon: 'images/apply.png',
             scale: 'medium',
+            ctCls: config.add_button_css,
             handler: function() { obj.do_save() },
             id: btn_id(obj, 'save')
         },{
             text: form_btn_prefix + _T('Revert'),
             icon: 'images/revert.png',
             scale: 'medium',
+            ctCls: config.add_button_css,
             handler: function() { obj.do_revert(); },
             id: btn_id(obj, 'revert')
-        }]
+        },
+        ' ' ]
     };
 
     var desc_panel = {
@@ -770,25 +773,25 @@ function create_obj_tab (obj) {
 
     var obj_btn_prefix = '';// + _T(obj.title) + ': ';
 
-    var obj_buttons = [{
+    var obj_buttons = [ ' ', {
             text: obj_btn_prefix  + _T('Create'),
             icon: 'images/add.png',
             scale: 'medium',
-            //ctCls: config.btm_button_class,
+            ctCls: config.add_button_css,
             handler: function() { obj.do_add(); },
             id: btn_id(obj, 'add')
         },{
             text: obj_btn_prefix  + _T('Delete'),
             icon: 'images/delete.png',
             scale: 'medium',
-            //ctCls: config.btm_button_class,
+            ctCls: config.add_button_css,
             handler: function() { obj.do_delete(); },
             id: btn_id(obj, 'delete')
         },{
             text: obj_btn_prefix  + _T('Refresh'),
             icon: 'images/refresh.png',
             scale: 'medium',
-            //ctCls: config.btm_button_class,
+            ctCls: config.add_button_css,
             handler: function() { obj.do_refresh(); },
             id: btn_id(obj, 'refresh')
         },

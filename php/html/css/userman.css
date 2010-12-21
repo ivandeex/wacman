@@ -28,7 +28,9 @@
     display: block;
 }
 
-.btm-button-class {
+/* gentle frame around toolbar buttons */
+
+.gentle-frame {
     border-right: 1px solid  #fff;
     border-bottom: 1px solid #fff;
     border-radius-bottomleft: 8px;
@@ -42,7 +44,7 @@
     -webkit-border-radius-topright: 8px;
 }
 
-.btm-button-class:hover {
+.gentle-frame:hover {
     border-right: 1px solid transparent;
     border-bottom: 1px solid transparent;
 }

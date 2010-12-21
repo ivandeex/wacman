@@ -38,7 +38,7 @@ reserved_names = 'public,office,pubadmin,pubwrite'
 language = en
 theme_css = js/ext/resources/css/ext-all.css,js/ext/resources/css/xtheme-gray.css
 ext_js = js/ext/adapter/ext/ext-base.js,js/ext/ext-all-debug.js
-btm_button_class = ''
+add_button_css = 'gentle-frame'
 
 create_homes  = 1
 remove_homes  = 1
