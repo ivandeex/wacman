@@ -4,54 +4,44 @@
 // users
 //
 
-var user_obj = {};
+var user_obj = {
+    name: 'user',
+    title: ' Users ',
 
-var user_cfg = {
-    obj_name: 'user',
-    tab_title: ' Users ',
-    obj: user_obj,
     list_url: 'user-list.php',
     read_url: 'user-read.php',
     write_url: 'user-write.php',
     id_attr: 'uid',
-    save_handler: user_save,
-    revert_handler: user_revert,
-    list_handler_change: user_change,
-    list_handler_select: user_load,
-    handler_add: user_add,
-    handler_delete: user_delete,
-    handler_refresh: users_refresh,
-    entry_edited: user_entry_edited
-};
 
-function user_add() {
-}
+    do_add: function () {
+    },
 
-function user_delete() {
-}
+    do_delete: function () {
+    },
 
-function users_refresh() {
-    user_obj.store.reload();
-}
+    do_refresh: function () {
+        user_obj.store.reload();
+    },
 
-function user_unselect() {
-}
+    do_save: function () {
+    },
 
-function user_change(user_sm) {
-}
+    do_revert: function () {
+    },
 
-function user_load(user_sm, row_idx, rec) {
-}
+    do_change: function (sm) {
+    },
 
-function user_save() {
-}
+    do_load: function (sm, row_idx, rec) {
+    },
 
-function user_revert() {
-}
+    do_unselect: function () {
+    },
 
-function user_entry_edited (entry, ev) {
-    var val = trim(entry.getValue());
-    if (val != entry._attr.val) {
+    do_entry: function (entry, ev) {
+        var val = trim(entry.getValue());
+        if (val == entry._attr.val)
+            return;
         var obj = entry._attr.obj;
         obj_setup_form(obj);
         set_attr(obj, entry._attr.desc.name, val);
@@ -60,60 +50,50 @@ function user_entry_edited (entry, ev) {
         Ext.getCmp('user_panel').setTitle(
                 get_attr(obj, 'uid') + ' (' + get_attr(obj, 'cn') + ') ...');
     }
-}
+};
 
 /////////////////////////////////////////////////////////
 // groups
 //
 
-var group_obj = {};
+var group_obj = {
+    name: 'group',
+    title: ' Groups ',
 
-var group_cfg = {
-    obj_name: 'group',
-    tab_title: ' Groups ',
-    obj: group_obj,
     list_url: 'group-list.php',
     read_url: 'group-read.php',
     write_url: 'group-write.php',
     id_attr: 'dn',
-    save_handler: group_save,
-    revert_handler: group_revert,
-    list_handler_change: group_change,
-    list_handler_select: group_load,
-    handler_add: group_add,
-    handler_delete: group_delete,
-    handler_refresh: groups_refresh,
-    entry_edited: group_entry_edited
-};
 
-function group_add() {
-}
+    do_add: function () {
+    },
 
-function group_delete() {
-}
+    do_delete: function () {
+    },
 
-function groups_refresh() {
-    group_obj.store.reload();
-}
+    do_refresh: function () {
+        group_obj.store.reload();
+    },
 
-function group_unselect() {
-}
+    do_save: function () {
+    },
 
-function group_change(user_sm) {
-}
+    do_revert: function () {
+    },
 
-function group_load(user_sm, row_idx, rec) {
-}
+    do_change: function (sm) {
+    },
 
-function group_save() {
-}
+    do_load: function (sm, row_idx, rec) {
+    },
 
-function group_revert() {
-}
+    do_unselect: function () {
+    },
 
-function group_entry_edited (entry, ev) {
-    var val = trim(entry.getValue());
-    if (val != entry._attr.val) {
+    do_entry: function (entry, ev) {
+        var val = trim(entry.getValue());
+        if (val == entry._attr.val)
+            return;
         var obj = entry._attr.obj;
         obj_setup_form(obj);
         set_attr(obj, entry._attr.desc.name, val);
@@ -121,60 +101,50 @@ function group_entry_edited (entry, ev) {
         update_obj_gui(obj);
         Ext.getCmp('group_panel').setTitle(get_attr(obj, 'cn') + ' ...');
     }
-}
+};
 
 /////////////////////////////////////////////////////////
 // mailgroups
 //
 
-var mailgroup_obj = {};
+var mailgroup_obj = {
+    name: 'mailgroup',
+    title: ' Mail groups ',
 
-var mailgroup_cfg = {
-    obj_name: 'mailgroup',
-    tab_title: ' Mail groups ',
-    obj: mailgroup_obj,
     list_url: 'mailgroup-list.php',
     read_url: 'mailgroup-read.php',
     write_url: 'mailgroup-write.php',
     id_attr: 'uid',
-    save_handler: mailgroup_save,
-    revert_handler: mailgroup_revert,
-    list_handler_change: mailgroup_change,
-    list_handler_select: mailgroup_load,
-    handler_add: mailgroup_add,
-    handler_delete: mailgroup_delete,
-    handler_refresh: mailgroups_refresh,
-    entry_edited: mailgroup_entry_edited
-};
 
-function mailgroup_add() {
-}
+    do_add: function () {
+    },
 
-function mailgroup_delete() {
-}
+    do_delete: function () {
+    },
 
-function mailgroups_refresh() {
-    mailgroup_obj.store.reload();
-}
+    do_refresh: function () {
+        mailgroup_obj.store.reload();
+    },
 
-function mailgroup_unselect() {
-}
+    do_save: function () {
+    },
 
-function mailgroup_change(user_sm) {
-}
+    do_revert: function () {
+    },
 
-function mailgroup_load(user_sm, row_idx, rec) {
-}
+    do_change: function (sm) {
+    },
 
-function mailgroup_save() {
-}
+    do_load: function (sm, row_idx, rec) {
+    },
 
-function mailgroup_revert() {
-}
+    do_unselect: function () {
+    },
 
-function mailgroup_entry_edited (entry, ev) {
-    var val = trim(entry.getValue());
-    if (val != entry._attr.val) {
+    do_entry: function (entry, ev) {
+        var val = trim(entry.getValue());
+        if (val == entry._attr.val)
+            return;
         var obj = entry._attr.obj;
         obj_setup_form(obj);
         set_attr(obj, entry._attr.desc.name, val);
@@ -182,7 +152,7 @@ function mailgroup_entry_edited (entry, ev) {
         update_obj_gui(obj);
         Ext.getCmp('mailgroup_panel').setTitle(get_attr(obj, 'uid') + ' ...');
     }
-}
+};
 
 /////////////////////////////////////////////////////////
 // Rework
@@ -573,17 +543,15 @@ function btn_id (obj, op) {
     return 'btn_' + obj.short_name + '_' + op;
 }
 
-function create_obj_tab (cfg) {
+function create_obj_tab (obj) {
 
     var col_gap = 2;
     var label_width = 150;
 
-    var obj = cfg.obj;
-    obj.name = cfg.obj_name;
-    obj.short_name = cfg.short_name;
     obj.attr = {};
     obj.form_is_setup = false;
     obj.changed = false;
+    obj.enabled = false;
 
     var form_attrs = gui_attrs[obj.name];
     if (! form_attrs)
@@ -595,11 +563,11 @@ function create_obj_tab (cfg) {
     obj.rec = Ext.data.Record.create(obj_attrs);
 
     obj.store = new Ext.data.Store({
-        url: cfg.list_url,
+        url: obj.list_url,
         autoLoad: true,
         reader: new Ext.data.JsonReader({
             root: 'rows',
-            idProperty: cfg.id_attr
+            idProperty: obj.id_attr
         }, obj.rec)
     });
 
@@ -630,7 +598,7 @@ function create_obj_tab (cfg) {
                 desc: desc,
                 id: 'form_' + obj.name + '_field_' + attr_name
             };
-            cfg.obj.attr[desc.name] = attr;
+            obj.attr[desc.name] = attr;
             if (desc.disable)
                 continue;
 
@@ -650,14 +618,14 @@ function create_obj_tab (cfg) {
                 fieldLabel: _T(desc.label),
                 readonly: desc.readonly,
                 anchor: '-20',
+                listeners: { valid: obj.do_entry },
                 id: attr.id,
                 _attr: attr,
             };
 
             if (desc.type == 'pass' && !config.show_password)
                 entry.inputType = 'password';
-            if (cfg.entry_edited)
-                entry.listeners = { valid: cfg.entry_edited };
+
             entries.push(entry);
         }
 
@@ -678,7 +646,7 @@ function create_obj_tab (cfg) {
     if (! desc_tabs.length)
         return null;
 
-    var form_btn_prefix = '';// + _T(cfg.tab_title) + ': ';
+    var form_btn_prefix = '';// + _T(obj.title) + ': ';
 
     var desc_form = {
         region: 'center',
@@ -686,7 +654,7 @@ function create_obj_tab (cfg) {
         layout: 'fit',
 
         xtype: 'form',
-        url: cfg.url,
+        url: obj.write_url,
         border: false,
 
         items: [{
@@ -699,13 +667,13 @@ function create_obj_tab (cfg) {
             text: form_btn_prefix + _T('Save'),
             icon: 'images/apply.png',
             scale: 'medium',
-            handler: cfg.save_handler,
+            handler: obj.do_save,
             id: btn_id(obj, 'save')
         },{
             text: form_btn_prefix + _T('Revert'),
             icon: 'images/revert.png',
             scale: 'medium',
-            handler: cfg.revert_handler,
+            handler: obj.do_revert,
             id: btn_id(obj, 'revert')
         }]
     };
@@ -721,7 +689,7 @@ function create_obj_tab (cfg) {
     var list_panel = {
         xtype: 'grid',
         store: obj.store,
-        title: _T(cfg.tab_title),
+        title: _T(obj.title),
 
         colModel: new Ext.grid.ColumnModel({
             columns: list_cols
@@ -730,8 +698,8 @@ function create_obj_tab (cfg) {
         selModel: new Ext.grid.RowSelectionModel({
             singleSelect: true,
             listeners: {
-                rowdeselect: cfg.list_handler_change,
-                rowselect: cfg.list_handler_select
+                rowdeselect: obj.do_change,
+                rowselect: obj.do_load
             }
         }),
 
@@ -743,35 +711,35 @@ function create_obj_tab (cfg) {
         minSize: 50
     };
 
-    var obj_btn_prefix = '';// + _T(cfg.tab_title) + ': ';
+    var obj_btn_prefix = '';// + _T(obj.title) + ': ';
 
     var obj_buttons = [{
             text: obj_btn_prefix  + _T('Create'),
             icon: 'images/add.png',
             scale: 'medium',
             ctCls: config.btm_button_class,
-            handler: cfg.handler_add,
+            handler: obj.do_add,
             id: btn_id(obj, 'add')
         },{
             text: obj_btn_prefix  + _T('Delete'),
             icon: 'images/delete.png',
             scale: 'medium',
             ctCls: config.btm_button_class,
-            handler: cfg.handler_delete,
+            handler: obj.do_delete,
             id: btn_id(obj, 'delete')
         },{
             text: obj_btn_prefix  + _T('Refresh'),
             icon: 'images/refresh.png',
             scale: 'medium',
             ctCls: config.btm_button_class,
-            handler: cfg.handler_refresh,
+            handler: obj.do_refresh,
             id: btn_id(obj, 'refresh')
         },
         '->', new AjaxIndicator()
         ];
 
     var obj_tab = {
-        title: _T(cfg.tab_title),
+        title: _T(obj.title),
         layout: 'border',
         items: [ list_panel, desc_panel ],
         bbar: {
@@ -780,6 +748,7 @@ function create_obj_tab (cfg) {
         }
     };
 
+    obj.enabled = true;
     return obj_tab;
 }
 
@@ -792,12 +761,12 @@ function main() {
 
     Ext.QuickTips.init();
 
-    var cfg_objs = [ user_cfg, group_cfg, mailgroup_cfg ];
-    var obj_tabs = [];
-    cfg_objs.forEach(function(cfg) {
-        var tab = create_obj_tab(cfg);
+    var objs = [ user_obj, group_obj, mailgroup_obj ];
+    var tabs = [];
+    objs.forEach(function(obj) {
+        var tab = create_obj_tab(obj);
         if (tab != null)
-            obj_tabs.push(tab);
+            tabs.push(tab);
     });
 
     new Ext.Viewport({
@@ -809,13 +778,11 @@ function main() {
             xtype: 'tabpanel',
             region: 'center',
             activeTab: 0,
-            items: obj_tabs
+            items: tabs
         }]
     });
 
-	user_unselect();
-	group_unselect();
-	mailgroup_unselect();
+    objs.forEach(function(obj) { if (obj.enabled) obj.do_unselect(); });
 
     //Ext.util.Observable.capture(Ext.getCmp('form_user_field_sn'), console.info);
 };
