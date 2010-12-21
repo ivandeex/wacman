@@ -547,6 +547,7 @@ function create_obj_tab (obj) {
 
     var col_gap = 2;
     var label_width = 150;
+    var right_gap = 20;
 
     obj.attr = {};
     obj.form_is_setup = false;
@@ -617,7 +618,7 @@ function create_obj_tab (obj) {
                 name: desc.name,
                 fieldLabel: _T(desc.label),
                 readonly: desc.readonly,
-                anchor: '-20',
+                anchor: '-' + right_gap,
                 listeners: { valid: obj.do_entry },
                 id: attr.id,
                 _attr: attr,
@@ -690,6 +691,7 @@ function create_obj_tab (obj) {
         xtype: 'grid',
         store: obj.store,
         title: _T(obj.title),
+        id: obj.name + '_list',
 
         colModel: new Ext.grid.ColumnModel({
             columns: list_cols
@@ -706,7 +708,7 @@ function create_obj_tab (obj) {
         region: 'west',
         split: true,
         collapsible: true,
-        collapseMode: 'mini',
+        //collapseMode: 'mini',
         width: list_width,
         minSize: 50
     };
@@ -717,21 +719,21 @@ function create_obj_tab (obj) {
             text: obj_btn_prefix  + _T('Create'),
             icon: 'images/add.png',
             scale: 'medium',
-            ctCls: config.btm_button_class,
+            //ctCls: config.btm_button_class,
             handler: obj.do_add,
             id: btn_id(obj, 'add')
         },{
             text: obj_btn_prefix  + _T('Delete'),
             icon: 'images/delete.png',
             scale: 'medium',
-            ctCls: config.btm_button_class,
+            //ctCls: config.btm_button_class,
             handler: obj.do_delete,
             id: btn_id(obj, 'delete')
         },{
             text: obj_btn_prefix  + _T('Refresh'),
             icon: 'images/refresh.png',
             scale: 'medium',
-            ctCls: config.btm_button_class,
+            //ctCls: config.btm_button_class,
             handler: obj.do_refresh,
             id: btn_id(obj, 'refresh')
         },
