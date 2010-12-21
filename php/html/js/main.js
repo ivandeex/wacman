@@ -562,28 +562,27 @@ function debug_log() {
 AjaxIndicator = Ext.extend(Ext.Button, {
     disabled: true,
     scale: 'medium',
-    urls : [],
+    ajax_urls : null,
 
     initComponent : function() {
-        Ext.Ajax.on('beforerequest', this.addReq, this);
-
-        Ext.Ajax.on('requestcomplete', this.removeReq, this);
-
-        Ext.Ajax.on('requestexception', this.removeReq, this);
-
+        this.ajax_urls = [];
+        Ext.Ajax.on('beforerequest', function(c,o) { this.addReq(c,o); }, this);
+        Ext.Ajax.on('requestcomplete', function(c,r,o) { this.remReq(c,r,o); }, this);
+        Ext.Ajax.on('requestexception', function(c,r,o) { this.remReq(c,r,o); }, this);
         this.hideProgress();
+        log_debug('%s: init', this.idid);
     },
 
     addReq: function (conn, o) {
-        if (this.urls.indexOf(o.url) < 0) {
-            this.urls.push(o.url);
+        if (this.ajax_urls.indexOf(o.url) < 0) {
+            this.ajax_urls.push(o.url);
             this.showProgress();
         }
     },
 
-    removeReq: function (conn, resp, o) {
-        this.urls.remove(o.url);
-        if (this.urls.length <= 0)
+    remReq: function (conn, resp, o) {
+        this.ajax_urls.remove(o.url);
+        if (this.ajax_urls.length <= 0)
             this.hideProgress();
     },
 
