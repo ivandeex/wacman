@@ -727,7 +727,7 @@ function create_obj_tab (cfg) {
             items: desc_tabs
         }],
 
-        buttons: [{
+        bbar: [ '->', {
             text: _T('Save'),
             icon: 'images/apply.png',
             scale: 'medium',
@@ -777,8 +777,7 @@ function create_obj_tab (cfg) {
         minSize: 50
     };
 
-    var obj_buttons = [
-        new AjaxIndicator(), ' ', {
+    var obj_buttons = [{
             text: _T('Create'),
             icon: 'images/add.png',
             scale: 'medium',
@@ -799,13 +798,9 @@ function create_obj_tab (cfg) {
             ctCls: config.btm_button_class,
             handler: cfg.handler_refresh,
             id: btn_id(cfg, 'refresh')
-        },'->',{
-            text: '',
-            icon: 'images/exit.png',
-            scale: 'medium',
-            handler: gui_exit,
-            disabled: true
-        }];
+        },
+        '->', new AjaxIndicator()
+        ];
 
     var obj_tab = {
         title: _T(cfg.tab_title),
@@ -840,15 +835,8 @@ function main() {
         },
         layout: 'border',
         items: [{
-            region: 'north',
-            margins: '5 5 5 5',
-            xtype: 'label',
-            text: _T('Userman'),
-            style: 'font-weight: bold; text-align: center'
-        } , {
-            region: 'center',
-            margins: '0 0 0 0',
             xtype: 'tabpanel',
+            region: 'center',
             activeTab: 0,
             items: obj_tabs
         }]
@@ -860,9 +848,6 @@ function main() {
 
     //Ext.util.Observable.capture(Ext.getCmp('form_user_field_sn'), console.info);
 };
-
-function gui_exit() {
-}
 
 /////////////////////////////////////////////////////////
 // preloader
