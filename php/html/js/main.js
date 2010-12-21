@@ -164,25 +164,27 @@ var mailgroup_obj = {
 
 function get_attr(obj, name) {
     if (!(name in obj.attr)) {
-        //console.log(name + ": undefined attribute in get_attr()");
+        debug_log('%s: undefined attribute in get_attr()', name);
         return '';
     }
-    return obj.attr[name].val;
+    return trim(obj.attr[name].val);
 }
 
 function cond_set(obj, name, val) {
     if (!(name in obj.attr)) {
-        //console.log(name + ": undefined attribute in cond_set()");
-        return;
+        debug_log('%s: undefined attribute in cond_set()', name);
+        return false;
     }
     at = obj.attr[name];
-    if (! at.desc.disable && ! has_attr(obj, name))
-        set_attr(obj, name, val);
+    if (at.desc.disable || has_attr(obj, name))
+        return false;
+    set_attr(obj, name, val);
+    return true;
 }
 
 function set_attr(obj, name, val) {
     if (!(name in obj.attr)) {
-        //console.log(name + ": undefined attribute in set_attr()");
+        debug_log('%s: undefined attribute in set_attr()', name);
         return;
     }
     val = trim(val);
@@ -202,7 +204,7 @@ function set_attr(obj, name, val) {
 
 function has_attr(obj, name) {
     if (!(name in obj.attr)) {
-        //console.log(name + ": undefined attribute in has_attr()");
+        debug_log('%s: undefined attribute in has_attr()', name);
         return false;
     }
     switch (obj.attr[name].state) {
@@ -240,12 +242,10 @@ function str_translate(s, from, to) {
 function str2bool(s) {
     if (s == undefined || s == null)
         return false;
-    v = trim(s).toLowerCase();
-    switch (v) {
-   	    case 'y': case 'yes': case 't': case 'true': case 'on': case 'ok': case '1':
-   	        return true;
-   	}
-    return false;
+    s = trim(s);
+    if (s.length < 1)
+        return false;
+    return ("yto1".indexOf(s.charAt(0).toLowerCase()) >= 0);
 }
 
 function bool2str(v) {
@@ -350,10 +350,10 @@ function obj_submit (obj) {
     form.submit({});
 }
 
-function update_obj_gui (obj) {
+function update_obj_gui (obj, only) {
     for (var name in obj.attr) {
         var attr = obj.attr[name];
-        if (! attr.desc.disable && ('entry' in attr)) {
+        if (! attr.desc.disable && ('entry' in attr) && (!only || name == only)) {
             if (attr.val != trim(attr.entry.getValue()))
                 attr.entry.setValue(attr.val);
         }
@@ -370,8 +370,31 @@ function obj_fill_defs (obj) {
     }
 }
 
-function get_next_id (which) {
-    return 1;
+function request_next_id (which, obj, name, format) {
+    if (has_attr(obj, name) || get_attr(obj, name) != '')
+        return;
+    debug_log('request_id(%s,%s,%s) in progress (state=%s)', which, obj.name, name, obj.attr[name].state);
+    Ext.Ajax.request({
+        url: 'next-id.php?which=' + which,
+        success: function (resp, opts) {
+            var id = trim(resp.responseText);
+            id = id.replace(/[^0-9]/g, '');
+            if (format)
+                id = format(id);
+            if (cond_set(obj, name, id))
+                update_obj_gui(obj, name);
+            debug_log('request_id(%s,%s,%s) returns "%s"', which, obj.name, name, id);
+        },
+        failure: function (resp, opts) {
+            debug_log('request_id(%s,%s,%s) failed', which, obj.name, name);
+        }
+    });
+}
+
+function format_telnum (telnum) {
+    telnum = trim(telnum).replace(/[^0-9]/g, '');
+    while (telnum.length < 3)  telnum = '0' + telnum;
+    return telnum.substr(0, 3);
 }
 
 function user_rework (usr) {
@@ -398,14 +421,12 @@ function user_rework (usr) {
     cond_set(usr, 'cgpDn', get_obj_config(usr, 'cgp_user_dn'));
 
     // assign next available UID number
-    var uidn;
     if (has_attr(usr, 'uidNumber')) {
-        uidn = get_attr(usr, 'uidNumber');
+        var uidn = get_attr(usr, 'uidNumber');
         uidn = uidn.replace(/[^0-9]/g, '');
-    } else {
-        uidn = get_next_id('unix_uidn');
+        set_attr(usr, 'uidNumber', uidn);
     }
-    set_attr(usr, 'uidNumber', uidn);
+    request_next_id('unix_uidn', usr, 'uidNumber');
 
     // mail
     if (uid != '')
@@ -437,16 +458,10 @@ function user_rework (usr) {
     // ######## CommuniGate Pro ########
     //set_attr(usr, 'cgpObjectClass', append_list(get_attr($usr, 'cgpObjectClass'), config.cgp_user_classes));
 
-    var telnum;
     if (has_attr(usr, 'telnum')) {
-        telnum = get_attr(usr, 'telnum');
-    } else {
-        telnum = get_next_id('cgp_telnum');
+        set_attr(usr, format_telnum(get_attr(usr, 'telnum')));
     }
-    telnum = trim(telnum);
-    while (telnum.length < 3)  telnum = '0' + telnum;
-    telnum = telnum.substr(0, 3);
-    set_attr(usr, 'telnum', telnum);
+    request_next_id('cgp_telnum', usr, 'telnum', format_telnum);
 
     set_attr(usr, 'domainIntercept', bool2str(get_attr(usr, 'domainIntercept')) );
     set_attr(usr, 'userIntercept', bool2str(get_attr(usr, 'userIntercept')) );
@@ -462,11 +477,8 @@ function group_rework (grp) {
     val = get_attr(grp, 'cn');
     set_attr(grp, 'cn', string2id(val));
 
-    val = get_attr(grp, 'gidNumber');
-    if (! val)
-        val = get_next_id('unix_gidn');
-    val = trim(val).replace(/[^0-9]/g, '');
-    set_attr(grp, 'gidNumber', val);
+    set_attr(grp, 'gidNumber', get_attr(grp, 'gidNumber').replace(/[^0-9]/g, ''));
+    request_next_id('unix_gidn', grp, 'gidNumber');
 
     set_attr(grp, 'dn', get_obj_config(grp, 'unix_group_dn'));
 }
@@ -508,17 +520,28 @@ Ext.form.PopupField = Ext.extend(Ext.form.TriggerField, {
 Ext.reg('popupfield', Ext.form.PopupField);
 
 /////////////////////////////////////////////////////////
-// Translations (loaded dynamically)
+// Messages and logging
 //
 
 function _T() {
 	var args = arguments;
-	var format = args[0];
-	var message = translations && translations[format] ? translations[format] : format;
-	for (i = 1; i < arguments.length; i++)
-	    message = message.replace('%s', arguments[i]);
-	return message;
+	var msg = (args[0] in translations) ? translations[args[0]] : args[0];
+	for (i = 1; i < args.length; i++)
+	    msg = msg.replace('%s', args[i]);
+	return msg;
 };
+
+function debug_log() {
+    if (!('debug' in config) || !str2bool(config.debug))
+        return;
+    if ((typeof console === 'undefined') || console == null)
+        return;
+	var args = arguments;
+	var msg = args[0];
+	for (i = 1; i < args.length; i++)
+	    msg = msg.replace('%s', args[i]);
+    console.log(msg);
+}
 
 /////////////////////////////////////////////////////////
 // AJAX indicator
@@ -527,33 +550,38 @@ function _T() {
 AjaxIndicator = Ext.extend(Ext.Button, {
     disabled: true,
     scale: 'medium',
-    ajax_urls : new Array(),
+    urls : [],
 
     initComponent : function() {
-        Ext.Ajax.on('beforerequest', function(conn, o) {
-            if (this.ajax_urls.indexOf(o.url) == -1) {
-                this.ajax_urls.push(o.url);
-                this.showProgress();
-            }
-        }, this);
+        Ext.Ajax.on('beforerequest', this.addReq, this);
 
-        Ext.Ajax.on('requestcomplete', function(conn, response, o) {
-            this.ajax_urls.remove(o.url);
-            if (this.ajax_urls.length <= 0)
-                this.hideProgress();
-        }, this);
+        Ext.Ajax.on('requestcomplete', this.removeReq, this);
 
-        Ext.Ajax.on('requestexception', function(conn, response, o) {
-            if (this.ajax_urls.length <= 0)
-                this.hideProgress();
-        }, this);
+        Ext.Ajax.on('requestexception', this.removeReq, this);
 
         this.hideProgress();
     },
 
-    showProgress: function() { this.setIcon('images/throbber-24.gif'); },
+    addReq: function (conn, o) {
+        if (this.urls.indexOf(o.url) < 0) {
+            this.urls.push(o.url);
+            this.showProgress();
+        }
+    },
 
-    hideProgress: function() { this.setIcon('images/userman-32.png');  },
+    removeReq: function (conn, resp, o) {
+        this.urls.remove(o.url);
+        if (this.urls.length <= 0)
+            this.hideProgress();
+    },
+
+    showProgress: function() {
+        this.setIcon('images/throbber-24.gif');
+    },
+
+    hideProgress: function() {
+        this.setIcon('images/userman-32.png');
+    },
 });
 
 /////////////////////////////////////////////////////////
@@ -803,6 +831,7 @@ function main() {
             bodyStyle: 'padding: 5px;',
         },
         layout: 'border',
+        id: 'viewport',
         items: [{
             xtype: 'tabpanel',
             region: 'center',
