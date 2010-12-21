@@ -53,7 +53,7 @@ function cli_cmd () {
     $cfg =& get_server('cli');
     if (! $cfg['connected']) {
         set_error("server CLI is not connected");
-        return null;
+        return array('code' => -1, 'error' => 'CLI not connected', 'data' => array());
     }
     $cli = $cfg['cli'];
     $args = func_get_args();
@@ -66,7 +66,7 @@ function cli_cmd () {
     }
 
     log_error("CLI error in $func: " . $cli->getErrMessage());
-    return array('code' => $cli->getErrCode(), 'error' => $cli->getErrMessage(), 'data' => null);
+    return array('code' => $cli->getErrCode(), 'error' => $cli->getErrMessage(), 'data' => array());
 }
 
 

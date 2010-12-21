@@ -71,7 +71,7 @@ function uldap_connect_all () {
         log_info('connecting to "%s"', $srv);
         $cfg['connected'] = 0;
         if (uldap_connect($srv) < 0)
-            log_error('Connection to "%s" failed', $srv);
+            log_error('connection to "%s" failed', $srv);
     }
 }
 
@@ -140,7 +140,13 @@ function uldap_value ($data, $name, $asarray = false) {
 
 function uldap_entries ($res) {
     $entries = array();
-    $count = isset($res['data']['count']) ? $res['data']['count'] : 0;
+    if (isset($res['data']['count'])) {
+        $count = $res['data']['count']; // this is how php ldap works
+    } elseif (isset($res['data'][0])) {
+        $count = count($res['data']); // this is how cli works
+    } else {
+        $count = 0;
+    }
     for ($i = 0; $i < $count; $i++)
         $entries[] = $res['data'][$i];
     return $entries;

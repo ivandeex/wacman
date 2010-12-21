@@ -370,9 +370,11 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
                 $this->send('APOP '.$login.' '.md5($matches[1].$password));
                 $this->_parseResponse();
                 
-                // Set to INLINE mode
-                $this->send('INLINE');
-                $this->_parseResponse();
+                if ($this->isSuccess()) {
+                    // Set to INLINE mode
+                    $this->send('INLINE');
+                    $this->_parseResponse();
+                }
                 
             } else {
                 echo "$errno: $errstr\n";
