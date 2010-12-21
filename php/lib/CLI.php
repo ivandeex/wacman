@@ -85,6 +85,8 @@
     void VerifyAccountPassword(string accountName, string password)
     array GetAccountAliases(string accountName)
     void SetAccountAliases(string accountName, array aliases)
+    array GetAccountTelnums(string accountName)
+    void SetAccountTelnums(string accountName, array telnums)
     array GetAccountRules(string accountName) [returns array of arrays]
     void SetAccountRules(string accountName, array rules) [requires array of arrays]
     array GetAccountRPOP(string accountName)
@@ -446,7 +448,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         // Account commands     
         
         function ListAccounts($domain='') {
-            $command = 'LSTACNT';
+            $command = 'LISTACCOUNTS';
             if($domain != '') $command .= ' '.$domain;
             $this->send($command);
             $this->_parseResponse();
@@ -469,7 +471,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
                 $err .= '   $cli->CreateAccount(array $UserData);'."\n";
                 die("$err");
             } else {
-                $command = 'CRACNT '.$params["accountName"];
+                $command = 'CREATEACCOUNT '.$params["accountName"];
                 if(array_key_exists("accountType",$params) && isset($params["accountType"]))
                     $command .= ' '. $params["accountType"];
                 if(array_key_exists("externalFlag",$params))
@@ -484,7 +486,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function RenameAccount($oldAccountName,$newAccountName) {
             if($oldAccountName == '' || $newAccountName == '') 
                 die('usage: $cli->RenameAccount(string $oldAccountName, string $newAccountName)'."\n");
-            $this->send('RNACNT '.$oldAccountName.' into '.$newAccountName);
+            $this->send('RENAMEACCOUNT '.$oldAccountName.' into '.$newAccountName);
             $this->_parseResponse();
         }
         
@@ -498,7 +500,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function GetAccountSettings($accountName) {
             if($accountName == '')
                 die('usage: $cli->GetAccountSettings(string $accountName)'."\n");
-            $this->send('GTACNT '.$accountName);
+            $this->send('GETACCOUNTSETTINGS '.$accountName);
             $this->_parseResponse();
             if($this->isSuccess()) {
                 return $this->parseWords($this->getWords());
@@ -514,7 +516,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function GetAccountEffectiveSettings($accountName) {
             if($accountName == '')
                 die('usage: $cli->GetAccountEffectiveSettings(string $accountName)'."\n");
-            $this->send('GetAccountEffectiveSettings '.$accountName);
+            $this->send('GETACCOUNTEFFECTIVESETTINGS '.$accountName);
             $this->_parseResponse();
             if($this->isSuccess()) {
                 return $this->parseWords($this->getWords());
@@ -526,7 +528,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function UpdateAccountSettings($accountName,$params) {
             if($accountName == '' || !is_array($params)) 
                 die('usage: $cli->UpdateAccountSettings(string $accountName, array $settings)'."\n");
-            $this->send('UPDACNT '.$accountName.' '.$this->printWords($params));
+            $this->send('UPDATEACCOUNTSETTINGS '.$accountName.' '.$this->printWords($params));
             $this->_parseResponse();
         }
         
@@ -562,7 +564,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function GetAccountAliases($accountName) {
             if($accountName == '')
                 die('usage: $cli->GetAccountAliases(string $accountName)'."\n");
-            $this->send('GTACNTALS '.$accountName);
+            $this->send('GETACCOUNTALIASES '.$accountName);
             $this->_parseResponse();
             if($this->isSuccess()) {
                 return $this->parseWords($this->getWords());
@@ -575,6 +577,25 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             if($accountName == '' || !is_array($aliases))
                 die('usage: $cli->SetAccountAliases(string $accountName, array $aliases)'."\n");
             $this->send('STACNTALS '.$accountName.' '.$this->printWords($aliases));
+            $this->_parseResponse();
+        }
+
+        function GetAccountTelnums($accountName) {
+            if($accountName == '')
+                die('usage: $cli->GetAccountTelnums(string $accountName)'."\n");
+            $this->send('GETACCOUNTTELNUMS '.$accountName);
+            $this->_parseResponse();
+            if($this->isSuccess()) {
+                return $this->parseWords($this->getWords());
+            } else {
+                return '';
+            }
+        }
+        
+        function SetAccountTelnums($accountName,$telnums) {
+            if($accountName == '' || !is_array($telnums))
+                die('usage: $cli->SetAccountTelnums(string $accountName, array $telnums)'."\n");
+            $this->send('SETACCOUNTTELNUMS '.$accountName.' '.$this->printWords($telnums));
             $this->_parseResponse();
         }
 
