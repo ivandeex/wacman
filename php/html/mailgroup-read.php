@@ -12,10 +12,10 @@ if (empty($_GET['uid'])) {
 }
 
 uldap_connect_all();
-$gid = $_GET['uid'];
+$id = $_GET['uid'];
 $mgrp = create_obj('mailgroup');
 
-$res = cli_cmd('GetGroup', $gid.'@'.get_config('mail_domain'));
+$res = cli_cmd('GetGroup', $id.'@'.get_config('mail_domain'));
 if ($res['code']) {
     echo json_error($res['error']);
     uldap_disconnect_all();
@@ -23,12 +23,12 @@ if ($res['code']) {
 }
 
 $data = $res['data'];
-init_attr($mgrp, 'uid', $gid);
-init_attr($mgrp, 'cn', nvl($data['RealName']));
+set_attr($mgrp, 'uid', $id);
+set_attr($mgrp, 'cn', nvl($data['RealName']));
 unset($data['RealName']);
-init_attr($mgrp, 'groupMember', join_list($data['Members']));
+set_attr($mgrp, 'groupMember', join_list($data['Members']));
 unset($data['Members']);
-init_attr($mgrp, 'params', dict2str($data));
+set_attr($mgrp, 'params', dict2str($data));
 
 echo obj_json_encode($mgrp);
 uldap_disconnect_all();

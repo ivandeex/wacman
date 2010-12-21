@@ -195,6 +195,13 @@ function get_attr (&$obj, $name, $param = array()) {
 }
 
 
+function set_attr (&$obj, $name, $val) {
+    if (!isset($obj['attrs'][$name]))
+        error_page(_T('attribute "%s" undefined in object "%s"', $name, $obj['type']));
+    $obj['attrs'][$name]['val'] = $val;
+}
+
+
 function obj_json_encode (&$obj) {
     $ret = array();
     foreach ($obj['attrs'] as $name => &$at)

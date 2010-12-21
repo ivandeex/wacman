@@ -20,7 +20,7 @@ var user_obj = {
     },
 
     do_refresh: function () {
-        user_obj.store.reload();
+        this.store.reload();
     },
 
     do_save: function () {
@@ -33,6 +33,7 @@ var user_obj = {
     },
 
     do_load: function (sm, row_idx, rec) {
+        obj_load(this, rec);
     },
 
     do_unselect: function () {
@@ -63,7 +64,7 @@ var group_obj = {
     list_url: 'group-list.php',
     read_url: 'group-read.php',
     write_url: 'group-write.php',
-    id_attr: 'dn',
+    id_attr: 'cn',
 
     do_add: function () {
     },
@@ -72,7 +73,7 @@ var group_obj = {
     },
 
     do_refresh: function () {
-        group_obj.store.reload();
+        this.store.reload();
     },
 
     do_save: function () {
@@ -85,6 +86,7 @@ var group_obj = {
     },
 
     do_load: function (sm, row_idx, rec) {
+        obj_load(this, rec);
     },
 
     do_unselect: function () {
@@ -123,7 +125,7 @@ var mailgroup_obj = {
     },
 
     do_refresh: function () {
-        mailgroup_obj.store.reload();
+        this.store.reload();
     },
 
     do_save: function () {
@@ -136,6 +138,7 @@ var mailgroup_obj = {
     },
 
     do_load: function (sm, row_idx, rec) {
+        obj_load(this, rec);
     },
 
     do_unselect: function () {
@@ -327,6 +330,15 @@ function obj_setup_form (obj) {
         attr.val = trim(attr.entry.getValue());
     }
     obj.form_is_setup = true;
+}
+
+function obj_load (obj, rec) {
+    var form = Ext.getCmp(obj.name + '_form');
+    var url = obj.read_url + '?' + obj.id_attr + '=' + rec.get(obj.id_attr);
+    form.load({
+        url: url,
+        waitMsg: _T('Loading...')
+    });
 }
 
 function update_obj_gui (obj) {
@@ -657,6 +669,12 @@ function create_obj_tab (obj) {
         xtype: 'form',
         url: obj.write_url,
         border: false,
+        id: obj.name + '_form',
+
+        reader: new Ext.data.JsonReader({
+            root: 'obj',
+            idProperty: obj.id_attr
+        }, obj.rec),
 
         items: [{
             xtype: 'tabpanel',
@@ -668,13 +686,13 @@ function create_obj_tab (obj) {
             text: form_btn_prefix + _T('Save'),
             icon: 'images/apply.png',
             scale: 'medium',
-            handler: obj.do_save,
+            handler: function() { obj.do_save() },
             id: btn_id(obj, 'save')
         },{
             text: form_btn_prefix + _T('Revert'),
             icon: 'images/revert.png',
             scale: 'medium',
-            handler: obj.do_revert,
+            handler: function() { obj.do_revert(); },
             id: btn_id(obj, 'revert')
         }]
     };
@@ -700,8 +718,8 @@ function create_obj_tab (obj) {
         selModel: new Ext.grid.RowSelectionModel({
             singleSelect: true,
             listeners: {
-                rowdeselect: obj.do_change,
-                rowselect: obj.do_load
+                rowdeselect: function(sm) { obj.do_change(sm); },
+                rowselect: function(sm, row, rec) { obj.do_load(sm, row, rec); }
             }
         }),
 
@@ -720,21 +738,21 @@ function create_obj_tab (obj) {
             icon: 'images/add.png',
             scale: 'medium',
             //ctCls: config.btm_button_class,
-            handler: obj.do_add,
+            handler: function() { obj.do_add(); },
             id: btn_id(obj, 'add')
         },{
             text: obj_btn_prefix  + _T('Delete'),
             icon: 'images/delete.png',
             scale: 'medium',
             //ctCls: config.btm_button_class,
-            handler: obj.do_delete,
+            handler: function() { obj.do_delete(); },
             id: btn_id(obj, 'delete')
         },{
             text: obj_btn_prefix  + _T('Refresh'),
             icon: 'images/refresh.png',
             scale: 'medium',
             //ctCls: config.btm_button_class,
-            handler: obj.do_refresh,
+            handler: function() { obj.do_refresh(); },
             id: btn_id(obj, 'refresh')
         },
         '->', new AjaxIndicator()
