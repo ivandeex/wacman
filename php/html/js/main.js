@@ -24,6 +24,7 @@ var user_obj = {
     },
 
     do_save: function () {
+        obj_submit(this);
     },
 
     do_revert: function () {
@@ -44,7 +45,7 @@ var user_obj = {
         if (val == entry._attr.val)
             return;
         var obj = entry._attr.obj;
-        obj_setup_form(obj);
+        obj_setup(obj);
         set_attr(obj, entry._attr.desc.name, val);
         user_rework(obj);
         update_obj_gui(obj);
@@ -97,7 +98,7 @@ var group_obj = {
         if (val == entry._attr.val)
             return;
         var obj = entry._attr.obj;
-        obj_setup_form(obj);
+        obj_setup(obj);
         set_attr(obj, entry._attr.desc.name, val);
         group_rework(obj);
         update_obj_gui(obj);
@@ -149,7 +150,7 @@ var mailgroup_obj = {
         if (val == entry._attr.val)
             return;
         var obj = entry._attr.obj;
-        obj_setup_form(obj);
+        obj_setup(obj);
         set_attr(obj, entry._attr.desc.name, val);
         mailgroup_rework(obj);
         update_obj_gui(obj);
@@ -318,7 +319,7 @@ function get_obj_config (obj, what, override) {
 	return dn;
 }
 
-function obj_setup_form (obj) {
+function obj_setup (obj) {
     if (obj.form_is_setup)
         return;
     for (var name in obj.attr) {
@@ -329,16 +330,24 @@ function obj_setup_form (obj) {
             attr.entry = Ext.getCmp(attr.id);
         attr.val = trim(attr.entry.getValue());
     }
+    obj.form = Ext.getCmp(obj.name + '_form');
     obj.form_is_setup = true;
 }
 
 function obj_load (obj, rec) {
-    var form = Ext.getCmp(obj.name + '_form');
+    obj_setup(obj);
     var url = obj.read_url + '?' + obj.id_attr + '=' + rec.get(obj.id_attr);
+    var form = obj.form;
     form.load({
         url: url,
         waitMsg: _T('Loading...')
     });
+}
+
+function obj_submit (obj) {
+    obj_setup(obj);
+    var form = obj.form;
+    form.submit({});
 }
 
 function update_obj_gui (obj) {
