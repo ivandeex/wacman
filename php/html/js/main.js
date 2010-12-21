@@ -561,7 +561,7 @@ AjaxIndicator = Ext.extend(Ext.Button, {
 //
 
 function btn_id (obj, op) {
-    return 'btn_' + obj.short_name + '_' + op;
+    return 'btn_' + obj.name + '_' + op;
 }
 
 function create_obj_tab (obj) {
@@ -618,7 +618,7 @@ function create_obj_tab (obj) {
                 state: 'empty',
                 obj: obj,
                 desc: desc,
-                id: 'form_' + obj.name + '_field_' + attr_name
+                id: 'field_' + obj.name + '_' + attr_name
             };
             obj.attr[desc.name] = attr;
             if (desc.disable)
@@ -813,7 +813,7 @@ function main() {
 
     objs.forEach(function(obj) { if (obj.enabled) obj.do_unselect(); });
 
-    //Ext.util.Observable.capture(Ext.getCmp('form_user_field_sn'), console.info);
+    //Ext.util.Observable.capture(Ext.getCmp('field_user_sn'), console.info);
 };
 
 /////////////////////////////////////////////////////////
