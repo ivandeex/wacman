@@ -661,9 +661,10 @@ function ldap_read_aliases (&$at, $srv, $ldap, $name) {
     $telnum = '';
     $old_telnum = get_attr($at['obj'], 'telnum', array('orig' => 1));
     $entries = uldap_search($srv, "(&(objectClass=alias)(aliasedObjectName=$dn))", array('uid'));
+    $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
     foreach ($entries as $e) {
         $alias = uldap_value($e, 'uid');
-        if ($old_telnum == '' && $telnum == '' && preg_match('/^\d{3}$/', $alias)) {
+        if ($old_telnum == '' && $telnum == '' && preg_match($telnum_pat, $alias)) {
 			$telnum = $alias;
         } else {
             $aliases[] = $alias;

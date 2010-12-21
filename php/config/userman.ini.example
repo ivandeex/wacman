@@ -61,6 +61,7 @@ start_group_id = 1000
 
 min_telnum = 501
 max_telnum = 599
+telnum_len = 3
 cgp_listener = listener@communigate
 
 #ad_primary_group = 'Пользователи домена'

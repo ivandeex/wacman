@@ -1,7 +1,7 @@
 <?php
 // $Id$
 
-// Return list of users from LDAP
+// Return next available ids
 
 require '../lib/common.php';
 
@@ -42,11 +42,12 @@ switch ($which) {
         $domain = get_config('mail_domain');
         $res1 = cli_cmd('ListAccounts', $domain);
         $telnums = array();
+        $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
         foreach ($res1['data'] as $muid => $mutype) {
             $email = $muid.'@'.$domain;
             $res2 = cli_cmd('GetAccountAliases', $email);
             foreach ($res2['data'] as $alias) {
-                if (preg_match('/^\d{3}$/', $alias))
+                if (preg_match($telnum_pat, $alias))
                     $telnums[$alias] = 1;
             }
             $res2 = cli_cmd('GetAccountTelnums', $email);

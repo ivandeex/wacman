@@ -188,8 +188,8 @@ function set_attr(obj, name, val) {
         return;
     }
     val = trim(val);
-    at = obj.attr[name];
-    if (at.val == val || at.desc.disable)
+    var at = obj.attr[name];
+    if (at.desc.disable)
         return;
     at.val = val;
     if (val == '')
@@ -200,6 +200,8 @@ function set_attr(obj, name, val) {
         at.state = 'user';
     else
         at.state = 'calc';
+    if (val == '')
+        at.requested = false;
 }
 
 function has_attr(obj, name) {
@@ -323,10 +325,10 @@ function obj_setup (obj) {
     if (obj.form_is_setup)
         return;
     for (var name in obj.attr) {
-        attr = obj.attr[name];
+        var attr = obj.attr[name];
         if (attr.desc.disable)
             continue;
-        if (! attr.entry)
+        if (!('entry' in attr) || attr.entry == null)
             attr.entry = Ext.getCmp(attr.id);
         attr.val = trim(attr.entry.getValue());
     }
@@ -371,8 +373,12 @@ function obj_fill_defs (obj) {
 }
 
 function request_next_id (which, obj, name, format) {
-    if (has_attr(obj, name) || get_attr(obj, name) != '')
+    if (has_attr(obj, name))
         return;
+    var at = obj.attr[name];
+    if (at.requested && at.val != '')
+        return;
+    at.requested = true;
     debug_log('request_id(%s,%s,%s) in progress (state=%s)', which, obj.name, name, obj.attr[name].state);
     Ext.Ajax.request({
         url: 'next-id.php?which=' + which,
@@ -393,8 +399,15 @@ function request_next_id (which, obj, name, format) {
 
 function format_telnum (telnum) {
     telnum = trim(telnum).replace(/[^0-9]/g, '');
-    while (telnum.length < 3)  telnum = '0' + telnum;
-    return telnum.substr(0, 3);
+    var len = config.telnum_len;
+    if (telnum.length < len) {
+        while (telnum.length < len)
+            telnum = '0' + telnum;
+        return telnum;
+    }
+    if (telnum.length > len)
+        telnum = telnum.substr(telnum.length - len, len);
+    return telnum;
 }
 
 function user_rework (usr) {
@@ -458,9 +471,8 @@ function user_rework (usr) {
     // ######## CommuniGate Pro ########
     //set_attr(usr, 'cgpObjectClass', append_list(get_attr($usr, 'cgpObjectClass'), config.cgp_user_classes));
 
-    if (has_attr(usr, 'telnum')) {
-        set_attr(usr, format_telnum(get_attr(usr, 'telnum')));
-    }
+    var telnum = get_attr(usr, 'telnum');
+    set_attr(usr, 'telnum', format_telnum(telnum));
     request_next_id('cgp_telnum', usr, 'telnum', format_telnum);
 
     set_attr(usr, 'domainIntercept', bool2str(get_attr(usr, 'domainIntercept')) );
@@ -646,6 +658,7 @@ function create_obj_tab (obj) {
                 state: 'empty',
                 obj: obj,
                 desc: desc,
+                requested: false,
                 id: 'field_' + obj.name + '_' + attr_name
             };
             obj.attr[desc.name] = attr;
