@@ -21,6 +21,34 @@ var user_store = new Ext.data.Store({
     }, user_rec)
 });
 
+var user_cfg = {
+    obj_name: 'user',
+    tab_title: ' Users ',
+    store: user_store,
+    obj: user_obj,
+    url: 'user-write.php',
+    save_handler: user_save,
+    revert_handler: user_revert,
+    list_width: 300,
+    list_columns: [{
+        header: 'Identifier',
+        dataIndex: 'uid',
+        sortable: true,
+        width: 100,
+    },{
+        header: 'Full name',
+        dataIndex: 'cn',
+        sortable: true,
+        width: 190
+    }],
+    list_handler_change: user_change,
+    list_handler_select: user_load,
+    handler_add: user_add,
+    handler_delete: user_delete,
+    handler_refresh: users_refresh,
+    entry_edited: user_entry_edited
+};
+
 function user_add() {
 }
 
@@ -81,6 +109,29 @@ var group_store = new Ext.data.Store({
     }, group_rec)
 });
 
+var group_cfg = {
+    obj_name: 'group',
+    tab_title: ' Groups ',
+    store: group_store,
+    obj: group_obj,
+    url: 'group-write.php',
+    save_handler: group_save,
+    revert_handler: group_revert,
+    list_width: 150,
+    list_columns: [{
+        header: 'Group name',
+        dataIndex: 'cn',
+        sortable: true,
+        width: 120
+    }],
+    list_handler_change: group_change,
+    list_handler_select: group_load,
+    handler_add: group_add,
+    handler_delete: group_delete,
+    handler_refresh: groups_refresh,
+    entry_edited: group_entry_edited
+};
+
 function group_add() {
 }
 
@@ -138,6 +189,29 @@ var mailgroup_store = new Ext.data.Store({
         idProperty: 'cn'
     }, mailgroup_rec)
 });
+
+var mailgroup_cfg = {
+    obj_name: 'mailgroup',
+    tab_title: ' Mail groups ',
+    store: mailgroup_store,
+    obj: mailgroup_obj,
+    url: 'mailgroup-write.php',
+    save_handler: mailgroup_save,
+    revert_handler: mailgroup_revert,
+    list_width: 150,
+    list_columns: [{
+        header: 'Mailgroup name',
+        dataIndex: 'cn',
+        sortable: true,
+        width: 140
+    }],
+    list_handler_change: mailgroup_change,
+    list_handler_select: mailgroup_load,
+    handler_add: mailgroup_add,
+    handler_delete: mailgroup_delete,
+    handler_refresh: mailgroups_refresh,
+    entry_edited: mailgroup_entry_edited
+};
 
 function mailgroup_add() {
 }
@@ -676,6 +750,8 @@ function create_obj_tab (cfg) {
         items: [ desc_form ]
     };
 
+    cfg.list_columns.forEach(function (col) { col.header = _T(col.header); });
+
     var list_panel = {
         xtype: 'grid',
         store: cfg.store,
@@ -750,87 +826,13 @@ function create_obj_tab (cfg) {
 
 function main() {
     hide_preloader();
+
     var obj_tabs = [];
-
-    var user_tab = create_obj_tab({
-        obj_name: 'user',
-        tab_title: ' Users ',
-        store: user_store,
-        obj: user_obj,
-        url: 'user-write.php',
-        save_handler: user_save,
-        revert_handler: user_revert,
-        list_width: 300,
-        list_columns: [{
-            header: _T('Identifier'),
-            dataIndex: 'uid',
-            sortable: true,
-            width: 100,
-        },{
-            header: _T('Full name'),
-            dataIndex: 'cn',
-            sortable: true,
-            width: 190
-        }],
-        list_handler_change: user_change,
-        list_handler_select: user_load,
-        handler_add: user_add,
-        handler_delete: user_delete,
-        handler_refresh: users_refresh,
-        entry_edited: user_entry_edited
+    [ user_cfg, group_cfg, mailgroup_cfg ].forEach(function(cfg) {
+        var tab = create_obj_tab(cfg);
+        if (tab != null)
+            obj_tabs.push(tab);
     });
-    if (user_tab != null)
-        obj_tabs.push(user_tab);
-
-    var group_tab = create_obj_tab({
-        obj_name: 'group',
-        tab_title: ' Groups ',
-        store: group_store,
-        obj: group_obj,
-        url: 'group-write.php',
-        save_handler: group_save,
-        revert_handler: group_revert,
-        list_width: 150,
-        list_columns: [{
-            header: _T('Group name'),
-            dataIndex: 'cn',
-            sortable: true,
-            width: 120
-        }],
-        list_handler_change: group_change,
-        list_handler_select: group_load,
-        handler_add: group_add,
-        handler_delete: group_delete,
-        handler_refresh: groups_refresh,
-        entry_edited: group_entry_edited
-    });
-    if (group_tab != null)
-        obj_tabs.push(group_tab);
-
-    var mailgroup_tab = create_obj_tab({
-        obj_name: 'mailgroup',
-        tab_title: ' Mail groups ',
-        store: mailgroup_store,
-        obj: mailgroup_obj,
-        url: 'mailgroup-write.php',
-        save_handler: mailgroup_save,
-        revert_handler: mailgroup_revert,
-        list_width: 150,
-        list_columns: [{
-                header: _T('Mailgroup name'),
-                dataIndex: 'cn',
-                sortable: true,
-                width: 140
-        }],
-        list_handler_change: mailgroup_change,
-        list_handler_select: mailgroup_load,
-        handler_add: mailgroup_add,
-        handler_delete: mailgroup_delete,
-        handler_refresh: mailgroups_refresh,
-        entry_edited: mailgroup_entry_edited
-    });
-    if (mailgroup_tab != null)
-        obj_tabs.push(mailgroup_tab);
 
     new Ext.Viewport({
         defaults: {
