@@ -6,13 +6,13 @@
 require '../lib/common.php';
 
 send_json_headers();
-if (empty($_GET['gid'])) {
-    echo json_error("cn: required parameter wrong or not specified");
+if (empty($_GET['uid'])) {
+    echo json_error("uid: required parameter wrong or not specified");
     exit;
 }
 
 uldap_connect_all();
-$gid = $_GET['gid'];
+$gid = $_GET['uid'];
 $mgrp = create_obj('mailgroup');
 
 $res = cli_cmd('GetGroup', $gid.'@'.get_config('mail_domain'));

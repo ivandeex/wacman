@@ -15,7 +15,7 @@ if ($mgroups['code']) {
 } else {
     $arr = array();
     foreach ($mgroups['data'] as $name)
-        $arr[] = array('cn' => $name);
+        $arr[] = array('uid' => $name);
     echo "{success:true,rows:" . json_encode($arr) . "}\n";
 }
 

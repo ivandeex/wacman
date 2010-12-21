@@ -22,12 +22,12 @@ $all_attrs = array(
             'ldap' => 'uni',
             'label' => 'UNIX DN',
             'readonly' => 1,
-    ),
-    'ntDn' => array(
-        'type' => 'dn',
-        'ldap' => 'ads',
-        'label' => 'Windows DN',
-        'readonly' => 1,
+        ),
+        'ntDn' => array(
+            'type' => 'dn',
+            'ldap' => 'ads',
+            'label' => 'Windows DN',
+            'readonly' => 1,
         ),
         'cgpDn' => array(
             'type' => 'dn',
@@ -59,11 +59,13 @@ $all_attrs = array(
         'cn' => array(
             'label' => 'Full name',
             'ldap' => 'uni,ads,cgp',
+            'colwidth' => 160,
         ),
         'uid' => array(
             'type' => 'number',
             'label' => 'Identifier',
             'ldap' => 'uni,ads,cgp',
+            'colwidth' => 120,
         ),
         'password' => array(
             'type' => 'pass',
@@ -297,6 +299,7 @@ $all_attrs = array(
         'cn' => array(
             'label' => 'Group name',
             'ldap' => 'uni',
+            'colwidth' => 130,
         ),
         'gidNumber' => array(
             'label' => 'Group number',
@@ -323,6 +326,7 @@ $all_attrs = array(
             'type' => 'mailgroup',
             'label' => 'Group name',
             'ldap' => 'cli',
+            'colwidth' => 140,
         ),
         'cn' => array(
             'type' => 'mailgroup',
