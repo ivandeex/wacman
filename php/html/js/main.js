@@ -646,10 +646,11 @@ function create_obj_tab (cfg) {
     var form_attrs = gui_attrs[cfg.obj_name];
     if (! form_attrs)
         return null;
-    cfg.obj.name = cfg.obj_name;
-    cfg.obj.short_name = cfg.short_name;
-    cfg.obj.attr = {};
-    cfg.obj.form_is_setup = false;
+    var obj = cfg.obj;
+    obj.name = cfg.obj_name;
+    obj.short_name = cfg.short_name;
+    obj.attr = {};
+    obj.form_is_setup = false;
     var desc_tabs = [];
 
     for (var i = 0; i < form_attrs.length; i++) {
@@ -660,9 +661,9 @@ function create_obj_tab (cfg) {
 
         for (var j = 0; j < tab_attrs.length; j++) {
             var attr_name = tab_attrs[j];
-            var desc = all_attrs[cfg.obj_name][attr_name];
+            var desc = all_attrs[obj.name][attr_name];
             if (!desc) {
-                Ext.Msg.alert(_T('attribute "%s" in object "%s" not defined', attr_name, cfg.obj_name));
+                Ext.Msg.alert(_T('attribute "%s" in object "%s" not defined', attr_name, obj.name));
                 continue;
             }
 
@@ -670,9 +671,9 @@ function create_obj_tab (cfg) {
                 val: '',
                 old: '',
                 state: 'empty',
-                obj: cfg.obj,
+                obj: obj,
                 desc: desc,
-                id: 'form_' + cfg.obj_name + '_field_' + attr_name
+                id: 'form_' + obj.name + '_field_' + attr_name
             };
             cfg.obj.attr[desc.name] = attr;
             if (desc.disable)
@@ -712,6 +713,8 @@ function create_obj_tab (cfg) {
     if (! desc_tabs.length)
         return null;
 
+    var form_btn_prefix = '';// + _T(cfg.tab_title) + ': ';
+
     var desc_form = {
         region: 'center',
         margins: '0 0 0 0',
@@ -728,17 +731,17 @@ function create_obj_tab (cfg) {
         }],
 
         bbar: [ '->', {
-            text: _T('Save'),
+            text: form_btn_prefix + _T('Save'),
             icon: 'images/apply.png',
             scale: 'medium',
             handler: cfg.save_handler,
-            id: btn_id(cfg, 'save')
+            id: btn_id(obj, 'save')
         },{
-            text: _T('Revert'),
+            text: form_btn_prefix + _T('Revert'),
             icon: 'images/revert.png',
             scale: 'medium',
             handler: cfg.revert_handler,
-            id: btn_id(cfg, 'revert')
+            id: btn_id(obj, 'revert')
         }]
     };
 
@@ -746,7 +749,7 @@ function create_obj_tab (cfg) {
         region: 'center',
         title: '...',
         layout: 'fit',
-        id: cfg.obj_name + '_panel',
+        id: obj.name + '_panel',
         items: [ desc_form ]
     };
 
@@ -777,27 +780,29 @@ function create_obj_tab (cfg) {
         minSize: 50
     };
 
+    var obj_btn_prefix = '';// + _T(cfg.tab_title) + ': ';
+
     var obj_buttons = [{
-            text: _T('Create'),
+            text: obj_btn_prefix  + _T('Create'),
             icon: 'images/add.png',
             scale: 'medium',
             ctCls: config.btm_button_class,
             handler: cfg.handler_add,
-            id: btn_id(cfg, 'add')
+            id: btn_id(obj, 'add')
         },{
-            text: _T('Delete'),
+            text: obj_btn_prefix  + _T('Delete'),
             icon: 'images/delete.png',
             scale: 'medium',
             ctCls: config.btm_button_class,
             handler: cfg.handler_delete,
-            id: btn_id(cfg, 'delete')
+            id: btn_id(obj, 'delete')
         },{
-            text: _T('Refresh'),
+            text: obj_btn_prefix  + _T('Refresh'),
             icon: 'images/refresh.png',
             scale: 'medium',
             ctCls: config.btm_button_class,
             handler: cfg.handler_refresh,
-            id: btn_id(cfg, 'refresh')
+            id: btn_id(obj, 'refresh')
         },
         '->', new AjaxIndicator()
         ];
