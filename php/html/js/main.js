@@ -164,7 +164,7 @@ var mailgroup_obj = {
 
 function get_attr(obj, name) {
     if (!(name in obj.attr)) {
-        debug_log('%s: undefined attribute in get_attr()', name);
+        log_debug('%s: undefined attribute in get_attr()', name);
         return '';
     }
     return trim(obj.attr[name].val);
@@ -172,7 +172,7 @@ function get_attr(obj, name) {
 
 function cond_set(obj, name, val) {
     if (!(name in obj.attr)) {
-        debug_log('%s: undefined attribute in cond_set()', name);
+        log_debug('%s: undefined attribute in cond_set()', name);
         return false;
     }
     at = obj.attr[name];
@@ -184,7 +184,7 @@ function cond_set(obj, name, val) {
 
 function set_attr(obj, name, val) {
     if (!(name in obj.attr)) {
-        debug_log('%s: undefined attribute in set_attr()', name);
+        log_debug('%s: undefined attribute in set_attr()', name);
         return;
     }
     val = trim(val);
@@ -206,7 +206,7 @@ function set_attr(obj, name, val) {
 
 function has_attr(obj, name) {
     if (!(name in obj.attr)) {
-        debug_log('%s: undefined attribute in has_attr()', name);
+        log_debug('%s: undefined attribute in has_attr()', name);
         return false;
     }
     switch (obj.attr[name].state) {
@@ -379,7 +379,7 @@ function request_next_id (which, obj, name, format) {
     if (at.requested && at.val != '')
         return;
     at.requested = true;
-    debug_log('request_id(%s,%s,%s) in progress (state=%s)', which, obj.name, name, obj.attr[name].state);
+    log_debug('request_id(%s,%s,%s) in progress (state=%s)', which, obj.name, name, obj.attr[name].state);
     Ext.Ajax.request({
         url: 'next-id.php?which=' + which,
         success: function (resp, opts) {
@@ -389,10 +389,10 @@ function request_next_id (which, obj, name, format) {
                 id = format(id);
             if (cond_set(obj, name, id))
                 update_obj_gui(obj, name);
-            debug_log('request_id(%s,%s,%s) returns "%s"', which, obj.name, name, id);
+            log_debug('request_id(%s,%s,%s) returns "%s"', which, obj.name, name, id);
         },
         failure: function (resp, opts) {
-            debug_log('request_id(%s,%s,%s) failed', which, obj.name, name);
+            log_debug('request_id(%s,%s,%s) failed', which, obj.name, name);
         }
     });
 }
@@ -543,7 +543,7 @@ function _T() {
 	return msg;
 };
 
-function debug_log() {
+function log_debug() {
     if (!('debug' in config) || !str2bool(config.debug))
         return;
     if ((typeof console === 'undefined') || console == null)
