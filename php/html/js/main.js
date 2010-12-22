@@ -24,7 +24,7 @@ var user_obj = {
     },
 
     do_save: function () {
-        obj_submit(this);
+        obj_save(this);
     },
 
     do_revert: function () {
@@ -322,34 +322,28 @@ function get_obj_config (obj, what, override) {
 }
 
 function obj_setup (obj) {
-    if (obj.form_is_setup)
-        return;
-    for (var name in obj.attr) {
-        var at = obj.attr[name];
-        if (at.desc.disable || !at.desc.visual)
-            continue;
-        if (at.entry == null)
-            at.entry = Ext.getCmp(attr.id);
-        at.val = trim(at.entry.getValue());
+    if (! obj.form_is_setup) {
+        for (var name in obj.attr) {
+            var at = obj.attr[name];
+            if (at.entry)
+                at.val = trim(at.entry.getValue());
+        }
+        obj.form_is_setup = true;
     }
-    obj.form = Ext.getCmp(obj.name + '_form');
-    obj.form_is_setup = true;
 }
 
 function obj_load (obj, rec) {
     obj_setup(obj);
     var url = obj.read_url + '?' + obj.id_attr + '=' + rec.get(obj.id_attr);
-    var form = obj.form;
-    form.load({
+    obj.form.load({
         url: url,
         waitMsg: _T('Loading...')
     });
 }
 
-function obj_submit (obj) {
+function obj_save (obj) {
     obj_setup(obj);
-    var form = obj.form;
-    form.submit({});
+    obj.form.submit();
 }
 
 function update_obj_gui (obj, only) {
@@ -722,15 +716,13 @@ function create_obj_tab (obj) {
 
     var form_btn_prefix = '';// + _T(obj.title) + ': ';
 
-    var desc_form = {
+    obj.form_panel = new Ext.FormPanel({
         region: 'center',
-        margins: '0 0 0 0',
-        layout: 'fit',
-
-        xtype: 'form',
+        id: obj.name + '_panel',
+        title: '...',
         url: obj.write_url,
         border: false,
-        id: obj.name + '_form',
+        layout: 'fit',
 
         reader: new Ext.data.JsonReader({
             root: 'obj',
@@ -759,18 +751,10 @@ function create_obj_tab (obj) {
             id: btn_id(obj, 'revert')
         },
         ' ' ]
-    };
+    });
+    obj.form = obj.form_panel.getForm();
 
-    var desc_panel = {
-        region: 'center',
-        title: '...',
-        layout: 'fit',
-        id: obj.name + '_panel',
-        items: [ desc_form ]
-    };
-
-    var list_panel = {
-        xtype: 'grid',
+    obj.list_panel = new Ext.grid.GridPanel({
         store: obj.store,
         title: _T(obj.title),
         id: obj.name + '_list',
@@ -793,7 +777,7 @@ function create_obj_tab (obj) {
         //collapseMode: 'mini',
         width: obj.list_width,
         minSize: 50
-    };
+    });
 
     var obj_btn_prefix = '';// + _T(obj.title) + ': ';
 
@@ -825,7 +809,7 @@ function create_obj_tab (obj) {
     var obj_tab = {
         title: _T(obj.title),
         layout: 'border',
-        items: [ list_panel, desc_panel ],
+        items: [ obj.list_panel, obj.form_panel ],
         bbar: {
             xtype: 'toolbar',
             items: obj_buttons
