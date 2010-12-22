@@ -91,6 +91,7 @@ $translations = array(
 	'Cannot delete reserved object' => 'Этот объект нельзя удалить. Он зарезервирован.',
 	'Connection in progress ...' => 'Идет подключение ...',
 	'Connection to "%s" failed' => 'Ошибка подключения к серверу "%s"',
+	'Loading...' => 'Загружаю...',
 );
 
 ?>

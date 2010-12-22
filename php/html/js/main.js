@@ -682,7 +682,7 @@ function create_obj_tab (obj) {
     // setup visual attributes
     var desc_tabs = [];
     obj.list_cols = [];
-    obj.list_width = 1;
+    obj.list_width = 3;
 
     for (var i = 0; i < form_attrs.length; i++) {
 
