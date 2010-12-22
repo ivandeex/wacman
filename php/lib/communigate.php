@@ -50,10 +50,11 @@ function cli_disconnect () {
 
 
 function cli_cmd () {
-    $cfg =& get_server('cli');
-    if (! $cfg['connected']) {
-        set_error("server CLI is not connected");
-        return array('code' => -1, 'error' => 'CLI not connected', 'data' => array());
+    $cfg =& get_server('cli', true);
+    if (!$cfg['connected']) {
+        $msg = $cfg['disable'] ? 'CGP disabled' : 'CGP not connected';
+        set_error($msg);
+        return array('code' => -1, 'error' => $msg, 'data' => array());
     }
     $cli = $cfg['cli'];
     $args = func_get_args();

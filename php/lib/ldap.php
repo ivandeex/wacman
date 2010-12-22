@@ -21,7 +21,7 @@ function & get_server ($srv, $allow_disabled = false) {
     global $servers;
     if (! isset($servers[$srv]))
         error_page(_T('unknown ldap server "%s"', $srv));
-    $cfg = &$servers[$srv];
+    $cfg =& $servers[$srv];
     if (! $allow_disabled && $cfg['disable'])
         error_page(_T('server "%s" is disabled', $srv));
     return $cfg;
@@ -30,15 +30,15 @@ function & get_server ($srv, $allow_disabled = false) {
 
 function uldap_connect ($srv) {
     global $servers;
-    $cfg = &$servers[$srv];
+    $cfg =& $servers[$srv];
     $cfg['name'] = $srv;
     $cfg['connected'] = 0;
-    if ($srv == 'cli')
-        return cli_connect();
     if ($cfg['disable']) {
         $cfg['ldap'] = null;
         return 0;
     }
+    if ($srv == 'cli')
+        return cli_connect();
     if (empty($cfg['uri'])) {
         log_error('invalid uri for server "%s"', $srv);
         $cfg['ldap'] = null;
@@ -67,7 +67,7 @@ function uldap_connect ($srv) {
 
 function uldap_connect_all () {
     global $servers;
-    foreach ($servers as $srv => $cfg) {
+    foreach ($servers as $srv => &$cfg) {
         log_info('connecting to "%s"', $srv);
         $cfg['connected'] = 0;
         if (uldap_connect($srv) < 0)
@@ -165,7 +165,7 @@ function uldap_json_encode ($res) {
 
 function uldap_search ($srv, $filter, $attrs = null, $params = null)
 {
-    $cfg = &get_server($srv, true);
+    $cfg =& get_server($srv, true);
     if (! $cfg['connected'])
         return array('code' => -1, 'error' => 'not connected', 'data' => array('count' => 0));
     $conn = $cfg['ldap'];
