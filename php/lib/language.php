@@ -30,13 +30,13 @@ function setup_language () {
         $language = 'en';
     }
 
-    $filename = realpath(LIBDIR . 'lang_' . $language . '.php');
+    $filename = real_path(LIBDIR . 'lang_' . $language . '.php');
     if (is_readable($filename)) {
         global $translations;
         require($filename);
-        log_debug("%s: %s translations loaded", $filename, count($translations));
-    } else {
-        log_error("%s: cannot read translation file", $filename);
+        log_debug('%s: %s translations loaded', $filename, count($translations));
+    } else if ($language != 'en') {
+        log_error('cannot read translation file "%s" for language "%s"', $filename, $language);
     }
 
     if ($language != 'en') {

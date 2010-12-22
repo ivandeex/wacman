@@ -7,7 +7,12 @@
  * @package phpLDAPadmin
  */
 
-define('HTDOCDIR', realpath(LIBDIR.'../htdocs/').'/');
+function real_path ($path) {
+    $real = realpath($path);
+    return empty($real) ? $path : $real;
+}
+
+define('HTDOCDIR', realpath(LIBDIR.'../html').'/');
 define('CONFDIR',  realpath(LIBDIR.'../config').'/');
 define('CSSDIR',   'css/');
 define('JSDIR',    'js/');
@@ -1126,7 +1131,7 @@ function error_handler( $errno, $errstr, $file, $lineno ) {
 	<tr><td colspan=\'2\'><center><a target=\'new\' href=\'%s\'>Please check and see if this bug has been reported here</a>.</center></td></tr>
 	<tr><td colspan=\'2\'><center><a target=\'new\' href=\'%s\'>If it hasnt been reported, you may report this bug by clicking here</a>.</center></td></tr>
 	</table></center><br />'), $errstr, $errtype, $file,
-		$lineno, $caller, pla_version(), phpversion(), php_sapi_name(),
+		$lineno, $caller, 'current', phpversion(), php_sapi_name(),
 		$_SERVER['SERVER_SOFTWARE'], get_href('search_bug',"&summary_keyword=".htmlspecialchars($errstr)),get_href('add_bug'));
 		return;
 	}
@@ -1147,7 +1152,7 @@ function error_handler( $errno, $errstr, $file, $lineno ) {
 	     </table>
 	     <br />
 	     Please report this bug by clicking below!'), $errstr, $errtype, $file,
-		$lineno, $phpself, pla_version(),
+		$lineno, $phpself, 'current',
 		phpversion(), php_sapi_name(), $server ));
 }
 
@@ -1222,7 +1227,7 @@ function draw_jpeg_photos($ldapserver,$dn,$attr_name='jpegPhoto',$draw_delete_bu
 
 	$jpeg_temp_dir = realpath($config->GetValue('jpeg','tmpdir').'/');
 	if (! is_writable($jpeg_temp_dir))
-		error_page(_('Please set $jpeg_temp_dir to a writable directory in the phpLDAPadmin config.php') );
+		error_page(_('Please set $jpeg_temp_dir to a writable directory in the Userman config.php') );
 
 	if (! is_array($jpeg_data[$attr_name]))
 		$jpeg_data[$attr_name] = array($jpeg_data[$attr_name]);
@@ -1576,43 +1581,6 @@ function get_default_hash($server_id) {
 
 	global $ldapservers;
 	return $ldapservers->GetValue($server_id,'appearance','password_hash');
-}
-
-/**
- * Returns the phpLDAPadmin version currently running. The version
- * is read from the file named VERSION.
- *
- * @return string The current version as read from the VERSION file.
- */
-function pla_version() {
-	$version_file = realpath('../VERSION');
-	if (! file_exists($version_file))
-		$return = 'UNKNOWN';
-
-	else {
-		$f = fopen($version_file,'r');
-		$version = trim(fread($f, filesize($version_file)));
-		fclose($f);
-
-		# We use cvs_prefix, because CVS will translate this on checkout otherwise.
-		$cvs_prefix = '\$Name:';
-
-		$return = preg_replace('/^'.$cvs_prefix.' RELEASE-([0-9_]+)\s*\$$/','$1',$version);
-		$return = preg_replace('/_/','.',$return);
-
-		# Check if we are a CVS copy.
-		if (preg_match('/^'.$cvs_prefix.'?\s*\$$/',$return))
-			$return = 'CVS';
-
-		# If return is still the same as version, then the tag is not one we expect.
-		elseif ($return == $version)
-			$return = 'UNKNOWN';
-	}
-
-	if (defined('DEBUG_ENABLED') && DEBUG_ENABLED)
-		debug_log('pla_version(): Entered with (), Returning (%s)',1,$return);
-
-	return $return;
 }
 
 /**
