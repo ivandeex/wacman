@@ -38,6 +38,7 @@ reserved_names = 'public,office,pubadmin,pubwrite'
 language = en
 theme_css = js/ext/resources/css/ext-all.css,js/ext/resources/css/xtheme-gray.css
 ext_js = js/ext/adapter/ext/ext-base.js,js/ext/ext-all-debug.js
+ext_js_lang = js/ext/src/locale/ext-lang-%s.js
 add_button_css = 'gentle-frame'
 
 create_homes  = 1

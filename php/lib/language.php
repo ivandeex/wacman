@@ -6,6 +6,7 @@
 header('Content-type: text/html; charset=UTF-8', true);
 
 $translations = array();
+$ext_js_lang = null;
 
 function setup_language () {
     global $config;
@@ -36,6 +37,13 @@ function setup_language () {
         log_debug("%s: %s translations loaded", $filename, count($translations));
     } else {
         log_error("%s: cannot read translation file", $filename);
+    }
+
+    if ($language != 'en') {
+        global $ext_js_lang;
+        $ext_js_lang = get_config('ext_js_lang', null);
+        if ($ext_js_lang)
+            $ext_js_lang = sprintf($ext_js_lang, $language);
     }
 }
 
