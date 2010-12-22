@@ -36,6 +36,7 @@ skel_dir = /etc/skel
 prefer_nss_ids = 0
 reserved_names = 'public,office,pubadmin,pubwrite'
 
+rework_accounts = 1
 create_homes  = 1
 remove_homes  = 1
 home_root     = /group

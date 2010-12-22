@@ -76,7 +76,8 @@ my %config = (
 	config_files		=>	[
 		'/etc/userman.conf',
 		'~/.userman.conf',
-		'./userman.conf'
+		'./userman.conf',
+		'./config/userman.conf'
 	],
 	pic_homes			=> [
 		'/usr/share/userman/images',
@@ -102,6 +103,7 @@ my %config = (
 	language			=>	'ru',
 	locale				=>	'ru_RU.utf8',
 	show_splash			=>	0,
+	rework_accounts		=>	1,
 );
 
 
@@ -250,6 +252,7 @@ my %all_attrs = (
 			type => 'number',
 			label => 'Identifier',
 			ldap => 'uni,ads,cgp',
+			is_duplicate => 1,
 		},
 		password => {
 			type => 'pass',
@@ -270,6 +273,7 @@ my %all_attrs = (
 		uidNumber => {
 			label => 'User#',
 			ldap => 'uni,ads',
+			is_duplicate => 1,
 		},
 		gidNumber => {
 			type => 'gid',
@@ -415,24 +419,28 @@ my %all_attrs = (
 			type => 'none',		# (read/write via aliases)
 			label => 'Short number',
 			ldap => { cgp => 'uid' },
+			is_duplicate => 1,
 		},
 		mailgroups => {
 			type => 'mgroups',
 			label => 'Mail groups',
 			popup => 'mgroups',
 			ldap => { cgp => 'uid' },
+			is_duplicate => 1,
 		},
 		domainIntercept => {
 			type => 'domainIntercept',
 			label => 'Domain Intercept',
 			checkbox => 1,
 			ldap => { cgp => 'uid' },
+			is_duplicate => 1,
 		},
 		userIntercept => {
 			type => 'userIntercept',
 			label => 'User Intercept',
 			checkbox => 1,
 			ldap => { cgp => 'uid' },
+			is_duplicate => 1,
 		},
 		# Personal / Extended...
 		telephoneNumber => {
@@ -460,6 +468,7 @@ my %all_attrs = (
 			type => 'real_gidn',
 			label => 'Real group id',
 			readonly => 1,
+			is_duplicate => 1,
 		},
 	},
 	########## group ##########
@@ -718,7 +727,7 @@ sub setup_all_attrs ()
 		$all_lc_attrs{$objtype} = {};
 		my $descs = $all_attrs{$objtype};
 
-		for my $name (keys %$descs) {
+		for my $name (sort keys %$descs) {
 
 			my $desc = $descs->{$name};
 			$all_lc_attrs{$objtype}->{lc($name)} = $desc;
@@ -783,7 +792,7 @@ sub setup_all_attrs ()
 
 				my $ldapattr = $ldap->{$srv};
 				my $cfg = get_server($srv);
-				if ($cfg->{attrhash}{$objtype}{$ldapattr}) {
+				if ($cfg->{attrhash}{$objtype}{$ldapattr} && !$desc->{is_duplicate}) {
 					log_debug('duplicate attribute "%s" as "%s" for server "%s"',
 							$name, $ldapattr, $srv);
 				}
@@ -3390,7 +3399,7 @@ sub users_refresh ()
 	$model->clear;
 
 	ldap_reconnect_all();
-	rework_accounts();
+	rework_accounts() if $config{rework_accounts};
 
 	my $res = ldap_search('uni', "(objectClass=person)", \@attrs);
 	my @users = $res->entries;
