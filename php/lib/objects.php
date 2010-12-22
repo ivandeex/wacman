@@ -30,6 +30,7 @@ function setup_all_attrs () {
     global $convtype2subs;
     global $gui_attrs;
     global $all_lc_attrs;
+    global $config;
 
     $all_lc_attrs = array();
 
