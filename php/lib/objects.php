@@ -28,6 +28,8 @@ function setup_all_attrs () {
     global $servers;
     global $ldap_rw_subs;
     global $convtype2subs;
+    global $gui_attrs;
+    global $all_lc_attrs;
 
     $all_lc_attrs = array();
 
@@ -43,26 +45,28 @@ function setup_all_attrs () {
         foreach ($descs as $name => &$desc) {
 
             $desc['name'] = $name;
+            $desc['visual'] = false;
             if (empty($desc['type']))
                 $desc['type'] = 'string';
             if (isset($desc['label']))
 			    $desc['label'] = _T($desc['label']);
             if (! isset($desc['readonly']))
-                $desc['readonly'] = 0;
+                $desc['readonly'] = false;
             if (! isset($desc['verify']))
-                $desc['verify'] = 0;
+                $desc['verify'] = false;
+            if (! isset($desc['colwidth']))
+                $desc['colwidth'] = null;
 
             if (! isset($desc['popup']))
-			    $desc['popup'] = 0;
+			    $desc['popup'] = null;
             if (! isset($desc['checkbox']))
-			    $desc['checkbox'] = 0;
+			    $desc['checkbox'] = false;
             if ($desc['checkbox'])
                 $desc['popup'] = 'yesno';
 			
             if (! isset($desc['defval'])) {
                 $cfg_def = "default_value_${objtype}_${name}";
-                if (isset($config[$cfg_def]))
-                    $desc['defval'] = $config[$cfg_def];
+                $desc['defval'] = isset($config[$cfg_def]) ? $config[$cfg_def] : null;
             }
 
             if (! isset($desc['conv']))
@@ -80,9 +84,11 @@ function setup_all_attrs () {
             if (isset($desc['copyfrom']) && !isset($descs[$desc['copyfrom']]))
                 log_error('%s attribute "%s" is copy-from unknown "%s"',
                             $objtype, $name, $desc['copyfrom']);
+            if (! isset($desc['copyfrom']))
+                $desc['copyfrom'] = null;
 
             if (! isset($desc['disable']))
-			    $desc['disable'] = 0;
+			    $desc['disable'] = false;
 
             $ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
             if (! is_array($ldap)) {
@@ -145,6 +151,15 @@ function setup_all_attrs () {
             sort($arr);
             $cfg['attrlist'][$objtype] = $arr;
             unset($cfg['attrhash']);
+        }
+    }
+
+    // mark visual attributes
+    foreach ($gui_attrs as $objtype => &$obj_gui) {
+        foreach ($obj_gui as &$gui_tab) {
+            foreach ($gui_tab[1] as $name) {
+                $all_attrs[$objtype][$name]['visual'] = true;
+            }
         }
     }
 }

@@ -21,19 +21,19 @@ $all_attrs = array(
             'type' => 'dn',
             'ldap' => 'uni',
             'label' => 'UNIX DN',
-            'readonly' => 1,
+            'readonly' => true,
         ),
         'ntDn' => array(
             'type' => 'dn',
             'ldap' => 'ads',
             'label' => 'Windows DN',
-            'readonly' => 1,
+            'readonly' => true,
         ),
         'cgpDn' => array(
             'type' => 'dn',
             'ldap' => 'cgp',
             'label' => 'CGP DN',
-            'readonly' => 1,
+            'readonly' => true,
         ),
         'objectClass' => array(
             'type' => 'class',
@@ -84,7 +84,7 @@ $all_attrs = array(
                 'ads' => 'unicodePwd',
                 'cgp' => 'userPassword'
             ),
-            'verify' => 1,
+            'verify' => true,
         ),
         'mail' => array(
             'label' => 'Mail',
@@ -190,12 +190,12 @@ $all_attrs = array(
         'ntUserLastLogon' => array(
             'conv' => 'adtime',
             'ldap' => 'ntuser',
-            'disable' => 1,
+            'disable' => true,
         ),
         'ntUserDomainId' => array(
             'ldap' => 'ntuser',
             'copyfrom' => 'uid',
-            'disable' => 1,
+            'disable' => true,
         ),
         // ======== Active Directory disabled... ========
         'ufn'			=> array( 'conv' => 'bkslash', ),
@@ -215,11 +215,11 @@ $all_attrs = array(
         'countryCode'   => array( 'defval' => '0', ),
         'logonCount'    => array( 'defval' => '0', ),
         'pwdLastSet'    => array( 'defval' => '0', ),
-        'objectCategory'=> array( 'disable' => 1 ),
+        'objectCategory'=> array( 'disable' => true ),
         'samAccountType'=> array(
             'defval' => SAM_USER_OBJECT,
             'conv' => 'decihex',
-            'disable' => 1,
+            'disable' => true,
         ),
         // ======== CommuniGate Pro ========
         'hostServer' => array(
@@ -248,13 +248,13 @@ $all_attrs = array(
         'domainIntercept' => array(
             'type' => 'domainIntercept',
             'label' => 'Domain Intercept',
-            'checkbox' => 1,
+            'checkbox' => true,
             'ldap' => array( 'cgp' => 'uid' ),
         ),
         'userIntercept' => array(
             'type' => 'userIntercept',
             'label' => 'User Intercept',
-            'checkbox' => 1,
+            'checkbox' => true,
             'ldap' => array( 'cgp' => 'uid' ),
         ),
         // ======== Personal / Extended... ========
@@ -276,13 +276,13 @@ $all_attrs = array(
             'ldap' => array( 'uni' => 'uidNumber' ),
             'type' => 'real_uidn',
             'label' => 'Real user id',
-            'readonly' => 1,
+            'readonly' => true,
         ),
         'real_gidn' => array(
             'ldap' => array( 'uni' => 'gidNumber' ),
             'type' => 'real_gidn',
             'label' => 'Real group id',
-            'readonly' => 1,
+            'readonly' => true,
         ),
     ),
     // ============ group ============

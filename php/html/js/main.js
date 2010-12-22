@@ -196,7 +196,7 @@ function set_attr(obj, name, val) {
         at.state = 'empty';
     else if (val == at.old)
         at.state = 'orig';
-    else if (('entry' in at) && (val == at.entry.getValue()))
+    else if (at.desc.visual && val == at.entry.getValue())
         at.state = 'user';
     else
         at.state = 'calc';
@@ -303,7 +303,7 @@ function string2id(s) {
 }
 
 function get_obj_config (obj, what, override) {
-    var dn = trim(what in config ? config[what] : '');
+    var dn = trim((what in config) ? config[what] : '');
     var name;
 	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
 		name = name[1];
@@ -325,12 +325,12 @@ function obj_setup (obj) {
     if (obj.form_is_setup)
         return;
     for (var name in obj.attr) {
-        var attr = obj.attr[name];
-        if (attr.desc.disable)
+        var at = obj.attr[name];
+        if (at.desc.disable || !at.desc.visual)
             continue;
-        if (!('entry' in attr) || attr.entry == null)
-            attr.entry = Ext.getCmp(attr.id);
-        attr.val = trim(attr.entry.getValue());
+        if (at.entry == null)
+            at.entry = Ext.getCmp(attr.id);
+        at.val = trim(at.entry.getValue());
     }
     obj.form = Ext.getCmp(obj.name + '_form');
     obj.form_is_setup = true;
@@ -354,20 +354,21 @@ function obj_submit (obj) {
 
 function update_obj_gui (obj, only) {
     for (var name in obj.attr) {
-        var attr = obj.attr[name];
-        if (! attr.desc.disable && ('entry' in attr) && (!only || name == only)) {
-            if (attr.val != trim(attr.entry.getValue()))
-                attr.entry.setValue(attr.val);
-        }
+        var at = obj.attr[name];
+        if (!at.desc.disable
+                && at.desc.visual
+                && (!only || name == only)
+                && at.val != trim(at.entry.getValue()))
+            at.entry.setValue(at.val);
     }
 }
 
 function obj_fill_defs (obj) {
     for (var name in obj.attr) {
         var desc = obj.attr[name].desc;
-        if ('defval' in desc)
+        if (desc.defval != null)
             cond_set(obj, name, desc.defval);
-        if (('copyfrom' in desc) && has_attr(obj, desc.copyfrom))
+        if (desc.copyfrom != null && has_attr(obj, desc.copyfrom))
             cond_set(obj, name, get_attr(obj, desc.copyfrom));
     }
 }
@@ -376,15 +377,15 @@ function request_next_id (which, obj, name, format) {
     if (has_attr(obj, name))
         return;
     var at = obj.attr[name];
-    if (at.requested && at.val != '')
+    if (at.requesting || (at.requested && at.val != ''))
         return;
-    at.requested = true;
+    at.requesting = at.requested = true;
     log_debug('request_id(%s,%s,%s) in progress (state=%s)', which, obj.name, name, obj.attr[name].state);
     Ext.Ajax.request({
         url: 'next-id.php?which=' + which,
         success: function (resp, opts) {
-            var id = trim(resp.responseText);
-            id = id.replace(/[^0-9]/g, '');
+            at.requesting = false;
+            var id = trim(resp.responseText).replace(/[^0-9]/g, '');
             if (format)
                 id = format(id);
             if (cond_set(obj, name, id))
@@ -392,6 +393,7 @@ function request_next_id (which, obj, name, format) {
             log_debug('request_id(%s,%s,%s) returns "%s"', which, obj.name, name, id);
         },
         failure: function (resp, opts) {
+            at.requesting = false;
             log_debug('request_id(%s,%s,%s) failed', which, obj.name, name);
         }
     });
@@ -602,11 +604,57 @@ function btn_id (obj, op) {
     return 'btn_' + obj.name + '_' + op;
 }
 
-function create_obj_tab (obj) {
-
-    var col_gap = 2;
-    var label_width = 150;
+function init_attr (obj, name) {
     var right_gap = 20;
+    var col_gap = 2;
+    var desc = all_attrs[obj.name][name];
+
+    var at = {
+        val: '',
+        old: '',
+        state: 'empty',
+        obj: obj,
+        desc: desc,
+        entry: null,
+        id: 'field_' + obj.name + '_' + name,
+        requesting: false,
+        requested: false
+    };
+    obj.attr[name] = at;
+
+    if (desc.disable || !desc.visual)
+         return at;
+
+    if (desc.colwidth) {
+        obj.list_width += desc.colwidth + col_gap;
+        obj.list_cols.push({
+            header: _T(desc.label),
+            dataIndex: name,
+            sortable: true,
+            width: desc.colwidth,
+        });
+    }
+
+    var cfg = {
+        name: name,
+        fieldLabel: _T(desc.label),
+        readonly: desc.readonly,
+        anchor: '-' + right_gap,
+        listeners: { valid: obj.do_entry },
+        id: at.id,
+        _attr: at,
+    };
+
+    if (desc.type == 'pass' && !config.show_password)
+        cfg.inputType = 'password';
+
+    at.entry = desc.popup ? new Ext.form.PopupField(cfg)
+                          : new Ext.form.FillerField(cfg);
+    return at;
+}
+
+function create_obj_tab (obj) {
+    var label_width = 150;
 
     obj.attr = {};
     obj.form_is_setup = false;
@@ -631,9 +679,10 @@ function create_obj_tab (obj) {
         }, obj.rec)
     });
 
+    // setup visual attributes
     var desc_tabs = [];
-    var list_cols = [];
-    var list_width = col_gap;
+    obj.list_cols = [];
+    obj.list_width = 1;
 
     for (var i = 0; i < form_attrs.length; i++) {
 
@@ -642,52 +691,9 @@ function create_obj_tab (obj) {
         var entries = [];
 
         for (var j = 0; j < tab_attrs.length; j++) {
-
-            var attr_name = tab_attrs[j];
-            var desc = all_attrs[obj.name][attr_name];
-            if (!desc) {
-                Ext.Msg.alert(_T('attribute "%s" in object "%s" not defined', attr_name, obj.name));
-                continue;
-            }
-
-            attr = {
-                val: '',
-                old: '',
-                state: 'empty',
-                obj: obj,
-                desc: desc,
-                requested: false,
-                id: 'field_' + obj.name + '_' + attr_name
-            };
-            obj.attr[desc.name] = attr;
-            if (desc.disable)
-                continue;
-
-            if ('colwidth' in desc) {
-                list_width += desc.colwidth + col_gap;
-                list_cols.push({
-                    header: _T(desc.label),
-                    dataIndex: attr_name,
-                    sortable: true,
-                    width: desc.colwidth,
-                });
-            }
-
-            var entry = {
-                xtype: desc.popup ? 'popupfield' : 'fillerfield',
-                name: desc.name,
-                fieldLabel: _T(desc.label),
-                readonly: desc.readonly,
-                anchor: '-' + right_gap,
-                listeners: { valid: obj.do_entry },
-                id: attr.id,
-                _attr: attr,
-            };
-
-            if (desc.type == 'pass' && !config.show_password)
-                entry.inputType = 'password';
-
-            entries.push(entry);
+            var at = init_attr(obj, tab_attrs[j]);
+            if (at.entry)
+                entries.push(at.entry);
         }
 
         if (entries.length) {
@@ -706,6 +712,13 @@ function create_obj_tab (obj) {
 
     if (! desc_tabs.length)
         return null;
+
+    // setup non-visual attributes
+    for (var name in all_attrs[obj.name]) {
+        if (name in obj.attr)
+            continue;
+        init_attr(obj, name);
+    }
 
     var form_btn_prefix = '';// + _T(obj.title) + ': ';
 
@@ -763,7 +776,7 @@ function create_obj_tab (obj) {
         id: obj.name + '_list',
 
         colModel: new Ext.grid.ColumnModel({
-            columns: list_cols
+            columns: obj.list_cols
         }),
 
         selModel: new Ext.grid.RowSelectionModel({
@@ -778,7 +791,7 @@ function create_obj_tab (obj) {
         split: true,
         collapsible: true,
         //collapseMode: 'mini',
-        width: list_width,
+        width: obj.list_width,
         minSize: 50
     };
 
