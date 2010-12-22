@@ -302,13 +302,11 @@
  
 */
 if(!defined('PHP_CGP_CLI_CLASS')) {
-    
+
     define('PHP_CGP_CLI_CLASS',1);
-    
+
     class CLI {
-        
-        
-        
+
         // class variables
         var $PeerAddr               = '';
         var $PeerPort               = 106;
@@ -323,8 +321,8 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         var $errMsg                 = '';
         var $currentCGateCommand    = '';
         var $inlineResponse         = '';
-    
-        
+
+
         // Connect to the server
         function Login($PeerAddr, $PeerPort, $login, $password) {
             
@@ -356,7 +354,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
                     $out = fgets($sp, 1024);
                 }
                 if($this->debug)
-                    echo "$out";
+                    $this->_logDebug($out);
                 
                 // reset our socket pointer to blocking mode,
                 // so we can wait for communication to finish
@@ -2316,7 +2314,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function _parseResponse() {
             $line = fgets($this->sp, (1024*10));
             if($this->debug) 
-                echo "$line\n";
+                $this->_logDebug("$line\n");
             if(preg_match("/^(\d+)\s(.*)$/",$line,$matches)) {
                 $this->errCode = $matches[1];
                 if($matches[1] == 201) {
@@ -2422,7 +2420,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function send($command) {
             $this->currentCGateCommand = $command;
             if($this->debug)
-                echo "SENT: fputs($"."this->sp,\"$command\")\n";
+                $this->_logDebug("SENT: fputs($"."this->sp,\"$command\")\n");
             fputs($this->sp,"$command\n");
         }
         
@@ -2556,7 +2554,15 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             return $this->readValue();
         }
         
-    
+        // logging
+        function _logDebug($line) {
+            if ($this->debug) {
+                echo($line);
+                #$line = preg_replace('/\n$/', '', $line);
+                #log_debug("cli: $line");
+            }
+        }
+
     } // end CLI class
 
 }
