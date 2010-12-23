@@ -28,6 +28,10 @@ function & get_server ($srv, $allow_disabled = false) {
 }
 
 
+///////////////////////////////////////////////
+// Protocol basics
+//
+
 function uldap_connect ($srv) {
     global $servers;
     $cfg =& $servers[$srv];
@@ -187,15 +191,14 @@ function uldap_search ($srv, $filter, $attrs = null, $params = null)
     $res['error'] = '';
     set_error();
     if ($cfg['debug'])
-        log_error('LDAP(%s) search[%s]: %s', $srv, $filter, json_encode(uldap_convert_array($res['data'])));
+        log_debug('LDAP(%s) search[%s]: %s', $srv, $filter, json_encode(uldap_convert_array($res['data'])));
     return $res;
 }
 
 
 //////////////////////////////////////////////////////////////
-// ================  ldap readers / writers  ================
+// Readers / Writers
 //
-
 
 function ldap_read_none () {
     return '';
@@ -279,6 +282,10 @@ function ldap_write_class (&$at, $srv, $ldap, $name, $val) {
 }
 
 
+//////////////////////////////////////////////////////////////
+// Unix OpenLDAP
+//
+
 function ldap_read_unix_gidn (&$at, $srv, $ldap, $name) {
     $val = nvl(uldap_value($ldap, $at['name']));
 	if (is_int($val)) {
@@ -293,20 +300,6 @@ function ldap_read_unix_gidn (&$at, $srv, $ldap, $name) {
         }
     }
     return $val;
-}
-
-
-function ldap_read_real_uidn (&$at, $srv, $ldap, $name) {
-    $username = nvl(uldap_value($ldap, 'uid'));
-    $pwent = posix_getpwnam($username);
-    return $pwent === FALSE ? '' : $pwent['uid'];
-}
-
-
-function ldap_read_real_gidn (&$at, $srv, $ldap, $name) {
-    $username = nvl(uldap_value($ldap, 'uid'));
-    $pwent = posix_getpwnam($username);
-    return $pwent === FALSE ? '' : $pwent['gid'];
 }
 
 
@@ -657,78 +650,98 @@ function ldap_write_unix_members_final (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_aliases (&$at, $srv, $ldap, $name) {
-    $dn = nvl(uldap_dn($ldap));
-    if ($dn == '')
-        return '';
-    $aliases = array();
-    $telnum = '';
-    $old_telnum = get_attr($at['obj'], 'telnum', array('orig' => 1));
-    $entries = uldap_search($srv, "(&(objectClass=alias)(aliasedObjectName=$dn))", array('uid'));
-    $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
-    foreach ($entries as $e) {
-        $alias = uldap_value($e, 'uid');
-        if ($old_telnum == '' && $telnum == '' && preg_match($telnum_pat, $alias)) {
-			$telnum = $alias;
-        } else {
-            $aliases[] = $alias;
-        }
-    }
-    $aliases = join_list($aliases);
-    log_debug('read aliases: telnum="%s" aliases="%s"', $telnum, $aliases);
-    if ($telnum != '')
-        init_attr($at['obj'], 'telnum', $telnum);
-    return $aliases;
-}
+//////////////////////////////////////////////////////////////
+// Active Directory
+//
 
 
-function ldap_write_aliases_final (&$at, $srv, $ldap, $name, $val) {
-    $obj =& $at['obj'];
-    $old = append_list(nvl($at['old']), get_attr($obj, 'telnum', array('orig' => 1))); # FIXME!!!
-    $new = append_list(nvl($at['val']), get_attr($obj, 'telnum'));
-    log_debug('write_aliases_final: old="%s" new="%s"', $old, $new);
-    if ($old == $new)
-        return 0;
-    if (get_config('cgp_buggy_ldap')) {
-        $mail = get_attr($obj, 'mail');
-        $res = cli_cmd('SetAccountAliases %s (%s)', $mail, join_list(split_list($new)));
-        log_debug('set_mail_aliases: code="%s" msg="%s" out="%s"',
-                    $res['code'], $res['msg'], $res['out']);
-        if ($res['code'] == 0)
-            return 1;
+function ad_read_pri_group (&$at, $srv, $ldap, $name) {
+	return 0;
+/*
+    my $pgname = $config{ad_primary_group};
+    my $res = ldap_search($srv, "(&(objectClass=group)(cn=$pgname))", [ 'PrimaryGroupToken' ]);
+    my $gid = 0;
+    my $group = $res->pop_entry;
+    $gid = $group->get_value('PrimaryGroupToken') if defined $group;
+    $gid = 0 unless $gid;
+    if ($res->code || !defined($group) || !$gid) {
         message_box('error', 'close',
-                    _T('Cannot change mail aliases for "%s": %s', $mail, $res['msg']));
-        return 0;
-    } else {
-        $aliased = get_attr($obj, 'cgpDn');
-        log_debug('write_aliases(1): old=(%s) new=(%s)', $old, $new);
-        $arr = compare_lists($old, $new);
-        $old = $arr[0];
-        $new = $arr[1];
-        log_debug('write_aliases(2): del=(%s) add=(%s)', $old, $new);
-        foreach (split_list($old) as $aid) {
-            $dn = get_obj_config($obj, 'cgp_user_dn', array('uid' => $aid));
-            $res = uldap_delete($srv, $dn);
-            log_debug('Removing mail alias "%s" for "%s": %s', $dn, $aliased, $res['error']);
-        }
-        foreach (split_list($new) as $aid) {
-            $dn = get_obj_config($obj, 'cgp_user_dn', array('uid' => $aid));
-            log_debug('Adding mail alias "%s" for "%s": %s', $dn, $aliased, 'unimplemented');
-        }
-        return ($old != '' || $new != '');
+            _T('Error reading Windows group "%s" (%s): %s', $name, $gid, $res->error));
     }
+    return $gid;
+*/
 }
 
 
-function ldap_read_mail_groups (&$at, $srv, $ldap, $name) {
-    $uid = nvl(uldap_value($ldap, 'uid'));
-    if ($uid == '')
-        return '';
-    $entries = uldap_search($srv, "(&(objectClass=CommuniGateGroup)(groupMember=$uid))", array('uid'));
-    $arr = array();
-    foreach ($entries as $ue)
-        $arr[] = uldap_value($ue, 'uid');
-    return join_list($arr);
+function ad_write_pri_group (&$at, $srv, $ldap, $name, $val) {
+	// writing not supported: AD refuses to set PrimaryGroupID
+	return 0;
+}
+
+
+function ad_read_sec_groups (&$at, $srv, $ldap, $name) {
+	return '';
+/*
+    my $filter = join( '', map("(cn=$_)", split_list $config{ad_user_groups}) );
+    my $res = ldap_search($srv, "(&(objectClass=group)(|$filter))");
+    if ($res->code) {
+        message_box('error', 'close',
+            _T('Error reading list of Windows groups: %s', $res->error));
+    }
+    return join_list map { $_->get_value('name') } $res->entries;
+*/
+}
+
+
+function ad_write_sec_groups_final (&$at, $srv, $ldap, $name, $val) {
+	return 0;
+/*
+    my $dn = get_attr($at->{obj}, 'ntDn');
+
+    for my $gname (split_list $config{ad_user_groups}) {
+        my $res = ldap_search($srv, "(&(objectClass=group)(cn=$gname))");
+        my $grp = $res->pop_entry;
+        if ($res->code || !$grp) {
+        message_box('error', 'close',
+            _T('Error reading Windows group "%s": %s', $gname, $res->error));
+            next;
+        }
+        my $found = 0;
+        for ($grp->get_value('member')) {
+            if ($_ eq $dn) {
+                $found = 1;
+                last;
+            }
+        }
+        next if $found;
+        $grp->add(member => $dn);
+        $res = ldap_update('ads', $grp);
+        if ($res->code) {
+            message_box('error', 'close',
+                _T('Error adding "%s" to Windows-group "%s": %s',
+                    get_attr($at->{obj}, 'cn'), $gname, $res->error));
+        }
+    }
+    return 0;
+*/
+}
+
+
+//////////////////////////////////////////////////////////////
+// POSIX passwd
+//
+
+function posix_read_real_uidn (&$at, $srv, $ldap, $name) {
+    $username = nvl(uldap_value($ldap, 'uid'));
+    $pwent = posix_getpwnam($username);
+    return $pwent === FALSE ? '' : $pwent['uid'];
+}
+
+
+function posix_read_real_gidn (&$at, $srv, $ldap, $name) {
+    $username = nvl(uldap_value($ldap, 'uid'));
+    $pwent = posix_getpwnam($username);
+    return $pwent === FALSE ? '' : $pwent['gid'];
 }
 
 

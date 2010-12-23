@@ -406,15 +406,15 @@ $ldap_rw_subs = array(
     'gid'     => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', 'ldap_write_none' ),
     'groups'  => array( 'ldap_read_unix_groups', 'ldap_write_none', 'ldap_write_unix_groups_final' ),
     'users'   => array( 'ldap_read_unix_members', 'ldap_write_unix_members', 'ldap_write_unix_members_final' ),
-    'ntprig'  => array( 'ldap_read_ad_pri_group', 'ldap_write_ad_pri_group', 'ldap_write_none' ),
-    'ntsecg'  => array( 'ldap_read_ad_sec_groups', 'ldap_write_none', 'ldap_write_ad_sec_groups_final' ),
-    'aliases' => array( 'ldap_read_aliases', 'ldap_write_none', 'ldap_write_aliases_final' ),
-    'mgroups' => array( 'ldap_read_mail_groups', 'ldap_write_none', 'ldap_write_mail_groups_final' ),
+    'ntprig'  => array( 'ad_read_pri_group', 'ad_write_pri_group', 'ldap_write_none' ),
+    'ntsecg'  => array( 'ad_read_sec_groups', 'ldap_write_none', 'ad_write_sec_groups_final' ),
+    'aliases' => array( 'cgp_read_aliases', 'ldap_write_none', 'cgp_write_aliases_final' ),
+    'mgroups' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
     'domainIntercept' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),
     'userIntercept' => array( 'cgp_read_user_intercept', 'ldap_write_none', 'cgp_write_user_intercept' ),
     'mailgroup' => array( 'ldap_read_none', 'ldap_write_none', 'ldap_write_none' ),
-    'real_uidn' => array( 'ldap_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
-    'real_gidn' => array( 'ldap_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
+    'real_uidn' => array( 'posix_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
+    'real_gidn' => array( 'posix_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
     );
 
 
