@@ -7,7 +7,7 @@
 function cgp_read_domain_intercept (&$at, $srv, $ldap, $name) {
 	$res = cli_cmd('GetDomainMailRules %s', get_config('mail_domain'));
 	if ($res['code']) {
-		log_info('cgp_read_domain_intercept error: %s', $res->{msg});
+		log_error('cgp_read_domain_intercept error: %s', $res['error']);
 		return 0;
 	}
 /*

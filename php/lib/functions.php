@@ -52,14 +52,28 @@ function error_page ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = tru
     }
 }
 
+/////////////////////////////////
+// Basic functions
+//
+
+function str2bool($s) {
+    if (empty($s))  return false;
+    $s = trim($s);
+    if (empty($s))  return false;
+    return (strpos("yto1", strtolower(substr($s,0,1))) !== FALSE);
+}
+
+function bool2str($v) {
+    return str2bool($v) ? 'Yes' : 'No';
+}
+
+function nvl ($s) {
+    return empty($s) ? '' : trim($s);
+}
 
 /////////////////////////////////
 // List functions
 //
-
-function nvl ($str) {
-    return empty($str) ? '' : trim($str);
-}
 
 function split_list ($str, $asstring = false) {
     $str = nvl($str);
