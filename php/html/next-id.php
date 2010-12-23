@@ -50,9 +50,9 @@ switch ($which) {
                 if (preg_match($telnum_pat, $alias))
                     $telnums[$alias] = 1;
             }
-            $res2 = cli_cmd('GetAccountTelnums', $email);
-            foreach ($res2['data'] as $telnum)
-                $telnums[$telnum] = 1;
+            #$res2 = cli_cmd('GetAccountTelnums', $email);
+            #foreach ($res2['data'] as $telnum)
+            #    $telnums[$telnum] = 1;
         }
 
         list($min_telnum, $max_telnum) = array(get_config('min_telnum'), get_config('max_telnum'));
