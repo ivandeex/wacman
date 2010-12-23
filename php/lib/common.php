@@ -32,7 +32,7 @@ $includes = array(
     'http.php',
     'ldap.php',
     'CLI.php',
-    'communigate.php',
+    'cgpro.php',
     'attrs.php',
     'objects.php'
     );

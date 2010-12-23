@@ -327,61 +327,33 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function Login($PeerAddr, $PeerPort, $login, $password) {
             
             // Must have a login and password
-            if (!isset( $login )) {
-                die ("You must pass login parameter to cgpCLI\n");
-            }
-            if (!isset( $password )) {
-                die ("You must pass password paramter to cgpCLI\n");
-            }
-            $out = '';
-            $sp = fsockopen( $PeerAddr, $PeerPort, $errno, $errstr );
-            if($sp) {
+            if (!isset($login) || !isset($password))
+                die("You must pass login and password to cgpCLI\n");
 
-                $this->sp = $sp;
+            $sp = fsockopen($PeerAddr, $PeerPort, $errno, $errstr);
+            if (!$sp)
+                die("fsockopen: $errno: $errstr\n");
+            $this->sp = $sp;
 
+            // set our socket pointer to blocking mode,
+            stream_set_blocking($sp, 1);
+            stream_set_timeout($sp, 10);
 
-                // set our created socket for $sp to 
-                // non-blocking mode so that our fgets()
-                // calls will return with a quickness
-                if (function_exists('stream_set_blocking')) {
-                    stream_set_blocking ( $sp, false );
-                } else {
-                    set_socket_blocking ( $sp, false );
-                }
-                
-                // get greeting
-                while($out == '') {
-                    $out = fgets($sp, 1024);
-                }
-                if($this->debug)
-                    $this->_logDebug($out);
-                
-                // reset our socket pointer to blocking mode,
-                // so we can wait for communication to finish
-                // before moving on ...
-                if (function_exists('stream_set_blocking')) {
-                    stream_set_blocking ( $sp, true );
-                } else {
-                    set_socket_blocking ( $sp, true );
-                }
-                
-                // secure login -- grab what we need from greeting
-                preg_match("/(\<.*\@*\>)/",$out,$matches);
-                $this->send('APOP '.$login.' '.md5($matches[1].$password));
+            // get greeting
+            $this->_parseResponse();
+
+            // secure login -- grab what we need from greeting
+            if (! preg_match("/(\<.*\@*\>)/", $this->errMsg, $matches))
+                return false;
+
+            $this->send('APOP '.$login.' '.md5($matches[1].$password));
+            if ($this->_parseResponse()) {
+                // Set to INLINE mode
+                $this->send('INLINE');
                 $this->_parseResponse();
-                
-                if ($this->isSuccess()) {
-                    // Set to INLINE mode
-                    $this->send('INLINE');
-                    $this->_parseResponse();
-                }
-                
-            } else {
-                echo "$errno: $errstr\n";
-                exit;
             }
-                
-        
+
+            return $this->isSuccess();
         }
 
         //////////////////////////////////////////////////
@@ -400,13 +372,9 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         }
         
         function isSuccess() {
-            if($this->errCode == 200 || $this->errCode == 201) {
-                return true;
-            } else {
-                return false;
-            }
+            return ($this->errCode == 200 || $this->errCode == 201);
         }
-        
+
         function setDebug($debugFlag) {
             $this->debug = $debugFlag;
         }
@@ -2299,7 +2267,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         // Internal routines
         
         // sub _setStrangeError
-        function _setStrangeError($line,$code) {
+        function _setStrangeError($line, $code) {
             if($code != '') {
                 $this->errCode = $code;
             } else {
@@ -2309,28 +2277,30 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             $this->errMsg = rtrim($line);
             return false;
         }
-    
+
         // sub _parseResponse
         function _parseResponse() {
-            $line = fgets($this->sp, (1024*10));
+            $line = fgets($this->sp, 10240);
             if($this->debug) 
-                $this->_logDebug("$line\n");
-            if(preg_match("/^(\d+)\s(.*)$/",$line,$matches)) {
-                $this->errCode = $matches[1];
-                if($matches[1] == 201) {
-                    // inline response
-                    $this->inlineResponse = $matches[2];
-                    $this->errMsg = "OK";
-                } else {
-                    // error
-                    $this->errMsg = rtrim($matches[2]);
-                }
-                $this->isSuccess();
-            } else {
-                $this->_setStrangeError($line,$code);
+                $this->_logDebug("RESP: [" . preg_replace('/[\r\n]+$/', '', $line) . "]");
+            if (! preg_match("/^(\d+)\s(.*)$/", $line, $matches)) {
+                $this->_setStrangeError($line, '');
+                return false;
             }
+
+            $this->errCode = $matches[1];
+            if ($matches[1] == 201) {
+                // inline response
+                $this->inlineResponse = $matches[2];
+                $this->errMsg = "OK";
+            } else {
+                // error
+                $this->inlineResponse = '';
+                $this->errMsg = rtrim($matches[2]);
+            }
+            return $this->isSuccess();
         }
-        
+
         // sub convertOutput
         // prepares the $data for sending via fputs
         function convertOutput($data,$translate) {
@@ -2420,8 +2390,8 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function send($command) {
             $this->currentCGateCommand = $command;
             if($this->debug)
-                $this->_logDebug("SENT: fputs($"."this->sp,\"$command\")\n");
-            fputs($this->sp,"$command\n");
+                $this->_logDebug("SENT: [$command]");
+            fputs($this->sp, $command . "\n");
         }
         
         // sub skipSpaces
@@ -2535,11 +2505,13 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
                 } else {
                     $theKey = $this->readKey();
                     $this->skipSpaces();
-                    if(substr($this->data,$this->span,1) != '=') die("CGPro output format error at '=':".substr($this->data,$this->span,10)."\n");
+                    if (substr($this->data,$this->span,1) != '=')
+                        die("CGPro output format error at '=':".substr($this->data,$this->span,10)."\n");
                     ++$this->span;
                     $result["$theKey"] = $this->readValue();
                     $this->skipSpaces();
-                    if(substr($this->data,$this->span,1) != ';') die("CGPro output format error while reading value:".substr($this->data,$this->span,10)."\n");
+                    if (substr($this->data,$this->span,1) != ';')
+                        die("CGPro output format error while reading value:".substr($this->data,$this->span,10)."\n");
                     ++$this->span;
                 }
             }
@@ -2556,11 +2528,10 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         
         // logging
         function _logDebug($line) {
-            if ($this->debug) {
+            if ($this->debug == 2 && function_exists("log_debug"))
+                log_debug("CLI: " . preg_replace('/[\r\n]+$/', '', $line));
+            elseif ($this->debug)
                 echo($line);
-                #$line = preg_replace('/\n$/', '', $line);
-                #log_debug("cli: $line");
-            }
         }
 
     } // end CLI class

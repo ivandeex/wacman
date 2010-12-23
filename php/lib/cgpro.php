@@ -17,11 +17,9 @@ function cli_connect () {
     $cfg['user'] = $creds['user'];
     $cfg['pass'] = $creds['pass'];
     $cfg['connected'] = 0;
-    #log_debug('connecting to CLI: host %s port %s as user %s pass %s',
-    #          $cfg['host'], $cfg['port'], $cfg['user'], $cfg['pass']);
     $cfg['cli'] = $cli = new CLI;
     if ($cfg['debug'])
-        $cli->SetDebug(1);
+        $cli->SetDebug(2);
     $cli->Login($cfg['host'], $cfg['port'], $cfg['user'], $cfg['pass']);
     if (! $cli->isSuccess()) {
         log_error('cannot bind to CLI: ' . $cli->getErrMessage());
