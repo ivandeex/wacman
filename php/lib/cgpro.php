@@ -25,7 +25,7 @@ function cli_connect () {
         log_error('cannot bind to CLI: ' . $cli->getErrMessage());
         return -1;
     }
-    #log_debug('successfully connected to CLI');
+    log_debug('connected to cgp cli');
     $cfg['connected'] = 1;
     return 0;
 }
@@ -99,6 +99,5 @@ function __dict2str ($d)
 	}
 	return $s . '}';
 }
-
 
 ?>

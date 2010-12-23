@@ -52,7 +52,8 @@ function uldap_connect ($srv) {
         log_error('error binding to server "%s"', $srv);
         return -1;
     }
-    log_debug('connecting to server "%s"...', $srv);
+    if ($srv == 'ads')
+        @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
     $okay = @ldap_bind($cfg['ldap'], $cfg['user'], $cfg['pass']);
     if (! $okay) {
         log_error('cannot bind to server "%s" (%s): %s',
@@ -60,7 +61,7 @@ function uldap_connect ($srv) {
         return -1;
     }
     $cfg['connected'] = 1;
-    log_debug('successfully connected to server "%s"', $srv);
+    log_debug('connected to server "%s"', $srv);
     return 0;
 }
 
@@ -68,10 +69,8 @@ function uldap_connect ($srv) {
 function uldap_connect_all () {
     global $servers;
     foreach ($servers as $srv => &$cfg) {
-        log_info('connecting to "%s"', $srv);
         $cfg['connected'] = 0;
-        if (uldap_connect($srv) < 0)
-            log_error('connection to "%s" failed', $srv);
+        uldap_connect($srv);
     }
 }
 
@@ -170,20 +169,25 @@ function uldap_search ($srv, $filter, $attrs = null, $params = null)
         return array('code' => -1, 'error' => 'not connected', 'data' => array('count' => 0));
     $conn = $cfg['ldap'];
     $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
-    if ($handle === FALSE)
-        return array('code' => ldap_errno($conn), 'error' => ldap_error($conn), 'data' => array('count' => 0));
+    if ($handle === FALSE) {
+        $res = array('code' => ldap_errno($conn), 'error' => ldap_error($conn), 'data' => array('count' => 0));
+        log_error('LDAP(%s) search[%s] failed: %s', $srv, $filter, $res['error']);
+        return $res;
+    }
     $res = array();
     $res['data'] = @ldap_get_entries($conn, $handle);
     if ($res['data'] === FALSE) {
         $res['code'] = ldap_errno($conn);
         $res['error'] = ldap_error($conn);
         $res['data'] = array('count' => 0);
-        log_error('ldap_search for "%s" on "%s" failed: %s', $filter, $srv, $res['code']);
+        log_error('LDAP(%s) search[%s] failed: %s', $srv, $filter, $res['error']);
         return $res;
     }
     $res['code'] = 0;
     $res['error'] = '';
     set_error();
+    if ($cfg['debug'])
+        log_error('LDAP(%s) search[%s]: %s', $srv, $filter, json_encode(uldap_convert_array($res['data'])));
     return $res;
 }
 
