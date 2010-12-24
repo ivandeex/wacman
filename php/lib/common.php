@@ -31,6 +31,8 @@ $includes = array(
     'config.php',
     'http.php',
     'ldap.php',
+    'unix.php',
+    'windows.php',
     'CLI.php',
     'cgpro.php',
     'attrs.php',

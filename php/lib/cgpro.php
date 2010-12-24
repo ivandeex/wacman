@@ -3,7 +3,6 @@
 
 // Interface with CommuniGate server
 
-
 function cgp_read_domain_intercept (&$at, $srv, $ldap, $name) {
 	$res = cli_cmd('GetDomainMailRules %s', get_config('mail_domain'));
 	if ($res['code']) {
@@ -257,6 +256,71 @@ function cgp_read_mail_groups (&$at, $srv, $ldap, $name) {
         $arr[] = uldap_value($ue, 'uid');
     return join_list($arr);
 }
+
+
+function cgp_write_pass_final (&$at, $srv, $ldap, $name, $val) {
+    global $servers;
+    $ldap =& $servers[$srv]['ldap'];
+    $obj =& $at['obj'];
+    $dn = get_attr($obj, 'cgpDn');
+
+    $alg = get_config('cgp_password');
+    $cgpass = nvl($val);
+    if (preg_match('/^\{\w{2,5}\}\w+$/', $cgpass) && get_config('show_password')) {
+        $cgpass = "\x2" . $cgpass;
+        if ($alg != 'cli')
+            $alg = 'clear';
+    }
+    if ($alg == 'cli') {
+        $mail = get_attr($obj, 'mail');
+        $passenc = nvl(get_config('cgp_pass_encryption'));
+        if ($passenc != '') {
+            $res = cli_cmd('UpdateAccountSettings %s { UseAppPassword = YES; }',
+                            $mail, $passenc);
+            if ($res['code'])
+                log_info('Cannot enable CGP passwords for %s: %s', $mail, $res['msg']);
+            $res = cli_cmd('UpdateAccountSettings %s { PasswordEncryption = %s; }',
+                            $mail, $passenc);
+            if ($res['code'])
+                log_info('Cannot change encryption for %s to %s: %s',
+                        $mail, $passenc, $res['msg']);
+            if (get_config('debug'))
+                $res = cli_cmd('GetAccountEffectiveSettings %s', $mail);
+        }
+        $res = cli_cmd('SetAccountPassword %s PASSWORD %s', $mail, $cgpass);
+        if (! $res['code'])
+            return 1;
+        message_box('error', 'close',
+                    _T('Cannot change password for "%s" on "%s": %s',
+                        $mail, $srv, $res->{msg}));
+        return 0;
+    }
+
+    if ($alg == 'sha') {
+        $cgpass = "\x2{SHA}" . base64_encode(sha1($val, true));
+    } else {
+        $cgpass = nvl($val);
+    }
+    log_debug('cgpass=%s', $cgpass);
+
+    // 'replace' works only for administrator.
+    // unprivileged users need to use change(delete=old,add=new)
+    $res = uldap_modify($ldap, $dn, $name, $cgpass);
+    log_debug('change password on "%s": dn="%s" attr=%s code=%d',
+                $srv, $dn, $name, $res->code);
+    if ($res->code) {
+        message_box('error', 'close',
+                    _T('Cannot change password for "%s" on "%s": %s',
+                        $dn, $srv, $res->error));
+        return 0;
+    }
+    return 1;
+}
+
+
+////////////////////////////////////////////////////
+//    CLI interface
+//
 
 
 function cli_connect () {
