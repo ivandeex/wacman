@@ -15,7 +15,7 @@ uldap_connect_all();
 $id = $_GET['uid'];
 $mgrp = create_obj('mailgroup');
 
-$res = cli_cmd('GetGroup', $id.'@'.get_config('mail_domain'));
+$res = cgp_cmd('cli', 'GetGroup', $id.'@'.get_config('mail_domain'));
 if ($res['code']) {
     echo json_error($res['error']);
     uldap_disconnect_all();
@@ -25,10 +25,10 @@ if ($res['code']) {
 $data = $res['data'];
 set_attr($mgrp, 'uid', $id);
 set_attr($mgrp, 'cn', nvl($data['RealName']));
-unset($data['RealName']);
 set_attr($mgrp, 'groupMember', join_list($data['Members']));
+unset($data['RealName']);
 unset($data['Members']);
-set_attr($mgrp, 'params', dict2str($data));
+set_attr($mgrp, 'params', cgp_string('cli', $data));
 
 echo obj_json_encode($mgrp);
 uldap_disconnect_all();

@@ -40,17 +40,17 @@ switch ($which) {
 
     case 'cgp_telnum':
         $domain = get_config('mail_domain');
-        $res1 = cli_cmd('ListAccounts', $domain);
+        $res1 = cgp_cmd('cli', 'ListAccounts', $domain);
         $telnums = array();
         $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
         foreach ($res1['data'] as $muid => $mutype) {
             $email = $muid.'@'.$domain;
-            $res2 = cli_cmd('GetAccountAliases', $email);
+            $res2 = cgp_cmd('cli', 'GetAccountAliases', $email);
             foreach ($res2['data'] as $alias) {
                 if (preg_match($telnum_pat, $alias))
                     $telnums[$alias] = 1;
             }
-            #$res2 = cli_cmd('GetAccountTelnums', $email);
+            #$res2 = cgp_cmd('cli', 'GetAccountTelnums', $email);
             #foreach ($res2['data'] as $telnum)
             #    $telnums[$telnum] = 1;
         }

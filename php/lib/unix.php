@@ -6,7 +6,7 @@
 // Unix OpenLDAP
 //
 
-function ldap_read_unix_gidn (&$at, $srv, $ldap, $name) {
+function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
     $val = nvl(uldap_value($ldap, $at['name']));
 	if (is_int($val)) {
         $res = uldap_search($ldap, 'uni', "(&(objectClass=posixGroup)(gidNumber=$val))");
@@ -23,7 +23,7 @@ function ldap_read_unix_gidn (&$at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_unix_gidn (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_unix_gidn (&$obj, &$at, $srv, &$ldap, $name, $val) {
     if (!empty($val) && !is_int($val)) { // /^\d*$/
         $cn = $val;
         $val = 0;
@@ -42,7 +42,7 @@ function ldap_write_unix_gidn (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function unix_write_pass_final (&$at, $srv, $ldap, $name, $val) {
+function unix_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     global $servers;
     $conf =& $servers[$srv];
     $ldap =& $conf['ldap'];
@@ -50,7 +50,6 @@ function unix_write_pass_final (&$at, $srv, $ldap, $name, $val) {
         $conf['extop'] = false; # FIXME $ldap->root_dse->supported_extension('1.3.6.1.4.1.4203.1.11.1');
     }
     $extop = $conf['extop'];
-    $obj =& $at['obj'];
     $dn = get_attr($obj, 'dn');
     if ($extop) {
         // set_password() without 'oldpasswd' works only for administrator
@@ -73,10 +72,10 @@ function unix_write_pass_final (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_unix_groups (&$at, $srv, $ldap, $name) {
+function ldap_read_unix_groups (&$obj, &$at, $srv, &$ldap, $name) {
     $uid = nvl(uldap_value($ldap, $name));
     if (!isset($uid) || !$uid)
-        $uid = get_attr($at['obj'], $name);
+        $uid = get_attr($obj, $name);
     $entries = uldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$uid))", array('cn'));
     $arr = array();
     foreach ($entries as $e)
@@ -159,8 +158,8 @@ function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
 }
 
 
-function ldap_write_unix_groups_final (&$at, $srv, $ldap, $name, $val) {
-    $uid = get_attr($at['obj'], $name);
+function ldap_write_unix_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $uid = get_attr($obj, $name);
     $old = ldap_get_unix_group_ids($srv, $at['old'], 'nowarn'); # FIXME!!!
     $new = ldap_get_unix_group_ids($srv, $at['val'], 'warn');
     log_debug('write_unix_groups(1): old=(%s) new=(%s)', $old, $new);
@@ -178,7 +177,7 @@ function ldap_write_unix_groups_final (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_unix_members (&$at, $srv, $ldap, $name) {
+function ldap_read_unix_members (&$obj, &$at, $srv, &$ldap, $name) {
     // RHDS returns uid numbers, OpenLDAP returns usernames. We handle both cases.
     $uidns = uldap_value($ldap, $name, true);
     log_debug('ldap_read_unix_members: "%s" is (%s)', $name, join_list($uidns));
@@ -199,7 +198,7 @@ function ldap_read_unix_members (&$at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_unix_members (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_unix_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $h_uids = array();
     $touched_uids = array();
     foreach (split_list($val) as $uidn) {
@@ -246,7 +245,7 @@ function ldap_write_unix_members (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_write_unix_members_final (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_unix_members_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $sel_usr = $user_obj;
     if ($sel_usr['refresh_request']) {
         // refresh gui for this user
@@ -262,14 +261,14 @@ function ldap_write_unix_members_final (&$at, $srv, $ldap, $name, $val) {
 // POSIX passwd
 //
 
-function posix_read_real_uidn (&$at, $srv, $ldap, $name) {
+function posix_read_real_uidn (&$obj, &$at, $srv, &$ldap, $name) {
     $username = nvl(uldap_value($ldap, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['uid'];
 }
 
 
-function posix_read_real_gidn (&$at, $srv, $ldap, $name) {
+function posix_read_real_gidn (&$obj, &$at, $srv, &$ldap, $name) {
     $username = nvl(uldap_value($ldap, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['gid'];

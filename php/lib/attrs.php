@@ -264,13 +264,13 @@ $all_attrs = array(
             'label' => 'Domain Intercept',
             'checkbox' => true,
             'disable' => true,
-            'ldap' => array( 'cgp' => 'uid' ),
+            'ldap' => 'cli',
         ),
         'userIntercept' => array(
             'type' => 'userIntercept',
             'label' => 'User Intercept',
             'checkbox' => true,
-            'ldap' => array( 'cgp' => 'uid' ),
+            'ldap' => 'cli',
         ),
 
         // ======== Personal / Extended... ========

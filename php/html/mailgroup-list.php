@@ -8,7 +8,7 @@ require '../lib/common.php';
 uldap_connect_all();
 send_json_headers();
 
-$res = cli_cmd('ListGroups', get_config('mail_domain'));
+$res = cgp_cmd('cli', 'ListGroups', get_config('mail_domain'));
 if ($res['code']) {
     echo json_error($res['error']);
 } else {

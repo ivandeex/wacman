@@ -31,7 +31,7 @@ function decode_ad_pass ($pass) {
 }
 
 
-function ad_read_pri_group (&$at, $srv, $ldap, $name) {
+function ad_read_pri_group (&$obj, &$at, $srv, &$ldap, $name) {
 	return 0;
 /*
     my $pgname = $config{ad_primary_group};
@@ -49,13 +49,13 @@ function ad_read_pri_group (&$at, $srv, $ldap, $name) {
 }
 
 
-function ad_write_pri_group (&$at, $srv, $ldap, $name, $val) {
+function ad_write_pri_group (&$obj, &$at, $srv, &$ldap, $name, $val) {
 	// writing not supported: AD refuses to set PrimaryGroupID
 	return 0;
 }
 
 
-function ad_read_sec_groups (&$at, $srv, $ldap, $name) {
+function ad_read_sec_groups (&$obj, &$at, $srv, &$ldap, $name) {
 	return '';
 /*
     my $filter = join( '', map("(cn=$_)", split_list $config{ad_user_groups}) );
@@ -69,7 +69,7 @@ function ad_read_sec_groups (&$at, $srv, $ldap, $name) {
 }
 
 
-function ad_write_sec_groups_final (&$at, $srv, $ldap, $name, $val) {
+function ad_write_sec_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
 	return 0;
 /*
     my $dn = get_attr($at->{obj}, 'ntDn');

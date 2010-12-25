@@ -36,13 +36,14 @@ function uldap_connect ($srv) {
     global $servers;
     $cfg =& $servers[$srv];
     $cfg['name'] = $srv;
-    $cfg['connected'] = 0;
+    $cfg['connected'] = false;
     if ($cfg['disable']) {
         $cfg['ldap'] = null;
         return 0;
     }
     if ($srv == 'cli')
-        return cli_connect();
+        return cgp_connect($srv);
+
     if (empty($cfg['uri'])) {
         log_error('invalid uri for server "%s"', $srv);
         $cfg['ldap'] = null;
@@ -56,15 +57,19 @@ function uldap_connect ($srv) {
         log_error('error binding to server "%s"', $srv);
         return -1;
     }
-    if ($srv == 'ads')
+    if ($srv == 'ads') {
+        // active directory requires ldap protocol v3
         @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
+    }
+
     $okay = @ldap_bind($cfg['ldap'], $cfg['user'], $cfg['pass']);
     if (! $okay) {
         log_error('cannot bind to server "%s" (%s): %s',
                     $cfg['uri'], $srv, ldap_error($cfg['ldap']));
         return -1;
     }
-    $cfg['connected'] = 1;
+
+    $cfg['connected'] = true;
     log_debug('connected to server "%s"', $srv);
     return 0;
 }
@@ -73,7 +78,7 @@ function uldap_connect ($srv) {
 function uldap_connect_all () {
     global $servers;
     foreach ($servers as $srv => &$cfg) {
-        $cfg['connected'] = 0;
+        $cfg['connected'] = false;
         uldap_connect($srv);
     }
 }
@@ -84,12 +89,13 @@ function uldap_disconnect_all () {
     foreach ($servers as $srv => &$cfg) {
         if ($cfg['disable'] || ! $cfg['connected'])
             continue;
-        if ($cfg['name'] == 'cli')
-            cli_disconnect();
-        else
-            ldap_close($cfg['ldap']);
+        if ($srv == 'cli') {
+            cgp_disconnect($srv);
+        } else {
+            @ldap_close($cfg['ldap']);
+        }
         unset($cfg['ldap']);
-        $cfg['connected'] = 0;
+        $cfg['connected'] = false;
     }
 }
 
@@ -210,14 +216,14 @@ function ldap_write_none () {
 }
 
 
-function ldap_read_string (&$at, $srv, $ldap, $name) {
+function ldap_read_string (&$obj, &$at, $srv, $ldap, $name) {
     return nvl(uldap_value($ldap, $name));
 }
 
 
-function ldap_write_string (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_string (&$obj, &$at, $srv, $ldap, $name, $val) {
     $changed = 0;
-    if ($val == '') {
+    if (empty($val)) {
 		if (uldap_exists($ldap, $name)) {
 			uldap_delete($ldap, $name);
 			$changed = 1;
@@ -243,12 +249,12 @@ function ldap_write_string (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_dn (&$at, $srv, $ldap, $name) {
+function ldap_read_dn (&$obj, &$at, $srv, $ldap, $name) {
 	return nvl(uldap_dn($ldap));
 }
 
 
-function ldap_write_dn (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_dn (&$obj, &$at, $srv, $ldap, $name, $val) {
     $prev = nvl(uldap_dn($ldap));
     $val = nvl($val);
     log_debug('ldap_write_dn(%s): attr="%s" dn="%s", prev="%s"',
@@ -260,12 +266,12 @@ function ldap_write_dn (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_class (&$at, $srv, $ldap, $name) {
+function ldap_read_class (&$obj, &$at, $srv, $ldap, $name) {
     return join_list(uldap_value($ldap, $name));
 }
 
 
-function ldap_write_class (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_class (&$obj, &$at, $srv, $ldap, $name, $val) {
     $changed = 0;
     $ca = array();
     foreach (uldap_value($ldap, $name) as $c)
@@ -282,7 +288,7 @@ function ldap_write_class (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_read_pass (&$at, $srv, $ldap, $name) {
+function ldap_read_pass (&$obj, &$at, $srv, $ldap, $name) {
     global $servers;
     $val = '';
     if (! get_config('show_password') || $servers['cgp']['disable']) {
@@ -294,7 +300,7 @@ function ldap_read_pass (&$at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_pass (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_pass (&$obj, &$at, $srv, $ldap, $name, $val) {
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return 0;
     if ($srv == 'ads') {
@@ -307,7 +313,7 @@ function ldap_write_pass (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_write_pass_final (&$at, $srv, $ldap, $name, $val) {
+function ldap_write_pass_final (&$obj, &$at, $srv, $ldap, $name, $val) {
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return 0;
     if ($srv == 'uni')

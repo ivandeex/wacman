@@ -26,18 +26,24 @@ if (! $servers['uni']['disable']) {
     }
 }
 
+$uid = get_attr($usr, 'uid');
+$cn = get_attr($usr, 'cn');
+
 if (! $servers['ads']['disable']) {
-    $uid = get_attr($usr, 'uid');
-    $cn = get_attr($usr, 'cn');
     $msg = obj_read($usr, 'ads', "(&(objectClass=user)(cn=$cn))");
     if ($msg)
         log_info('will create windows user "%s" for uid "%s"', $cn, $uid);
 }
 
 if (! $servers['cgp']['disable']) {
-    $uid = get_attr($usr, 'uid');
     $cgp_msg = obj_read($usr, 'cgp', "(&(objectClass=CommuniGateAccount)(uid=$uid))");
-    if ($msg)
+    if ($cgp_msg)
+        log_info('will create cgp account for uid "%s"', $uid);
+}
+
+if (! $servers['cli']['disable']) {
+    $cli_msg = obj_read($usr, 'cli', null);
+    if ($cli_msg)
         log_info('will create mail account for uid "%s"', $uid);
 }
 

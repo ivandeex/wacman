@@ -173,7 +173,6 @@ function & create_obj ($objtype) {
         $obj['attrs'][$name] = array(
             'name' => $name,
             'type' => $desc['type'],
-            'obj' => &$obj,
             'desc' => &$desc,
             'ldap' => array(),
             'val' => ''
@@ -205,8 +204,7 @@ function set_attr (&$obj, $name, $val) {
 
 function obj_json_encode (&$obj) {
     $ret = array();
-    foreach ($obj['attrs'] as $name => &$at)
-        $ret[$name] = $at['val'];
+    foreach ($obj['attrs'] as $name => &$at)  $ret[$name] = $at['val'];
     return "{success:true,obj:" . json_encode($ret) . "}\n";            
 }
 
@@ -219,18 +217,24 @@ function obj_read (&$obj, $srv, $filter) {
         return null;
     }
 
-    $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
-    if ($res['code'] || $res['data']['count'] == 0) {
-        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
-        log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
-        return $res['error'] ? $res['error'] : 'not found';
+    if (is_null($filter)) {
+        $obj['ldap'][$srv] = array();
+    } else {
+        $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
+        if ($res['code'] || $res['data']['count'] == 0) {
+            $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
+            log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
+            return $res['error'] ? $res['error'] : 'not found';
+        }
+        $obj['ldap'][$srv] = $res['data'];
     }
-    $obj['ldap'][$srv] = $res['data'];
 
     foreach ($obj['attrs'] as $name => &$at) {
         if (isset($at['desc']['ldap'][$srv])) {
-            $val = call_user_func ($at['desc']['ldap_read'], $at, $srv,
-                                    $obj['ldap'][$srv], $at['desc']['ldap'][$srv]);
+            $val = call_user_func($at['desc']['ldap_read'],
+                                    $obj, $at, $srv,
+                                    $obj['ldap'][$srv],
+                                    $at['desc']['ldap'][$srv]);
             $at['val'] = nvl($val);
         }
     }
@@ -253,8 +257,10 @@ function obj_write (&$obj, $srv) {
 
     foreach ($obj['attrs'] as $name => &$at) {
         if (isset($at['desc']['ldap'][$srv])) {
-            if (call_user_func ($at['desc']['ldap_write'], $at, $srv, $ldap,
-                                $at['desc']['ldap'][$srv], nvl($at['val'])))
+            if (call_user_func($at['desc']['ldap_write'],
+                                $obj, $at, $srv, $ldap,
+                                $at['desc']['ldap'][$srv],
+                                nvl($at['val']) ) )
                 $changed = true;
         }
 	}

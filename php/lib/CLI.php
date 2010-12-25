@@ -127,6 +127,8 @@
     void CreateSharedDomain(string domainName[, array params]) [optional AA for parameters]
     void CreateDirectoryDomain(string domainName[, array params]) [optional AA for parameters]
     void ReloadDirectoryDomains()
+    array GetDomainMailRules([string domainName])
+    void SetDomainMailRules(string domainName, array rules)
     array GetDomainAliases([string domainName])
     void SetDomainAliases(string domainName, array aliases)
     array ListAdminDomains([string domainName])
@@ -283,6 +285,8 @@
     void SetRouterTable(string table)
     string GetClusterRouterTable(void)
     void SetClusterRouterTable(string table)
+    array GetServerIntercept(void) [returns array]
+    void SetServerIntercept(array rules)
     void Route(string address)
 
 //////// Monitoring Commands
@@ -771,9 +775,8 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             if($domainName != '') $command .= ' '.$domainName;
             $this->send($command);
             $this->_parseResponse();
-            if($this->isSuccess()) {
+            if($this->isSuccess())
                 return $this->parseWords($this->getWords());
-            }
         }
 
         function UpdateDomainSettings($params) {
@@ -874,17 +877,30 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         
         function ReloadDirectoryDomains() {
             $this->send('ReloadDirectoryDomains');
-            $this->_parseResponse();
+            return $this->_parseResponse();
         }
         
+        function GetDomainMailRules($domainName) {
+            if (empty($domainName))
+                die('usage: $cli->GetDomainMailRules(string $domainName)'."\n");
+            $this->send('GetDomainMailRules '.$domainName);
+            $this->_parseResponse();
+            return $this->isSuccess() ? $this->parseWords($this->getWords()) : false;
+        }
+
+        function SetDomainMailRules($domainName, $rules) {
+            if (empty($domainName) || empty($rules))
+                die('usage: $cli->SetDomainMailRules(string $domainName, array $ules)'."\n");
+            $this->send('SetDomainMailRules '.$domainName.' '.$this->printWords($rules));
+            return $this->_parseResponse();
+        }
+
         function GetDomainAliases($domainName='') {
             $command = 'GTDMNALS';
             if($domainName != '') $command .= ' '.$domainName;
             $this->send($command);
             $this->_parseResponse();
-            if($this->isSuccess()) {
-                return $this->parseWords($this->getWords());
-            }
+            return $this->isSuccess() ? $this->parseWords($this->getWords()) : false;
         }
 
         function SetDomainAliases($domainName, $aliases) {
@@ -2174,6 +2190,18 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             }
         }
         
+        function GetServerIntercept() {
+            $this->send('GetServerIntercept');
+            return $this->_parseResponse() ? $this->parseWords($this->getWords()) : FALSE;
+        }
+
+        function SetServerIntercept($settings) {
+            if ($empty($settings))
+                die('usage CGP::CLI->SetServerIntercept(array $settings)'."\n");
+            $this->send('SetServerIntercept '.$this->printWords($settings));
+            return $this->_parseResponse();
+        }
+
         function Route($address) {
             if($address == '')
                 die('usage: $cli->Route(string $address)'."\n");

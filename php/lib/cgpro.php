@@ -3,105 +3,108 @@
 
 // Interface with CommuniGate server
 
-function cgp_read_domain_intercept (&$at, $srv, $ldap, $name) {
-	$res = cli_cmd('GetDomainMailRules %s', get_config('mail_domain'));
-	if ($res['code']) {
-		log_error('cgp_read_domain_intercept error: %s', $res['error']);
-		return 0;
-	}
-/*
-    my $rules = str2array($res->{out});
-    log_info('cgp_read_domain_intercept: %s', array2str($rules));
-    my $ret = -1;
-    for my $rule ($rules) {
-        if ($$rule[1] =~ /\#Redirect/) {
-            if (ref $$rule[2] && ref $$rule[3]) {
-                if (nvl($$rule[3][1]) eq $config{cgp_listener}) {
-                    $ret = 1;
-                    last;
+function cgp_read_domain_intercept (&$obj, &$at, $srv, &$ldap, $name) {
+    if (! isset($ldap['domain_mail_rules'])) {
+        $res = cgp_cmd($srv, 'GetDomainMailRules', get_config('mail_domain'));
+        if ($res['code']) {
+            log_error('cgp_read_domain_intercept error: %s', $res['error']);
+            return '';
+        }
+        if (! is_array($res['data'])) {
+            log_error('cgp_read_domain_intercept: expected array of rules');
+            return '';
+        }
+        $ldap['domain_mail_rules'] = $res['data'];
+    }
+    $rule_idx = -1;
+    foreach ($ldap['domain_mail_rules'] as $idx => &$rule) {
+        if (is_array($rule) || count($rule) >= 4) {
+            list($prio, $name, $cond, $steps) = $rule;
+            if (strpos($name, '#Redirect') !== false && is_array($steps)) {
+                foreach ($steps as $step) {
+                    if (is_array($step) && count($step) == 2) {
+                        if (trim($step[0]) === 'Mirror to'
+                                && trim($step[1] == get_config('cgp_listener'))) {
+                            $rule_idx = $idx;
+                            break;
+                        }
+                    }
                 }
             }
         }
     }
-
-    log_info('cgp_read_domain_intercept: ret = %d', $ret);
-    $domain_intercept = bool2str($ret > 0 ? 1 : 0);
-    return $domain_intercept;
-*/
-    return 0;
+    $ldap['domain_intercept_mail_rule_idx'] = $rule_idx;
+    $val = bool2str($rule_idx >= 0);
+    log_debug('cgp_read_domain_intercept: %s (idx=%s)', $val, $rule_idx);
+    return $val;
 }
 
 
-function cgp_write_domain_intercept (&$at, $srv, $ldap, $name, $val) {
-/*
-    my $rule = [
-        $new, '"#Redirect"',
-        [ '"Human Generated"', '"---"'],
-        [ '"Mirror to"', $config{cgp_listener} ]
-    ];
-    my $out = array2str($rule);
-    log_info('cgp_write_domain_intercept: rule = %s', $out);
-    my $res = cli_cmd('SetDomainMailRules %s %s', $config{mail_domain}, $out);
-    if ($res->{code}) {
-        log_info('cgp_write_domain_intercept error: %s', $res->{msg});
-        return 0;
-    }
-*/
-    return 1;
-}
-
-
-function cgp_get_server_intercept () {
-/*
-    return 0 if defined $server_intercept;
-    my $res = cli_cmd('GetServerIntercept');
-    if ($res->{code}) {
-        log_info('cgp_get_server_intercept error: %s', $res->{msg});
-        return -1;
-    }
-    $server_intercept = str2dict($res->{out});
-    log_debug('cgp_get_server_intercept: %s', dict2str($server_intercept));
-*/
-	return 0;
-}
-
-
-function cgp_read_user_intercept (&$at, $srv, $ldap, $name) {
-/*
-    my $mail = nvl( $ldap->get_value('mail') );
-    return bool2str(0) if $mail eq '' || cgp_get_server_intercept() < 0;
-    my $ret = bool2str(defined $server_intercept->{$mail});
-    log_debug('cgp_read_user_intercept(%s): %s', $mail, $ret);
-    return $ret;
-*/
-	return 0;
-}
-
-
-function cgp_write_user_intercept (&$at, $srv, $ldap, $name, $val) {
-/*
-    my $old = str2bool($at->{old});
-    my $new = str2bool($at->{val});
-    return 0 if $old == $new;
-    return 0 if cgp_get_server_intercept() < 0;
-    my $mail = nvl( $ldap->get_value('mail') );
-    if ($new) {
-        my $opt = {};
-        $opt->{SendTo} = $config{cgp_listener};
-        for (split_list $config{cgp_intercept_opts}) { $opt->{$_} = 'YES' }
-        $server_intercept->{$mail} = $opt;
+function cgp_write_domain_intercept (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $old = str2bool(cgp_read_domain_intercept ($obj, $at, $srv, $ldap, $name));
+    $val = str2bool($val);
+    if ($val === $old || !isset($ldap['domain_mail_rules']))
+        return false;
+    if ($val) {
+        $ldap['domain_mail_rules'][] = array(
+                0,
+                '#Redirect',
+                array( array('Human Generated', '---') ),
+                array( array('Mirror to', get_config('cgp_listener') ) )
+            );
+        $ldap['domain_intercept_mail_rule_idx'] = count($ldap['domain_mail_rules']) - 1;
     } else {
-        delete $server_intercept->{$mail};
+        array_splice($ldap['domain_mail_rules'], $ldap['domain_intercept_mail_rule_idx'], 1, null);
+        $ldap['domain_intercept_mail_rule_idx'] = -1;
     }
-    my $out = dict2str($server_intercept);
-    my $res = cli_cmd('SetServerIntercept %s', $out);
-    if ($res->{code}) {
-        log_info('cgp_write_user_intercept(%s) write error: %s ("%s")',
-                $mail, $res->{msg}, $out);
-        return 0;
+    $res = cgp_cmd($srv, 'SetDomainMailRules', get_config('mail_domain'));
+    if ($res['code']) {
+        log_error('cgp_write_domain_intercept error: %s', $res['error']);
+        return false;
     }
-    log_debug('cgp_write_user_intercept(%s) success: %s', $mail, $out);*/
-    return 1;
+    return true;
+}
+
+
+function cgp_read_user_intercept (&$obj, &$at, $srv, &$ldap, $name) {
+    if (! isset($ldap['server_intercept'])) {
+        $res = cgp_cmd($srv, 'GetServerIntercept', get_config('mail_domain'));
+        if ($res['code']) {
+            log_error('cgp_read_user_intercept error: %s', $res['error']);
+            return '';
+        }
+        if (! is_array($res['data'])) {
+            log_error('cgp_read_user_intercept: expected array of mails');
+            return '';
+        }
+        $ldap['server_intercept'] = $res['data'];
+    }
+    $mail = nvl(get_attr($obj, 'mail'));
+    if (empty($mail))
+        return '';
+    $val = bool2str(empty($mail) ? false : array_search($mail, $ldap['server_intercept']));
+    log_debug('cgp_read_user_intercept(%s): %s', $mail, $val);
+    return $val;
+}
+
+
+function cgp_write_user_intercept (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $old = str2bool(cgp_read_domain_intercept ($obj, $at, $srv, $ldap, $name));
+    $val = str2bool($val);
+    $mail = nvl(get_attr($obj, 'mail'));
+    if ($val === $old || !isset($ldap['server_intercept']) || empty($mail))
+        return false;
+    if ($val) {
+        $ldap['server_intercept'][] = $mail;
+    } else {
+        unset($ldap['server_intercept'][$mail]);
+    }
+    $res = cgp_cmd($srv, 'SetServerIntercept', $ldap['server_intercept']);
+    if ($res['code']) {
+        log_error('cgp_write_user_intercept error: %s', $res['error']);
+        return false;
+    }
+    return true;
 }
 
 
@@ -111,7 +114,7 @@ function cgp_modify_mail_group ($srv, $gid, $uid, $action) {
     my $retval;
     if ($config{cgp_buggy_ldap}) {
         my $gname = $gid . '@' . $config{mail_domain};
-        my $res = cli_cmd('GetGroup %s', $gname);
+        my $res = cgp_cmd($srv, 'GetGroup', $gname);
         if ($res->{code} == 0) {
             my $dict = str2dict($res->{out});
             log_debug('group "%s" members: %s', $gid, dict2str($dict));
@@ -123,7 +126,7 @@ function cgp_modify_mail_group ($srv, $gid, $uid, $action) {
             $dict->{Members} = "($new)";
             my $newparams = dict2str($dict);
             log_debug('newparams: "%s"', $newparams);
-            $res = cli_cmd("SetGroup %s %s", $gname, $newparams);
+            $res = cgp_cmd($srv, 'SetGroup', $gname, $newparams);
             if ($res->{code} == 0) {
                 $retval = 'OK';
             } else {
@@ -183,13 +186,13 @@ function cgp_modify_mail_group ($srv, $gid, $uid, $action) {
 }
 
 
-function cgp_read_aliases (&$at, $srv, $ldap, $name) {
+function cgp_read_aliases (&$obj, &$at, $srv, &$ldap, $name) {
     $dn = nvl(uldap_dn($ldap));
     if ($dn == '')
         return '';
     $aliases = array();
     $telnum = '';
-    $old_telnum = get_attr($at['obj'], 'telnum', array('orig' => 1));
+    $old_telnum = get_attr($obj, 'telnum', array('orig' => 1));
     $entries = uldap_search($srv, "(&(objectClass=alias)(aliasedObjectName=$dn))", array('uid'));
     $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
     foreach ($entries as $e) {
@@ -203,13 +206,12 @@ function cgp_read_aliases (&$at, $srv, $ldap, $name) {
     $aliases = join_list($aliases);
     log_debug('read aliases: telnum="%s" aliases="%s"', $telnum, $aliases);
     if ($telnum != '')
-        init_attr($at['obj'], 'telnum', $telnum);
+        init_attr($obj, 'telnum', $telnum);
     return $aliases;
 }
 
 
-function cgp_write_aliases_final (&$at, $srv, $ldap, $name, $val) {
-    $obj =& $at['obj'];
+function cgp_write_aliases_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $old = append_list(nvl($at['old']), get_attr($obj, 'telnum', array('orig' => 1))); # FIXME!!!
     $new = append_list(nvl($at['val']), get_attr($obj, 'telnum'));
     log_debug('write_aliases_final: old="%s" new="%s"', $old, $new);
@@ -217,7 +219,7 @@ function cgp_write_aliases_final (&$at, $srv, $ldap, $name, $val) {
         return 0;
     if (get_config('cgp_buggy_ldap')) {
         $mail = get_attr($obj, 'mail');
-        $res = cli_cmd('SetAccountAliases %s (%s)', $mail, join_list(split_list($new)));
+        $res = cgp_cmd($srv, 'SetAccountAliases', $mail, join_list(split_list($new)));
         log_debug('set_mail_aliases: code="%s" msg="%s" out="%s"',
                     $res['code'], $res['msg'], $res['out']);
         if ($res['code'] == 0)
@@ -246,7 +248,7 @@ function cgp_write_aliases_final (&$at, $srv, $ldap, $name, $val) {
 }
 
 
-function cgp_read_mail_groups (&$at, $srv, $ldap, $name) {
+function cgp_read_mail_groups (&$obj, &$at, $srv, &$ldap, $name) {
     $uid = nvl(uldap_value($ldap, 'uid'));
     if ($uid == '')
         return '';
@@ -258,11 +260,9 @@ function cgp_read_mail_groups (&$at, $srv, $ldap, $name) {
 }
 
 
-function cgp_write_pass_final (&$at, $srv, $ldap, $name, $val) {
+function cgp_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     global $servers;
     $ldap =& $servers[$srv]['ldap'];
-    $obj =& $at['obj'];
-    $dn = get_attr($obj, 'cgpDn');
 
     $alg = get_config('cgp_password');
     $cgpass = nvl($val);
@@ -271,28 +271,28 @@ function cgp_write_pass_final (&$at, $srv, $ldap, $name, $val) {
         if ($alg != 'cli')
             $alg = 'clear';
     }
+
     if ($alg == 'cli') {
         $mail = get_attr($obj, 'mail');
         $passenc = nvl(get_config('cgp_pass_encryption'));
         if ($passenc != '') {
-            $res = cli_cmd('UpdateAccountSettings %s { UseAppPassword = YES; }',
-                            $mail, $passenc);
+            $res = cgp_cmd($srv, 'UpdateAccountSettings', $mail,
+                            array('UseAppPassword' => 'YES') );
             if ($res['code'])
-                log_info('Cannot enable CGP passwords for %s: %s', $mail, $res['msg']);
-            $res = cli_cmd('UpdateAccountSettings %s { PasswordEncryption = %s; }',
-                            $mail, $passenc);
+                log_info('Cannot enable CGP passwords for %s: %s', $mail, $res['error']);
+            $res = cgp_cmd($srv, 'UpdateAccountSettings', $mail,
+                            array('PasswordEncryption' => $passenc) );
             if ($res['code'])
                 log_info('Cannot change encryption for %s to %s: %s',
                         $mail, $passenc, $res['msg']);
             if (get_config('debug'))
-                $res = cli_cmd('GetAccountEffectiveSettings %s', $mail);
+                $res = cgp_cmd($srv, 'GetAccountEffectiveSettings', $mail);
         }
-        $res = cli_cmd('SetAccountPassword %s PASSWORD %s', $mail, $cgpass);
+        $res = cgp_cmd($srv, 'SetAccountPassword', $mail, $cgpass);
         if (! $res['code'])
             return 1;
-        message_box('error', 'close',
-                    _T('Cannot change password for "%s" on "%s": %s',
-                        $mail, $srv, $res->{msg}));
+        log_error(_T('Cannot change password for "%s" on "%s": %s',
+                    $mail, $srv, $res['error']));
         return 0;
     }
 
@@ -302,18 +302,6 @@ function cgp_write_pass_final (&$at, $srv, $ldap, $name, $val) {
         $cgpass = nvl($val);
     }
     log_debug('cgpass=%s', $cgpass);
-
-    // 'replace' works only for administrator.
-    // unprivileged users need to use change(delete=old,add=new)
-    $res = uldap_modify($ldap, $dn, $name, $cgpass);
-    log_debug('change password on "%s": dn="%s" attr=%s code=%d',
-                $srv, $dn, $name, $res->code);
-    if ($res->code) {
-        message_box('error', 'close',
-                    _T('Cannot change password for "%s" on "%s": %s',
-                        $dn, $srv, $res->error));
-        return 0;
-    }
     return 1;
 }
 
@@ -323,8 +311,8 @@ function cgp_write_pass_final (&$at, $srv, $ldap, $name, $val) {
 //
 
 
-function cli_connect () {
-    $cfg =& get_server('cli');
+function cgp_connect ($srv) {
+    $cfg =& get_server($srv);
     $uri = $cfg['uri'];
     if (! preg_match('!^\s*(?:\w+\://)?([\w\.\-]+)(?:\s*\:\s*(\d+))[\s/]*$!', $uri, $parts)) {
         log_error('invalid uri for server CLI');
@@ -335,47 +323,46 @@ function cli_connect () {
     $creds = get_credentials('cli');
     $cfg['user'] = $creds['user'];
     $cfg['pass'] = $creds['pass'];
-    $cfg['connected'] = 0;
-    $cfg['cli'] = $cli = new CLI;
+    $cfg['connected'] = false;
+    $cfg['cli'] = new CLI;
+    $cli =& $cfg['cli'];
     if ($cfg['debug'])
         $cli->SetDebug(2);
-    $cli->Login($cfg['host'], $cfg['port'], $cfg['user'], $cfg['pass']);
-    if (! $cli->isSuccess()) {
+    if (! $cli->Login($cfg['host'], $cfg['port'], $cfg['user'], $cfg['pass'])) {
         log_error('cannot bind to CLI: ' . $cli->getErrMessage());
         return -1;
     }
     log_debug('connected to cgp cli');
-    $cfg['connected'] = 1;
+    $cfg['connected'] = true;
     return 0;
 }
 
 
-function & get_cli () {
-    $cfg =& get_server('cli');
-    return $cfg['cli'];
-}
-
-
-function cli_disconnect () {
-    $cfg =& get_server('cli');
+function cgp_disconnect ($srv) {
+    $cfg =& get_server($srv);
     if ($cfg['connected']) {
-        $cli =& $cfg['cli'];
-        $cli->Logout();
-        $cfg['connected'] = 0;
+        if (isset($cfg['cli'])) {
+            $cfg['cli']->Logout();
+            unset($cfg['cli']);
+        }
+        $cfg['connected'] = false;
     }
 }
 
 
-function cli_cmd () {
-    $cfg =& get_server('cli', true);
-    if (!$cfg['connected']) {
-        $msg = $cfg['disable'] ? 'CGP disabled' : 'CGP not connected';
+// cgp_cmd($srv_name, $func_name, $func_args...)
+function cgp_cmd () {
+    $args = func_get_args();
+    $srv = array_shift($args);
+    $func = array_shift($args);
+    $cfg =& get_server($srv, true);
+    if (!$cfg['connected'] || !isset($cfg['cli'])) {
+        $msg = $cfg['disable'] ? 'CGP disabled' :
+                (isset($cfg['cli']) ? 'CGP not connected' : 'CGP is not CLI');
         set_error($msg);
         return array('code' => -1, 'error' => $msg, 'data' => array());
     }
     $cli = $cfg['cli'];
-    $args = func_get_args();
-    $func = array_shift($args);
     $ret = call_user_func_array(array($cli, $func), $args);
 
     if ($cli->isSuccess()) {
@@ -388,35 +375,14 @@ function cli_cmd () {
 }
 
 
-function dict2str ($d)
-{
-    return __dict2str($d);
+function cgp_string ($srv, $data) {
+    $cfg =& get_server($srv, true);
+    if (!$cfg['connected'] || !isset($cfg['cli'])) {
+        log_error('cgp_string(%s): invalid CGP state', $srv);
+        return '';
+    }
+    return $cfg['cli']->printWords($data);
 }
 
-
-function __dict2str ($d)
-{
-	$s = '{ ';
-	$keys = array_keys($d);
-	sort($keys);
-	foreach ($keys as $k) {
-		$v = $d[$k];
-		$s .= $k . ' = ';
-		if (is_array($v)) {
-			$s .= __dict2str($v);
-		} else {
-            $x = preg_replace('/[0-9a-xA-Z_\@]/', '', $v);
-			$q = empty($x) ? '' : '"';
-			if (preg_match('/^\".*?\"$/', $v) || preg_match('/^\(.*?\)$/', $v)) {
-				$q = '';
-			} else {
-				$v = preg_replace('/\"/', '\\\"', $v);
-			}
-			$s .= $q.$v.$q;
-		}
-		$s .= '; ';
-	}
-	return $s . '}';
-}
 
 ?>
