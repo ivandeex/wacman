@@ -263,6 +263,7 @@ $all_attrs = array(
             'type' => 'domainIntercept',
             'label' => 'Domain Intercept',
             'checkbox' => true,
+            'disable' => true,
             'ldap' => array( 'cgp' => 'uid' ),
         ),
         'userIntercept' => array(
@@ -458,8 +459,6 @@ $convtype2subs = array(
 
 function attribute_enabled ($objtype, $name) {
     if ($objtype == 'user') {
-        if ($name == 'domainIntercept')
-            return false;
         if ($name == 'password2' && get_config('show_password'))
             return false;
         if ($name == 'real_uidn' || $name == 'real_gidn') {
