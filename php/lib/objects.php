@@ -4,9 +4,6 @@
 // Attribute helpers
 
 
-$all_lc_attrs = null;
-
-
 function setup_all_attrs () {
 
     global $all_attrs;
@@ -14,10 +11,7 @@ function setup_all_attrs () {
     global $ldap_rw_subs;
     global $convtype2subs;
     global $gui_attrs;
-    global $all_lc_attrs;
     global $config;
-
-    $all_lc_attrs = array();
 
     foreach ($all_attrs as $objtype => &$descs) {
 
@@ -25,8 +19,6 @@ function setup_all_attrs () {
             $cfg['attrhash'] = array();
             $cfg['attrhash'][$objtype] = array();
         }
-
-        $all_lc_attrs[$objtype] = array();
 
         foreach ($descs as $name => &$desc) {
 
@@ -128,8 +120,6 @@ function setup_all_attrs () {
             $desc['ldap_read'] = $subs[0];
             $desc['ldap_write'] = $subs[1];
             $desc['ldap_write_final'] = $subs[2];
-
-            $all_lc_attrs[$objtype][strtolower($name)] =& $desc;
         }
 
         foreach ($servers as $srv => &$cfg) {
@@ -144,7 +134,12 @@ function setup_all_attrs () {
     foreach ($gui_attrs as $objtype => &$obj_gui) {
         foreach ($obj_gui as &$gui_tab) {
             foreach ($gui_tab[1] as $name) {
-                $all_attrs[$objtype][$name]['visual'] = true;
+                if (isset($all_attrs[$objtype][$name])) {
+                    $all_attrs[$objtype][$name]['visual'] = true;
+                } else {
+                    log_error('cannot mark attribute "%s" in object "%s" as visual',
+                                $name, $objtype);
+                }
             }
         }
     }
@@ -189,16 +184,19 @@ function & create_obj ($objtype) {
 
 
 function get_attr (&$obj, $name, $param = array()) {
-    if (!isset($obj['attrs'][$name]))
-        error_page(_T('attribute "%s" undefined in object "%s"', $name, $obj['type']));
+    if (!isset($obj['attrs'][$name])) {
+        log_error('get_attr: attribute "%s" undefined in object "%s"', $name, $obj['type']);
+        return '';
+    }
     return nvl($obj['attrs'][$name]['val']);
 }
 
 
 function set_attr (&$obj, $name, $val) {
     if (!isset($obj['attrs'][$name]))
-        error_page(_T('attribute "%s" undefined in object "%s"', $name, $obj['type']));
-    $obj['attrs'][$name]['val'] = $val;
+        log_error('set_attr: attribute "%s" undefined in object "%s"', $name, $obj['type']);
+    else
+        $obj['attrs'][$name]['val'] = $val;
 }
 
 
@@ -206,6 +204,14 @@ function obj_json_encode (&$obj) {
     $ret = array();
     foreach ($obj['attrs'] as $name => &$at)  $ret[$name] = $at['val'];
     return "{success:true,obj:" . json_encode($ret) . "}\n";            
+}
+
+
+$curr_read_obj = null;
+
+function subst_filter_arg ($matches) {
+    global $curr_read_obj;
+    return get_attr($curr_read_obj, $matches[1]);
 }
 
 
@@ -217,10 +223,15 @@ function obj_read (&$obj, $srv, $filter) {
         return null;
     }
 
-    if (is_null($filter)) {
+    if (empty($filter)) {
         $obj['ldap'][$srv] = array();
     } else {
-        $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
+        global $curr_read_obj;
+        $curr_read_obj = $obj;
+        $res_filter = preg_replace_callback('/\$\{(\w+)\}/', 'subst_filter_arg', $filter);
+        if ($filter != $res_filter)
+            log_debug('filter substitutions src:"%s" res:"%s"', $filter, $res_filter);
+        $res = uldap_search($srv, $res_filter, $obj['attrlist'][$srv]);
         if ($res['code'] || $res['data']['count'] == 0) {
             $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
             log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
@@ -239,7 +250,7 @@ function obj_read (&$obj, $srv, $filter) {
         }
     }
 
-    return 0;
+    return '';
 }
 
 
