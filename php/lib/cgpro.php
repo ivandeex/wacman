@@ -324,6 +324,7 @@ function cgp_connect ($srv) {
     $cfg['user'] = $creds['user'];
     $cfg['pass'] = $creds['pass'];
     $cfg['connected'] = false;
+    $cfg['failed'] = true;
     $cfg['cli'] = new CLI;
     $cli =& $cfg['cli'];
     if ($cfg['debug'])
@@ -334,19 +335,20 @@ function cgp_connect ($srv) {
     }
     log_debug('connected to cgp cli');
     $cfg['connected'] = true;
+    $cfg['failed'] = false;
     return 0;
 }
 
 
 function cgp_disconnect ($srv) {
     $cfg =& get_server($srv);
-    if ($cfg['connected']) {
-        if (isset($cfg['cli'])) {
-            $cfg['cli']->Logout();
-            unset($cfg['cli']);
-        }
-        $cfg['connected'] = false;
+    if (!$cfg['connected'])
+        return;
+    if (isset($cfg['cli'])) {
+        $cfg['cli']->Logout();
+        unset($cfg['cli']);
     }
+    $cfg['connected'] = $cfg['failed'] = false;
 }
 
 
@@ -356,6 +358,7 @@ function cgp_cmd () {
     $srv = array_shift($args);
     $func = array_shift($args);
     $cfg =& get_server($srv, true);
+    srv_connect($srv);
     if (!$cfg['connected'] || !isset($cfg['cli'])) {
         $msg = $cfg['disable'] ? 'CGP disabled' :
                 (isset($cfg['cli']) ? 'CGP not connected' : 'CGP is not CLI');

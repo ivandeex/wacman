@@ -5,13 +5,11 @@
 
 require '../lib/common.php';
 
-uldap_connect_all();
 send_json_headers();
 
 $uid = isset($_GET['uid']) ? $_GET['uid'] : '';
 if (empty($uid)) {
     echo json_error("uid: required parameter wrong or not specified");
-    uldap_disconnect_all();
     exit;
 }
 
@@ -33,13 +31,13 @@ foreach ($searches as $srv => $filter) {
         continue;
     if ($srv == 'uni') {
         echo json_error($msg);
-        uldap_disconnect_all();
+        srv_disconnect_all();
         exit;
     }
     log_info('will create "%s" user for uid "%s"', $srv, $uid);
 }
 
 echo obj_json_encode($usr);
-uldap_disconnect_all();
+srv_disconnect_all();
 
 ?>

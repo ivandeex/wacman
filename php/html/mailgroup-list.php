@@ -5,7 +5,6 @@
 
 require '../lib/common.php';
 
-uldap_connect_all();
 send_json_headers();
 
 $res = cgp_cmd('cli', 'ListGroups', get_config('mail_domain'));
@@ -18,5 +17,5 @@ if ($res['code']) {
     echo "{success:true,rows:" . json_encode($arr) . "}\n";
 }
 
-uldap_disconnect_all();
+srv_disconnect_all();
 ?>

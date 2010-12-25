@@ -32,23 +32,29 @@ function & get_server ($srv, $allow_disabled = false) {
 // Protocol basics
 //
 
-function uldap_connect ($srv) {
+function srv_connect ($srv) {
     global $servers;
     $cfg =& $servers[$srv];
-    $cfg['name'] = $srv;
-    $cfg['connected'] = false;
-    if ($cfg['disable']) {
-        $cfg['ldap'] = null;
+
+    foreach (array('connected','failed','disable') as $prop)
+        if (!isset($cfg[$prop]))  $cfg[$prop] = false;
+    if (!isset($cfg['name']))  $cfg['name'] = $srv;
+    if (!isset($cfg['ldap']))  $cfg['ldap'] = null;
+
+    if ($cfg['connected'])
         return 0;
-    }
+    if ($cfg['disable'] || $cfg['failed'])
+        return -1;
+
     if ($srv == 'cli')
         return cgp_connect($srv);
 
+    $cfg['failed'] = true;
     if (empty($cfg['uri'])) {
         log_error('invalid uri for server "%s"', $srv);
-        $cfg['ldap'] = null;
         return -1;
     }
+
     $creds = get_credentials($srv);
     $cfg['user'] = $creds['user'];
     $cfg['pass'] = $creds['pass'];
@@ -57,6 +63,7 @@ function uldap_connect ($srv) {
         log_error('error binding to server "%s"', $srv);
         return -1;
     }
+
     if ($srv == 'ads') {
         // active directory requires ldap protocol v3
         @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
@@ -70,24 +77,18 @@ function uldap_connect ($srv) {
     }
 
     $cfg['connected'] = true;
+    $cfg['failed'] = false;
     log_debug('connected to server "%s"', $srv);
     return 0;
 }
 
 
-function uldap_connect_all () {
+function srv_disconnect_all () {
     global $servers;
     foreach ($servers as $srv => &$cfg) {
-        $cfg['connected'] = false;
-        uldap_connect($srv);
-    }
-}
-
-
-function uldap_disconnect_all () {
-    global $servers;
-    foreach ($servers as $srv => &$cfg) {
-        if ($cfg['disable'] || ! $cfg['connected'])
+        if (isset($cfg['disable']) && $cfg['disable'])
+            continue;
+        if (!(isset($cfg['connected']) && $cfg['connected']))
             continue;
         if ($srv == 'cli') {
             cgp_disconnect($srv);
@@ -96,6 +97,7 @@ function uldap_disconnect_all () {
         }
         unset($cfg['ldap']);
         $cfg['connected'] = false;
+        $cfg['failed'] = false;
     }
 }
 
@@ -175,6 +177,7 @@ function uldap_json_encode ($res) {
 function uldap_search ($srv, $filter, $attrs = null, $params = null)
 {
     $cfg =& get_server($srv, true);
+    srv_connect($srv);
     if (! $cfg['connected'])
         return array('code' => -1, 'error' => 'not connected', 'data' => array('count' => 0));
     $conn = $cfg['ldap'];

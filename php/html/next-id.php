@@ -5,13 +5,11 @@
 
 require '../lib/common.php';
 
-uldap_connect_all();
 send_json_headers();
 
 $which = isset($_GET['which']) ? $_GET['which'] : '';
 if (empty($which)) {
     echo json_error("which: required parameter wrong or not specified");
-    uldap_disconnect_all();
     exit;
 }
 
@@ -71,5 +69,5 @@ switch ($which) {
         break;
 }
 
-uldap_disconnect_all();
+srv_disconnect_all();
 ?>

@@ -11,14 +11,13 @@ if (empty($_GET['uid'])) {
     exit;
 }
 
-uldap_connect_all();
 $id = $_GET['uid'];
 $mgrp = create_obj('mailgroup');
 
 $res = cgp_cmd('cli', 'GetGroup', $id.'@'.get_config('mail_domain'));
 if ($res['code']) {
     echo json_error($res['error']);
-    uldap_disconnect_all();
+    srv_disconnect_all();
     exit;
 }
 
@@ -31,6 +30,6 @@ unset($data['Members']);
 set_attr($mgrp, 'params', cgp_string('cli', $data));
 
 echo obj_json_encode($mgrp);
-uldap_disconnect_all();
+srv_disconnect_all();
 
 ?>
