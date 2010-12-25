@@ -15,7 +15,11 @@ define('ADS_UF_DONT_EXPIRE_PASSWD', 0x10000);
 
 
 $all_attrs = array(
-    // ========== user ==========
+
+    /////////////////////////////////////////////
+    // ================   user   ===============
+    /////////////////////////////////////////////
+
     'user' => array(
         'dn' => array(
             'type' => 'dn',
@@ -47,7 +51,9 @@ $all_attrs = array(
             'type' => 'class',
             'ldap' => array( 'cgp' => 'objectClass' ),
         ),
+
         // ======== posixAccount... ========
+
         'givenName' => array(
             'label' => 'Name',
             'ldap' => 'uni,ads',
@@ -114,7 +120,9 @@ $all_attrs = array(
             'label' => 'Login shell',
             'ldap' => 'uni,ads',
         ),
+
         // ======== Active Directory... ========
+
         'accountExpires' => array(
             'defval' => NO_EXPIRE,
             'ldap' => 'ads',
@@ -173,7 +181,9 @@ $all_attrs = array(
             'ldap' => array( 'ads' => 'msSFU30Name' ),
             'copyfrom' => 'uid',
         ),
+
         // ======== ntUser... ========
+
         'ntUserCreateNewAccount' => array(
             'defval' => 'false',
             'ldap' => 'ntuser',
@@ -197,7 +207,9 @@ $all_attrs = array(
             'copyfrom' => 'uid',
             'disable' => true,
         ),
+
         // ======== Active Directory disabled... ========
+
         'ufn'			=> array( 'conv' => 'bkslash', ),
         'objectSid'     => array( 'conv' => 'binary', ),
         'objectGuid'	=> array( 'conv' => 'binary', ),
@@ -221,7 +233,9 @@ $all_attrs = array(
             'conv' => 'decihex',
             'disable' => true,
         ),
+
         // ======== CommuniGate Pro ========
+
         'hostServer' => array(
             'ldap' => 'cgp',
         ),
@@ -257,7 +271,9 @@ $all_attrs = array(
             'checkbox' => true,
             'ldap' => array( 'cgp' => 'uid' ),
         ),
+
         // ======== Personal / Extended... ========
+
         'telephoneNumber' => array(
             'label' => 'Telephone',
             'ldap' => 'uni,ads',
@@ -285,7 +301,11 @@ $all_attrs = array(
             'readonly' => true,
         ),
     ),
-    // ============ group ============
+
+    /////////////////////////////////////////////
+    // ==============   group   ================
+    /////////////////////////////////////////////
+
     'group' => array(
         'objectClass' => array(
             'type' => 'class',
@@ -316,7 +336,11 @@ $all_attrs = array(
             'ldap' => 'uni',
         ),
     ),
-    // ============ mail group ============
+
+    /////////////////////////////////////////////
+    // ============   mail group   =============
+    /////////////////////////////////////////////
+
     'mailgroup' => array(
         'dn' => array(
             'type' => 'mailgroup',
@@ -345,7 +369,9 @@ $all_attrs = array(
             'label' => 'Params',
         ),
     ),
+
     // ======== mail alias (not for creation :) ) ========
+
     'alias' => array(
         'objectclass' => array(
             'type' => 'class',
@@ -383,11 +409,13 @@ $gui_attrs = array(
                 'real_uidn', 'real_gidn', 'loginShell'
         ))
     ),
+
     'group' => array(
         array( 'Common', array(
                 'cn', 'gidNumber', 'description', 'memberUid'
         )),
 	),
+
     'mailgroup' => array(
         array( 'Common', array(
                 'uid', 'cn', 'groupMember'
