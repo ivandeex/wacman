@@ -7,21 +7,6 @@
 $all_lc_attrs = null;
 
 
-function attribute_enabled ($objtype, $name) {
-    if ($objtype == 'user') {
-        if ($name == 'domainIntercept')
-            return false;
-        if ($name == 'password2' && get_config('show_password'))
-            return false;
-        if ($name == 'real_uidn' || $name == 'real_gidn') {
-            if (! get_config('prefer_nss_ids'))
-                return false;
-        }
-    }
-    return true;
-}
-
-
 function setup_all_attrs () {
 
     global $all_attrs;

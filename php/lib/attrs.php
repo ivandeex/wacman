@@ -427,4 +427,20 @@ $convtype2subs = array(
     'adtime'	=> array('adjtime_front', 'adjtime_back')
     );
 
+
+function attribute_enabled ($objtype, $name) {
+    if ($objtype == 'user') {
+        if ($name == 'domainIntercept')
+            return false;
+        if ($name == 'password2' && get_config('show_password'))
+            return false;
+        if ($name == 'real_uidn' || $name == 'real_gidn') {
+            if (! get_config('prefer_nss_ids'))
+                return false;
+        }
+    }
+    return true;
+}
+
+
 ?>
