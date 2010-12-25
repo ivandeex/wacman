@@ -8,16 +8,17 @@
 
 function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
     $val = nvl(uldap_value($ldap, $at['name']));
-	if (is_int($val)) {
-        $res = uldap_search($ldap, 'uni', "(&(objectClass=posixGroup)(gidNumber=$val))");
-        $grp = $res[0];
-        if ($grp) {
-            $cn = uldap_value($grp, 'cn');
-            if (! empty($cn))
-                $val = $cn;
-        } else {
-            log_debug('cannot find group id %d (error: %s)', $val, $res->error);
-        }
+    log_info("name=%s val=%s is_int=%s", $at['name'], $val, preg_match('/^\d+$/',$val)?"y":"n");
+	if (! preg_match('/^\d+$/', $val))
+	    return $val;
+    $res = uldap_search($srv, "(&(objectClass=posixGroup)(gidNumber=$val))");
+    $grp = uldap_pop($res);
+    if (!empty($grp)) {
+        $cn = uldap_value($grp, 'cn');
+        if (! empty($cn))
+            $val = $cn;
+    } else {
+        log_debug('cannot find group id %d (error: %s)', $val, $res['error']);
     }
     return $val;
 }
@@ -27,9 +28,9 @@ function ldap_write_unix_gidn (&$obj, &$at, $srv, &$ldap, $name, $val) {
     if (!empty($val) && !is_int($val)) { // /^\d*$/
         $cn = $val;
         $val = 0;
-        $res = uldap_search('uni', "(&(objectClass=posixGroup)(cn=$cn))", array('gidNumber'));
-        $grp = $res[0];
-        if ($grp) {
+        $res = uldap_search($srv, "(&(objectClass=posixGroup)(cn=$cn))", array('gidNumber'));
+        $grp = uldap_pop($res);
+        if (!empty($grp)) {
             $gidn = uldap_value($grp, 'gidNumber');
             if ($gidn)
                 $val = $gidn;
@@ -76,9 +77,9 @@ function ldap_read_unix_groups (&$obj, &$at, $srv, &$ldap, $name) {
     $uid = nvl(uldap_value($ldap, $name));
     if (!isset($uid) || !$uid)
         $uid = get_attr($obj, $name);
-    $entries = uldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$uid))", array('cn'));
+    $res = uldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$uid))", array('cn'));
     $arr = array();
-    foreach ($entries as $e)
+    foreach (uldap_entries($res) as $e)
         $arr[] = uldap_value($e, 'cn');
     return join_list($arr);
 }
@@ -119,9 +120,9 @@ function ldap_get_unix_group_ids ($srv, $val, $warn, $asstring = false) {
 
 function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
     log_debug('will be %s\'ing unix user "%s" in group %d...',  $action, $uid, $gidn);    
-    $entries = uldap_search('uni', "(&(objectClass=posixGroup)(gidNumber=$gidn))", array('memberUid'));
-    $grp = $res[0];
-    if ($res['code'] || !$grp) {
+    $res = uldap_search('uni', "(&(objectClass=posixGroup)(gidNumber=$gidn))", array('memberUid'));
+    $grp = uldap_pop($res);
+    if ($res['code'] || empty($grp)) {
         log_info('cannot find unix group %d for modification', $gidn);
         return $res['error'];
     }
@@ -206,9 +207,9 @@ function ldap_write_unix_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
             $h_uids[$uidn] = $touched_uids[$uidn] = 1;
             continue;
         }
-        $entries = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
-        $ue = $entries[0];
-        $uid = isset($ue) ? nvl(uldap_value($ue, 'uid')) : '';
+        $res = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
+        $ue = uldap_pop($res);
+        $uid = !empty($ue) ? nvl(uldap_value($ue, 'uid')) : '';
         log_debug('search for uidn="%d" returns uid="%s" (code=%s)', $uidn, $uid, $res['code']);
         if ($uid != '') {
             $h_uids[$uid] = $touched_uids[$uid] = 1;

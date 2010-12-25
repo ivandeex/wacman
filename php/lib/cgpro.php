@@ -193,9 +193,9 @@ function cgp_read_aliases (&$obj, &$at, $srv, &$ldap, $name) {
     $aliases = array();
     $telnum = '';
     $old_telnum = get_attr($obj, 'telnum', array('orig' => 1));
-    $entries = uldap_search($srv, "(&(objectClass=alias)(aliasedObjectName=$dn))", array('uid'));
+    $res = uldap_search($srv, "(&(objectClass=alias)(aliasedObjectName=$dn))", array('uid'));
     $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
-    foreach ($entries as $e) {
+    foreach (uldap_entries($res) as $e) {
         $alias = uldap_value($e, 'uid');
         if ($old_telnum == '' && $telnum == '' && preg_match($telnum_pat, $alias)) {
 			$telnum = $alias;
@@ -206,7 +206,7 @@ function cgp_read_aliases (&$obj, &$at, $srv, &$ldap, $name) {
     $aliases = join_list($aliases);
     log_debug('read aliases: telnum="%s" aliases="%s"', $telnum, $aliases);
     if ($telnum != '')
-        init_attr($obj, 'telnum', $telnum);
+        set_attr($obj, 'telnum', $telnum);
     return $aliases;
 }
 
@@ -252,10 +252,10 @@ function cgp_read_mail_groups (&$obj, &$at, $srv, &$ldap, $name) {
     $uid = nvl(uldap_value($ldap, 'uid'));
     if ($uid == '')
         return '';
-    $entries = uldap_search($srv, "(&(objectClass=CommuniGateGroup)(groupMember=$uid))", array('uid'));
+    $res = uldap_search($srv, "(&(objectClass=CommuniGateGroup)(groupMember=$uid))", array('uid'));
     $arr = array();
-    foreach ($entries as $ue)
-        $arr[] = uldap_value($ue, 'uid');
+    foreach (uldap_entries($res) as $e)
+        $arr[] = uldap_value($e, 'uid');
     return join_list($arr);
 }
 

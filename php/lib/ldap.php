@@ -153,14 +153,18 @@ function uldap_entries ($res) {
     $entries = array();
     if (isset($res['data']['count'])) {
         $count = $res['data']['count']; // this is how php ldap works
-    } elseif (isset($res['data'][0])) {
-        $count = count($res['data']); // this is how cli works
     } else {
         $count = 0;
     }
     for ($i = 0; $i < $count; $i++)
         $entries[] = $res['data'][$i];
     return $entries;
+}
+
+function uldap_pop ($res) {
+    if (isset($res['data']['count']) && $res['data']['count'] > 0)
+        return $res['data'][0];
+    return null;
 }
 
 function uldap_dn (&$ldap) {
