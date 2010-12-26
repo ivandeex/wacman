@@ -182,19 +182,23 @@ function uldap_search ($srv, $filter, $attrs = null, $params = null)
 {
     $cfg =& get_server($srv, true);
     srv_connect($srv);
-    if (! $cfg['connected'])
-        return array('code' => -1, 'error' => 'not connected', 'data' => array('count' => 0));
+    $res = array('data' => array('count' => 0));
+    if (! $cfg['connected']) {
+        $res['code'] = -1;
+        $res['error'] = "$srv: not connected";
+        return $res;
+    }
     $conn = $cfg['ldap'];
     if (is_null($attrs))
         $attrs = array('*');
     $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
     if ($handle === FALSE) {
-        $res = array('code' => ldap_errno($conn), 'error' => ldap_error($conn), 'data' => array('count' => 0));
+        $res['code'] = ldap_errno($conn);
+        $res['error'] = ldap_error($conn);
         log_debug('LDAP(%s) search[%s] attrs[%s] search failed: %s',
                     $srv, $filter, join_list($attrs), $res['error']);
         return $res;
     }
-    $res = array();
     $res['data'] = @ldap_get_entries($conn, $handle);
     if ($res['data'] === FALSE) {
         $res['code'] = ldap_errno($conn);
