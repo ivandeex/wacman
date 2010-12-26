@@ -260,7 +260,7 @@ $all_attrs = array(
             'type' => 'mgroups',
             'label' => 'Mail groups',
             'popup' => 'mgroups',
-            'ldap' => array( 'cgp' => 'uid' ),
+            'ldap' => 'cli',
         ),
         'domainIntercept' => array(
             'type' => 'domainIntercept',
