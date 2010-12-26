@@ -40,7 +40,7 @@ switch ($which) {
         $domain = get_config('mail_domain');
         $res1 = cgp_cmd('cli', 'ListAccounts', $domain);
         $telnums = array();
-        $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
+        $telnum_pat = get_telnum_pattern();
         foreach ($res1['data'] as $muid => $mutype) {
             $email = $muid.'@'.$domain;
             $res2 = cgp_cmd('cli', 'GetAccountAliases', $email);

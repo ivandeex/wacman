@@ -3,6 +3,10 @@
 
 // Interface with CommuniGate server
 
+function get_telnum_pattern() {
+    return '/^\d{'.get_config('telnum_len',3).'}$/';
+}
+
 function cgp_read_domain_intercept (&$obj, &$at, $srv, &$ldap, $name) {
     if (! isset($ldap['domain_mail_rules'])) {
         $res = cgp_cmd($srv, 'GetDomainMailRules', get_config('mail_domain'));
@@ -79,7 +83,7 @@ function cgp_read_user_intercept (&$obj, &$at, $srv, &$ldap, $name) {
         }
         $ldap['server_intercept'] = $res['data'];
     }
-    $mail = nvl(get_attr($obj, 'mail'));
+    $mail = get_attr($obj, 'mail');
     if (empty($mail))
         return '';
     $val = bool2str(empty($mail) ? false : array_search($mail, $ldap['server_intercept']));
@@ -91,7 +95,7 @@ function cgp_read_user_intercept (&$obj, &$at, $srv, &$ldap, $name) {
 function cgp_write_user_intercept (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $old = str2bool(cgp_read_domain_intercept ($obj, $at, $srv, $ldap, $name));
     $val = str2bool($val);
-    $mail = nvl(get_attr($obj, 'mail'));
+    $mail = get_attr($obj, 'mail');
     if ($val === $old || !isset($ldap['server_intercept']) || empty($mail))
         return false;
     if ($val) {
@@ -187,70 +191,44 @@ function cgp_modify_mail_group ($srv, $gid, $uid, $action) {
 
 
 function cgp_read_aliases (&$obj, &$at, $srv, &$ldap, $name) {
-    $dn = nvl(uldap_dn($ldap));
-    if ($dn == '')
+    $telnum_pat = get_telnum_pattern();
+    $mail = get_attr($obj, 'mail');
+    if (empty($mail))
         return '';
     $aliases = array();
     $telnum = '';
-    $old_telnum = get_attr($obj, 'telnum', array('orig' => 1));
-    $res = uldap_search($srv, "(&(objectClass=alias)(aliasedObjectName=$dn))", array('uid'));
-    $telnum_pat = '/^\d{'.get_config('telnum_len',3).'}$/';
-    foreach (uldap_entries($res) as $e) {
-        $alias = uldap_value($e, 'uid');
-        if ($old_telnum == '' && $telnum == '' && preg_match($telnum_pat, $alias)) {
-			$telnum = $alias;
-        } else {
+    $res = cgp_cmd('cli', 'GetAccountAliases', $mail);
+    foreach ($res['data'] as $alias) {
+        if (preg_match($telnum_pat, $alias))
+            $telnum = $alias;
+        else
             $aliases[] = $alias;
-        }
     }
     $aliases = join_list($aliases);
     log_debug('read aliases: telnum="%s" aliases="%s"', $telnum, $aliases);
-    if ($telnum != '')
+    if (! empty($telnum))
         set_attr($obj, 'telnum', $telnum);
     return $aliases;
 }
 
 
 function cgp_write_aliases_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $old = append_list(nvl($at['old']), get_attr($obj, 'telnum', array('orig' => 1))); # FIXME!!!
-    $new = append_list(nvl($at['val']), get_attr($obj, 'telnum'));
-    log_debug('write_aliases_final: old="%s" new="%s"', $old, $new);
-    if ($old == $new)
-        return 0;
-    if (get_config('cgp_buggy_ldap')) {
-        $mail = get_attr($obj, 'mail');
-        $res = cgp_cmd($srv, 'SetAccountAliases', $mail, join_list(split_list($new)));
-        log_debug('set_mail_aliases: code="%s" msg="%s" out="%s"',
-                    $res['code'], $res['msg'], $res['out']);
-        if ($res['code'] == 0)
-            return 1;
-        message_box('error', 'close',
-                    _T('Cannot change mail aliases for "%s": %s', $mail, $res['msg']));
-        return 0;
-    } else {
-        $aliased = get_attr($obj, 'cgpDn');
-        log_debug('write_aliases(1): old=(%s) new=(%s)', $old, $new);
-        $arr = compare_lists($old, $new);
-        $old = $arr[0];
-        $new = $arr[1];
-        log_debug('write_aliases(2): del=(%s) add=(%s)', $old, $new);
-        foreach (split_list($old) as $aid) {
-            $dn = get_obj_config($obj, 'cgp_user_dn', array('uid' => $aid));
-            $res = uldap_delete($srv, $dn);
-            log_debug('Removing mail alias "%s" for "%s": %s', $dn, $aliased, $res['error']);
-        }
-        foreach (split_list($new) as $aid) {
-            $dn = get_obj_config($obj, 'cgp_user_dn', array('uid' => $aid));
-            log_debug('Adding mail alias "%s" for "%s": %s', $dn, $aliased, 'unimplemented');
-        }
-        return ($old != '' || $new != '');
-    }
+    $mail = nvl(get_attr($obj, 'mail'));
+    if (empty($mail))
+        return '';
+    $aliases = split_list($val);
+    $telnum = get_attr($obj, 'telnum');
+    $aliases[] = $telnum;
+    $aliases = array_unique($aliases);
+    $res = cgp_cmd('cli', 'SetAccountAliases', $mail, $aliases);
+    log_debug('write_aliases_final(%s): %s', join_list($aliases), $res['error']);
+    return ($res['code'] == 0);
 }
 
 
 function cgp_read_mail_groups (&$obj, &$at, $srv, &$ldap, $name) {
-    $uid = nvl(uldap_value($ldap, 'uid'));
-    if ($uid == '')
+    $uid = uldap_value($ldap, 'uid');
+    if (empty($uid))
         return '';
     $res = uldap_search($srv, "(&(objectClass=CommuniGateGroup)(groupMember=$uid))", array('uid'));
     $arr = array();
@@ -264,45 +242,28 @@ function cgp_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     global $servers;
     $ldap =& $servers[$srv]['ldap'];
 
-    $alg = get_config('cgp_password');
     $cgpass = nvl($val);
-    if (preg_match('/^\{\w{2,5}\}\w+$/', $cgpass) && get_config('show_password')) {
+    if (preg_match('/^\{\w{2,5}\}\w+$/', $cgpass) && get_config('show_password'))
         $cgpass = "\x2" . $cgpass;
-        if ($alg != 'cli')
-            $alg = 'clear';
-    }
 
-    if ($alg == 'cli') {
-        $mail = get_attr($obj, 'mail');
-        $passenc = nvl(get_config('cgp_pass_encryption'));
-        if ($passenc != '') {
-            $res = cgp_cmd($srv, 'UpdateAccountSettings', $mail,
-                            array('UseAppPassword' => 'YES') );
-            if ($res['code'])
-                log_info('Cannot enable CGP passwords for %s: %s', $mail, $res['error']);
-            $res = cgp_cmd($srv, 'UpdateAccountSettings', $mail,
-                            array('PasswordEncryption' => $passenc) );
-            if ($res['code'])
-                log_info('Cannot change encryption for %s to %s: %s',
-                        $mail, $passenc, $res['msg']);
-            if (get_config('debug'))
-                $res = cgp_cmd($srv, 'GetAccountEffectiveSettings', $mail);
-        }
-        $res = cgp_cmd($srv, 'SetAccountPassword', $mail, $cgpass);
-        if (! $res['code'])
-            return 1;
-        log_error(_T('Cannot change password for "%s" on "%s": %s',
-                    $mail, $srv, $res['error']));
-        return 0;
-    }
-
-    if ($alg == 'sha') {
-        $cgpass = "\x2{SHA}" . base64_encode(sha1($val, true));
-    } else {
-        $cgpass = nvl($val);
-    }
-    log_debug('cgpass=%s', $cgpass);
-    return 1;
+    $mail = get_attr($obj, 'mail');
+    $passenc = get_config('cgp_pass_encryption');
+    if (empty($passenc))
+        return false;
+    $res = cgp_cmd($srv, 'UpdateAccountSettings', $mail,
+                        array('UseAppPassword' => 'YES') );
+    if ($res['code'])
+        log_info('Cannot enable CGP passwords for %s: %s', $mail, $res['error']);
+    $res = cgp_cmd($srv, 'UpdateAccountSettings', $mail,
+                    array('PasswordEncryption' => $passenc) );
+    if ($res['code'])
+        log_info('Cannot change encryption for %s to %s: %s',
+                    $mail, $passenc, $res['error']);
+    $res = cgp_cmd($srv, 'SetAccountPassword', $mail, $cgpass);
+    if ($res['code'] == 0)
+        return true;
+    log_error('Cannot change password for "%s" on "%s": %s', $mail, $srv, $res['error']);
+    return false;
 }
 
 
@@ -370,7 +331,7 @@ function cgp_cmd () {
 
     if ($cli->isSuccess()) {
         set_error();
-        return array('code' => 0, 'error' => '', 'data' => $ret);
+        return array('code' => 0, 'error' => 'OK', 'data' => $ret);
     }
 
     log_error("CLI error in $func: " . $cli->getErrMessage());

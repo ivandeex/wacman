@@ -246,7 +246,9 @@ function obj_read (&$obj, $srv, $filter) {
                                     $obj, $at, $srv,
                                     $obj['ldap'][$srv],
                                     $at['desc']['ldap'][$srv]);
-            $at['val'] = nvl($val);
+            $val = nvl($val);
+            if (! empty($val))
+                $at['val'] = $val;
         }
     }
 

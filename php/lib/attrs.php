@@ -249,12 +249,12 @@ $all_attrs = array(
         'aliases' => array(
             'type' => 'aliases',
             'label' => 'Mail aliases',
-            'ldap' => array( 'cgp' => 'uid' ),
+            'ldap' => 'cli',
         ),
         'telnum' => array(
             'type' => 'none',		// (read/write via aliases)
             'label' => 'Short number',
-            'ldap' => array( 'cgp' => 'uid' ),
+            'ldap' => 'cli',
         ),
         'mailgroups' => array(
             'type' => 'mgroups',
