@@ -185,10 +185,13 @@ function uldap_search ($srv, $filter, $attrs = null, $params = null)
     if (! $cfg['connected'])
         return array('code' => -1, 'error' => 'not connected', 'data' => array('count' => 0));
     $conn = $cfg['ldap'];
+    if (is_null($attrs))
+        $attrs = array('*');
     $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
     if ($handle === FALSE) {
         $res = array('code' => ldap_errno($conn), 'error' => ldap_error($conn), 'data' => array('count' => 0));
-        log_error('LDAP(%s) search[%s] failed: %s', $srv, $filter, $res['error']);
+        log_debug('LDAP(%s) search[%s] attrs[%s] search failed: %s',
+                    $srv, $filter, join_list($attrs), $res['error']);
         return $res;
     }
     $res = array();
@@ -197,7 +200,8 @@ function uldap_search ($srv, $filter, $attrs = null, $params = null)
         $res['code'] = ldap_errno($conn);
         $res['error'] = ldap_error($conn);
         $res['data'] = array('count' => 0);
-        log_error('LDAP(%s) search[%s] failed: %s', $srv, $filter, $res['error']);
+        log_debug('LDAP(%s) search[%s] attrs[%s] entries failed: %s',
+                    $srv, $filter, join_list($attrs), $res['error']);
         return $res;
     }
     $res['code'] = 0;

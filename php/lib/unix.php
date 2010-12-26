@@ -8,17 +8,19 @@
 
 function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
     $val = nvl(uldap_value($ldap, $at['name']));
-    log_info("name=%s val=%s is_int=%s", $at['name'], $val, preg_match('/^\d+$/',$val)?"y":"n");
 	if (! preg_match('/^\d+$/', $val))
 	    return $val;
-    $res = uldap_search($srv, "(&(objectClass=posixGroup)(gidNumber=$val))");
+    $res = uldap_search('uni', "(&(objectClass=posixGroup)(gidNumber=$val))", array('cn'));
     $grp = uldap_pop($res);
     if (!empty($grp)) {
         $cn = uldap_value($grp, 'cn');
-        if (! empty($cn))
+        if (! empty($cn)) {
+            log_debug('ldap_read_unix_gidn(): found group id=%s name=%s', $val, $cn);
             $val = $cn;
+        }
     } else {
-        log_debug('cannot find group id %d (error: %s)', $val, $res['error']);
+        log_debug('ldap_read_unix_gidn(): cannot find group id=%s (error: %s)',
+                    $val, $res['error']);
     }
     return $val;
 }
