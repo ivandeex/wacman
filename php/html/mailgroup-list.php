@@ -7,7 +7,7 @@ require '../lib/common.php';
 
 send_json_headers();
 
-$res = cgp_cmd('cli', 'ListGroups', get_config('mail_domain'));
+$res = cgp_cmd('cgp', 'ListGroups', get_config('mail_domain'));
 if ($res['code']) {
     echo json_error($res['error']);
 } else {

@@ -36,12 +36,6 @@ $all_attrs = array(
             'label' => 'Windows DN',
             'readonly' => true,
         ),
-        'cgpDn' => array(
-            'type' => 'dn',
-            'ldap' => 'cgp',
-            'label' => 'CGP DN',
-            'readonly' => true,
-        ),
         'objectClass' => array(
             'type' => 'class',
             'ldap' => array( 'uni' => 'objectClass' ),
@@ -49,10 +43,6 @@ $all_attrs = array(
         'ntObjectClass' => array(
             'type' => 'class',
             'ldap' => array( 'ads' => 'objectClass' ),
-        ),
-        'cgpObjectClass' => array(
-            'type' => 'class',
-            'ldap' => array( 'cgp' => 'objectClass' ),
         ),
 
         // ======== posixAccount... ========
@@ -239,41 +229,38 @@ $all_attrs = array(
 
         // ======== CommuniGate Pro ========
 
-        'hostServer' => array(
+        'mailuser' => array(
+            'type' => 'mailuser',       // read/write cgp account
             'ldap' => 'cgp',
-        ),
-        'storageLocation' => array(
-            'ldap' => 'cgp',
-            'defval' => '*',
         ),
         'aliases' => array(
             'type' => 'aliases',
             'label' => 'Mail aliases',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
         'telnum' => array(
-            'type' => 'none',		// (read/write via aliases)
+            'type' => 'none',           // read/write via aliases
             'label' => 'Short number',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
         'mailgroups' => array(
             'type' => 'mgroups',
             'label' => 'Mail groups',
             'popup' => 'mgroups',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
         'domainIntercept' => array(
             'type' => 'domainIntercept',
             'label' => 'Domain Intercept',
             'checkbox' => true,
             'disable' => true,
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
         'userIntercept' => array(
             'type' => 'userIntercept',
             'label' => 'User Intercept',
             'checkbox' => true,
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
 
         // ======== Personal / Extended... ========
@@ -348,28 +335,28 @@ $all_attrs = array(
     'mailgroup' => array(
         'dn' => array(
             'type' => 'mailgroup',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
         'uid' => array(
             'type' => 'mailgroup',
             'label' => 'Group name',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
             'colwidth' => 140,
         ),
         'cn' => array(
             'type' => 'mailgroup',
             'label' => 'Description',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
         'groupMember' => array(
             'type' => 'mailgroup',
             'label' => 'Members',
             'popup' => 'mailusers',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
         ),
         'params' => array(
             'type' => 'mailgroup',
-            'ldap' => 'cli',
+            'ldap' => 'cgp',
             'label' => 'Params',
         ),
     ),
@@ -377,14 +364,6 @@ $all_attrs = array(
     // ======== mail alias (not for creation :) ) ========
 
     'alias' => array(
-        'objectclass' => array(
-            'type' => 'class',
-            'ldap' => 'cgp',
-        ),
-        'dn' => array(
-            'type' => 'dn',
-            'ldap' => 'cgp',
-        ),
         'uid' => array(
             'ldap' => 'cgp',
         ),
@@ -440,6 +419,7 @@ $ldap_rw_subs = array(
     'users'   => array( 'ldap_read_unix_members', 'ldap_write_unix_members', 'ldap_write_unix_members_final' ),
     'ntprig'  => array( 'ad_read_pri_group', 'ad_write_pri_group', 'ldap_write_none' ),
     'ntsecg'  => array( 'ad_read_sec_groups', 'ldap_write_none', 'ad_write_sec_groups_final' ),
+    'mailuser'=> array( 'cgp_read_user', 'cgp_write_user', 'ldap_write_none' ),
     'aliases' => array( 'cgp_read_aliases', 'ldap_write_none', 'cgp_write_aliases_final' ),
     'mgroups' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
     'domainIntercept' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),

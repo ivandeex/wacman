@@ -13,6 +13,32 @@ function get_email (&$obj) {
 }
 
 
+function cgp_read_user (&$obj, &$at, $srv, &$ldap, $name) {
+    $mail = get_email($obj);
+    if (empty($mail))
+        return '';
+    if (! isset($ldap['cgp_user'])) {
+        $res = cgp_cmd($srv, 'GetAccount', $mail);
+        if ($res['code']) {
+            log_error('cgp_read_user(%s) error: %s', $mail, $res['error']);
+            return null;
+        }
+        $ldap['cgp_user'] = $res['data'];
+    }
+    return '';
+}
+
+
+function cgp_write_user (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $mail = get_email($obj);
+    if (empty($mail))
+        return false;
+    if (is_null(cgp_read_user($obj, $at, $srv, $ldap, $name)))
+        return false;
+    return false;
+}
+
+
 function cgp_read_domain_intercept (&$obj, &$at, $srv, &$ldap, $name) {
     if (! isset($ldap['domain_mail_rules'])) {
         $res = cgp_cmd($srv, 'GetDomainMailRules', get_config('mail_domain'));
@@ -127,7 +153,7 @@ function cgp_read_aliases (&$obj, &$at, $srv, &$ldap, $name) {
     if (empty($mail))
         return '';
     if (! isset($ldap['mail_aliases'])) {
-        $res = cgp_cmd('cli', 'GetAccountAliases', $mail);
+        $res = cgp_cmd($srv, 'GetAccountAliases', $mail);
         if ($res['code']) {
             log_error('cannot read aliases(%s): %s', $mail, $res['error']);
             return null;
@@ -160,7 +186,7 @@ function cgp_write_aliases_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $telnum = get_attr($obj, 'telnum');
     $aliases[] = $telnum;
     $aliases = array_unique($aliases);
-    $res = cgp_cmd('cli', 'SetAccountAliases', $mail, $aliases);
+    $res = cgp_cmd($srv, 'SetAccountAliases', $mail, $aliases);
     log_debug('write_aliases_final(%s)=(%s): %s', $mail, $val, $res['error']);
     return ($res['code'] == 0);
 }
@@ -282,7 +308,7 @@ function cgp_connect ($srv) {
     }
     $cfg['host'] = empty($parts[1]) ? 'localhost' : $parts[1];
     $cfg['port'] = empty($parts[2]) ? 106 : $parts[2];
-    $creds = get_credentials('cli');
+    $creds = get_credentials($srv);
     $cfg['user'] = $creds['user'];
     $cfg['pass'] = $creds['pass'];
     $cfg['connected'] = false;

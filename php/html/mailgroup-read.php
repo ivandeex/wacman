@@ -14,7 +14,7 @@ if (empty($_GET['uid'])) {
 $id = $_GET['uid'];
 $mgrp = create_obj('mailgroup');
 
-$res = cgp_cmd('cli', 'GetGroup', $id.'@'.get_config('mail_domain'));
+$res = cgp_cmd('cgp', 'GetGroup', $id.'@'.get_config('mail_domain'));
 if ($res['code']) {
     echo json_error($res['error']);
     srv_disconnect_all();
@@ -27,7 +27,7 @@ set_attr($mgrp, 'cn', nvl($data['RealName']));
 set_attr($mgrp, 'groupMember', join_list($data['Members']));
 unset($data['RealName']);
 unset($data['Members']);
-set_attr($mgrp, 'params', cgp_string('cli', $data));
+set_attr($mgrp, 'params', cgp_string('cgp', $data));
 
 echo obj_json_encode($mgrp);
 srv_disconnect_all();

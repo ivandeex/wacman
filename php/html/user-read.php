@@ -16,8 +16,7 @@ if (empty($uid)) {
 $searches = array(
     'uni' => "(&(objectClass=person)(uid=\${uid}))",
     'ads' => "(&(objectClass=user)(cn=\${cn}))",
-    'cgp' => "(&(objectClass=CommuniGateAccount)(uid=\${uid}))",
-    'cli' => ""
+    'cgp' => ""
 );
 
 $usr = create_obj('user');

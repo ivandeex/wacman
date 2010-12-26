@@ -16,7 +16,6 @@ $config = array(
     'cgp_alias_classes' => 'top,alias',
     'cgp_intercept_opts'=> 'Access,Append,Login,Mailbox,Partial,Sent,Signal',
     'cgp_buggy_ldap'    => 1,
-    'cgp_password'      => 'cli',
     'cgp_pass_encryption'=> 'A-crpt',
     'min_telnum'        => 501,
     'max_telnum'        => 599,
@@ -96,11 +95,6 @@ function configure ($files = null) {
     }
 
     // some defaults
-    $alg = empty($config['cgp_password']) ? 'cli' : strtolower($config['cgp_password']);
-    if (! preg_match('/^(cli|sha|clear)$/', $alg))
-        log_error("CGP password type \"$alg\" is not one of: cli, sha, clear");
-    $config['cgp_password'] = $alg;
-
     if (empty($config['start_user_id']))
         $config{start_user_id} = 1000;
     if (empty($config['start_group_id']))

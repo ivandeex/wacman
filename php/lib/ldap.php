@@ -6,8 +6,7 @@
 $servers = array(
     'uni' => array( 'disable' => 1 ),    // Unix LDAP Server
     'ads' => array( 'disable' => 1 ),    // Windows Active Directory
-    'cgp' => array( 'disable' => 1 ),    // CommuniGate Pro
-    'cli' => array( 'disable' => 1 )     // CommuniGate Pro - CLI interface
+    'cgp' => array( 'disable' => 1 )     // CommuniGate Pro - CLI interface
 );
 
 
@@ -46,7 +45,7 @@ function srv_connect ($srv) {
     if ($cfg['disable'] || $cfg['failed'])
         return -1;
 
-    if ($srv == 'cli')
+    if ($srv == 'cgp')
         return cgp_connect($srv);
 
     $cfg['failed'] = true;
@@ -90,7 +89,7 @@ function srv_disconnect_all () {
             continue;
         if (!(isset($cfg['connected']) && $cfg['connected']))
             continue;
-        if ($srv == 'cli') {
+        if ($srv == 'cgp') {
             cgp_disconnect($srv);
         } else {
             @ldap_close($cfg['ldap']);

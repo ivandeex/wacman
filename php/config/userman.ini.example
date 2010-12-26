@@ -12,15 +12,8 @@ base = "dc=ourdom,dc=local"
 debug = 0
 disable = 0
 
-# communigate pro
-[cgp]
-uri = "ldaps://mail.ourdom.com:5636"
-base = "cn=ourdom.com,o=ourdom"
-debug = 0
-disable = 0
-
 # CGP CLI interface
-[cli]
+[cgp]
 uri = pwd://localhost:106/
 debug = 0
 disable = 0
@@ -53,7 +46,6 @@ homes_to_2    = "$(cn)"
 unix_user_dn = 'uid=$(uid),ou=People,dc=ourdom,dc=com'
 unix_group_dn = 'cn=$(cn),ou=Groups,dc=ourdom,dc=com'
 ad_user_dn = 'cn=$(cn),cn=Users,dc=ourdom,dc=local'
-cgp_user_dn = 'uid=$(uid),cn=ourdom.com,o=ourdom'
 
 mail_domain = ourdom.com
 ad_domain = ourdom.local
