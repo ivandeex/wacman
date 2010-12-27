@@ -427,7 +427,6 @@ function user_rework (usr) {
 
     cond_set(usr, 'dn', get_obj_config(usr, 'unix_user_dn'));
     cond_set(usr, 'ntDn', get_obj_config(usr, 'ad_user_dn'));
-    cond_set(usr, 'cgpDn', get_obj_config(usr, 'cgp_user_dn'));
 
     // assign next available UID number
     if (has_attr(usr, 'uidNumber')) {
@@ -501,19 +500,6 @@ function mailgroup_rework (mgrp) {
 }
 
 /////////////////////////////////////////////////////////
-// Custom fields
-//
-
-popup_functions = {
-    yesno: 'create_yesno_chooser',
-    gid: 'create_group_chooser',
-    groups: 'create_user_groups_editor',
-    users: 'create_group_users_editor',
-    mgroups: 'create_user_mail_groups_editor',
-    mailusers: 'create_mailgroup_users_editor'
-};
-
-/////////////////////////////////////////////////////////
 // Messages and logging
 //
 
@@ -584,6 +570,20 @@ function btn_id (obj, op) {
     return 'btn_' + obj.name + '_' + op;
 }
 
+var std_popups = {
+    'users': [ 'user-list.php', 'uid' ],
+    'gid': [ 'group-list.php', 'gidNumber' ],
+    'groups': [ 'group-list.php', 'cn' ],
+    'mgroups': [ 'mailgroup-list.php', 'uid' ],
+    'mailusers': [ 'mailuser-list.php', 'uid' ]
+};
+
+var combo_always_all = {        
+    beforequery: function (e) {
+        e.forceAll = true;
+    }
+};
+
 function init_attr (obj, name) {
     var right_gap = 20;
     var col_gap = 2;
@@ -616,20 +616,58 @@ function init_attr (obj, name) {
     }
 
     var cfg = {
+        id: at.id,
         name: name,
         fieldLabel: _T(desc.label),
         readonly: desc.readonly,
         anchor: '-' + right_gap,
         listeners: { valid: obj.do_entry },
-        id: at.id,
         _attr: at,
     };
 
     if (desc.type == 'pass' && !config.show_password)
         cfg.inputType = 'password';
 
-    at.entry = desc.popup ? new Ext.ux.form.LovCombo(cfg)
-                          : new Ext.form.TextField(cfg);
+    if (desc.popup === 'yesno') {
+        cfg.store = [ 'No', 'Yes' ];
+        cfg.listeners = combo_always_all;
+        at.entry = new Ext.form.ComboBox(cfg);
+    } else if (desc.popup === 'gid') {
+        cfg.store = new Ext.data.JsonStore({
+            url: 'group-list.php',
+            autoLoad: true,
+            root: 'rows',
+            idProperty: 'cn',
+            fields: [ 'cn' ],
+        });
+        //cfg.mode = 'local';
+        //cfg.listeners = combo_always_all;
+        //cfg.triggerAction = 'all';
+        cfg.displayField = cfg.valueField = 'cn';
+        at.entry = new Ext.form.ComboBox(cfg);
+    } else if (desc.popup in std_popups) {
+        var url = std_popups[desc.popup][0];
+        var fld = std_popups[desc.popup][1];
+        cfg.store = new Ext.data.JsonStore({
+            url: url,
+            autoLoad: true,
+            root: 'rows',
+            idProperty: fld,
+            fields: [ fld ],
+        });
+        cfg.mode = 'local';
+        //cfg.listeners = combo_always_all;
+        cfg.triggerAction = 'all';
+        cfg.hideOnSelect = false;
+        cfg.displayField = cfg.valueField = fld;
+        cfg.checkField = cfg.id + '_checked';
+        at.entry = new Ext.ux.form.LovCombo(cfg);
+    } else if (! desc.popup) {
+        at.entry = new Ext.form.TextField(cfg);
+    } else {
+        Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
+    }
+
     return at;
 }
 
@@ -648,15 +686,13 @@ function create_obj_tab (obj) {
     var obj_attrs = [];
     for (var name in all_attrs[obj.name])
         obj_attrs.push(name);
-    obj.rec = Ext.data.Record.create(obj_attrs);
 
-    obj.store = new Ext.data.Store({
+    obj.store = new Ext.data.JsonStore({
         url: obj.list_url,
         autoLoad: true,
-        reader: new Ext.data.JsonReader({
-            root: 'rows',
-            idProperty: obj.id_attr
-        }, obj.rec)
+        root: 'rows',
+        idProperty: obj.id_attr,
+        fields: obj_attrs
     });
 
     // setup visual attributes
@@ -712,8 +748,9 @@ function create_obj_tab (obj) {
 
         reader: new Ext.data.JsonReader({
             root: 'obj',
-            idProperty: obj.id_attr
-        }, obj.rec),
+            idProperty: obj.id_attr,
+            fields: obj_attrs
+        }),
 
         items: [{
             xtype: 'tabpanel',

@@ -14,3 +14,4 @@ For example:
  cd lovcombo
  wget http://www.vitki.net/sites/vitki.net/files/attachments/lovcombo.tar.gz
  tar xzf lovcombo.tar.gz
+ ln -s ../ext .
