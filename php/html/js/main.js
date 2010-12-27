@@ -1,11 +1,55 @@
 // $Id$
 
+
+/////////////////////////////////////////////////////////
+// lists
+//
+
+var std_lists = {
+    'users': {
+        url: 'user-list.php',
+        attr: 'uid',
+        fields: [ 'uid', 'cn' ]
+    },
+    'groups': {
+        url: 'group-list.php',
+        attr: 'cn',
+    },
+    'mailgroups': {
+        url: 'mailgroup-list.php',
+        attr: 'uid'
+    },
+    'mailusers': {
+        url: 'mailuser-list.php',
+        attr: 'uid'
+    }
+};
+
+function setup_std_lists () {
+    for (var name in std_lists) {
+        var list = std_lists[name];
+        var fields = [ list.attr ];
+        if (list.fields)
+            fields = list.fields;
+        list.store = new Ext.data.JsonStore({
+            url: list.url,
+            root: 'rows',
+            idProperty: list.attr,
+            fields: fields,
+            autoLoad: false
+        });
+        list.store.load();
+    }
+}
+
+
 /////////////////////////////////////////////////////////
 // users
 //
 
 var user_obj = {
     name: 'user',
+    list: 'users',
     title: ' Users ',
 
     list_url: 'user-list.php',
@@ -60,6 +104,7 @@ var user_obj = {
 
 var group_obj = {
     name: 'group',
+    list: 'groups',
     title: ' Groups ',
 
     list_url: 'group-list.php',
@@ -112,6 +157,7 @@ var group_obj = {
 
 var mailgroup_obj = {
     name: 'mailgroup',
+    list: 'mailgroups',
     title: ' Mail groups ',
 
     list_url: 'mailgroup-list.php',
@@ -570,13 +616,6 @@ function btn_id (obj, op) {
     return 'btn_' + obj.name + '_' + op;
 }
 
-var std_popups = {
-    'users': [ 'user-list.php', 'uid' ],
-    'groups': [ 'group-list.php', 'cn' ],
-    'mgroups': [ 'mailgroup-list.php', 'uid' ],
-    'mailusers': [ 'mailuser-list.php', 'uid' ]
-};
-
 function init_attr (obj, name) {
     var right_gap = 20;
     var col_gap = 2;
@@ -628,35 +667,21 @@ function init_attr (obj, name) {
         cfg.triggerAction = 'all';
         at.entry = new Ext.form.ComboBox(cfg);
     } else if (desc.popup === 'gid') {
-        cfg.store = new Ext.data.JsonStore({
-            url: 'group-list.php',
-            root: 'rows',
-            fields: [ 'cn' ],
-            autoLoad: true
-        });
-        cfg.store.load();
+        cfg.store = std_lists['groups'].store;
         cfg.mode = 'local';
         cfg.allowBlank = false;
         cfg.forceSelection = false;
         cfg.triggerAction = 'all';
         cfg.displayField = cfg.valueField = 'cn';
         at.entry = new Ext.form.ComboBox(cfg);
-    } else if (desc.popup in std_popups) {
-        var url = std_popups[desc.popup][0];
-        var fld = std_popups[desc.popup][1];
-        cfg.store = new Ext.data.JsonStore({
-            url: url,
-            root: 'rows',
-            fields: [ fld ],
-            autoLoad: true
-        });
-        cfg.store.load();
+    } else if (desc.popup in std_lists) {
+        cfg.store = std_lists[desc.popup].store;
         cfg.mode = 'local';
         cfg.allowBlank = true;
         cfg.forceSelection = false;
         cfg.triggerAction = 'all';
         cfg.hideOnSelect = false;
-        cfg.displayField = cfg.valueField = fld;
+        cfg.displayField = cfg.valueField = std_lists[desc.popup].attr;
         cfg.checkField = 'checked_' + cfg.id;
         at.entry = new Ext.ux.form.LovCombo(cfg);
     } else if (! desc.popup) {
@@ -684,13 +709,7 @@ function create_obj_tab (obj) {
     for (var name in all_attrs[obj.name])
         obj_attrs.push(name);
 
-    obj.store = new Ext.data.JsonStore({
-        url: obj.list_url,
-        autoLoad: true,
-        root: 'rows',
-        idProperty: obj.id_attr,
-        fields: obj_attrs
-    });
+    obj.store = std_lists[obj.list].store;
 
     // setup visual attributes
     var desc_tabs = [];
@@ -845,9 +864,10 @@ function create_obj_tab (obj) {
 //
 
 function main() {
-    hide_preloader();
 
+    hide_preloader();
     Ext.QuickTips.init();
+    setup_std_lists();
 
     var objs = [ user_obj, group_obj, mailgroup_obj ];
     var tabs = [];

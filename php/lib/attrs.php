@@ -244,9 +244,9 @@ $all_attrs = array(
             'ldap' => 'cgp',
         ),
         'mailgroups' => array(
-            'type' => 'mgroups',
+            'type' => 'mailgroups',
             'label' => 'Mail groups',
-            'popup' => 'mgroups',
+            'popup' => 'mailgroups',
             'ldap' => 'cgp',
         ),
         'domainIntercept' => array(
@@ -421,7 +421,7 @@ $ldap_rw_subs = array(
     'ntsecg'  => array( 'ad_read_sec_groups', 'ldap_write_none', 'ad_write_sec_groups_final' ),
     'mailuser'=> array( 'cgp_read_user', 'cgp_write_user', 'ldap_write_none' ),
     'aliases' => array( 'cgp_read_aliases', 'ldap_write_none', 'cgp_write_aliases_final' ),
-    'mgroups' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
+    'mailgroups' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
     'domainIntercept' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),
     'userIntercept' => array( 'cgp_read_user_intercept', 'ldap_write_none', 'cgp_write_user_intercept' ),
     'mailgroup' => array( 'ldap_read_none', 'ldap_write_none', 'ldap_write_none' ),
