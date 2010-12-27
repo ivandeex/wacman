@@ -653,7 +653,6 @@ function init_attr (obj, name) {
         fieldLabel: _T(desc.label),
         readonly: desc.readonly,
         anchor: '-' + right_gap,
-        listeners: { valid: obj.do_entry },
         _attr: at,
     };
 
@@ -685,6 +684,9 @@ function init_attr (obj, name) {
         cfg.checkField = 'checked_' + cfg.id;
         at.entry = new Ext.ux.form.LovCombo(cfg);
     } else if (! desc.popup) {
+        cfg.enableKeyEvents = true;
+        cfg.listeners = { keypress: obj.do_entry };
+        //cfg.listeners = { valid: obj.do_entry };
         at.entry = new Ext.form.TextField(cfg);
     } else {
         Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
