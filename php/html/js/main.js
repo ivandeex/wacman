@@ -2,282 +2,17 @@
 
 
 /////////////////////////////////////////////////////////
-// lists
+// String utilities
 //
 
-var std_lists = {
-    'users': {
-        url: 'user-list.php',
-        attr: 'uid',
-        fields: [ 'uid', 'cn' ]
-    },
-    'groups': {
-        url: 'group-list.php',
-        attr: 'cn',
-    },
-    'mailgroups': {
-        url: 'mailgroup-list.php',
-        attr: 'uid'
-    },
-    'mailusers': {
-        url: 'mailuser-list.php',
-        attr: 'uid'
-    }
-};
+var MAX_ID_LEN = 16;
 
-function setup_std_lists () {
-    for (var name in std_lists) {
-        var list = std_lists[name];
-        var fields = [ list.attr ];
-        if (list.fields)
-            fields = list.fields;
-        list.store = new Ext.data.JsonStore({
-            url: list.url,
-            root: 'rows',
-            idProperty: list.attr,
-            fields: fields,
-            autoLoad: false
-        });
-        list.store.load();
-    }
-}
-
-
-/////////////////////////////////////////////////////////
-// users
-//
-
-var user_obj = {
-    name: 'user',
-    list: 'users',
-    title: ' Users ',
-
-    list_url: 'user-list.php',
-    read_url: 'user-read.php',
-    write_url: 'user-write.php',
-    id_attr: 'uid',
-
-    do_add: function () {
-    },
-
-    do_delete: function () {
-    },
-
-    do_refresh: function () {
-        this.store.reload();
-    },
-
-    do_save: function () {
-        obj_save(this);
-    },
-
-    do_revert: function () {
-    },
-
-    do_leave: function (sm, row, rec) {
-        return true;
-    },
-
-    do_load: function (sm, row, rec) {
-        obj_load(this, rec);
-    },
-
-    do_unselect: function () {
-    },
-
-    do_entry: function (entry, ev) {
-        var val = trim(entry.getValue());
-        if (val == entry._attr.val)
-            return;
-        var obj = entry._attr.obj;
-        obj_setup(obj);
-        set_attr(obj, entry._attr.desc.name, val);
-        user_rework(obj);
-        update_obj_gui(obj);
-        Ext.getCmp('user_panel').setTitle(
-                get_attr(obj, 'uid') + ' (' + get_attr(obj, 'cn') + ') ...');
-    }
-};
-
-/////////////////////////////////////////////////////////
-// groups
-//
-
-var group_obj = {
-    name: 'group',
-    list: 'groups',
-    title: ' Groups ',
-
-    list_url: 'group-list.php',
-    read_url: 'group-read.php',
-    write_url: 'group-write.php',
-    id_attr: 'cn',
-
-    do_add: function () {
-    },
-
-    do_delete: function () {
-    },
-
-    do_refresh: function () {
-        this.store.reload();
-    },
-
-    do_save: function () {
-    },
-
-    do_revert: function () {
-    },
-
-    do_leave: function (sm, row, rec) {
-        return true;
-    },
-
-    do_load: function (sm, row, rec) {
-        obj_load(this, rec);
-    },
-
-    do_unselect: function () {
-    },
-
-    do_entry: function (entry, ev) {
-        var val = trim(entry.getValue());
-        if (val == entry._attr.val)
-            return;
-        var obj = entry._attr.obj;
-        obj_setup(obj);
-        set_attr(obj, entry._attr.desc.name, val);
-        group_rework(obj);
-        update_obj_gui(obj);
-        Ext.getCmp('group_panel').setTitle(get_attr(obj, 'cn') + ' ...');
-    }
-};
-
-/////////////////////////////////////////////////////////
-// mailgroups
-//
-
-var mailgroup_obj = {
-    name: 'mailgroup',
-    list: 'mailgroups',
-    title: ' Mail groups ',
-
-    list_url: 'mailgroup-list.php',
-    read_url: 'mailgroup-read.php',
-    write_url: 'mailgroup-write.php',
-    id_attr: 'uid',
-
-    do_add: function () {
-    },
-
-    do_delete: function () {
-    },
-
-    do_refresh: function () {
-        this.store.reload();
-    },
-
-    do_save: function () {
-    },
-
-    do_revert: function () {
-    },
-
-    do_leave: function (sm, row, rec) {
-        return true;
-    },
-
-    do_load: function (sm, row, rec) {
-        alert("load row="+row);
-        obj_load(this, rec);
-    },
-
-    do_unselect: function () {
-    },
-
-    do_entry: function (entry, ev) {
-        var val = trim(entry.getValue());
-        if (val == entry._attr.val)
-            return;
-        var obj = entry._attr.obj;
-        obj_setup(obj);
-        set_attr(obj, entry._attr.desc.name, val);
-        mailgroup_rework(obj);
-        update_obj_gui(obj);
-        Ext.getCmp('mailgroup_panel').setTitle(get_attr(obj, 'uid') + ' ...');
-    }
-};
-
-/////////////////////////////////////////////////////////
-// Rework
-//
-
-function get_attr(obj, name) {
-    if (!(name in obj.attr)) {
-        log_debug('%s: undefined attribute in get_attr()', name);
-        return '';
-    }
-    return trim(obj.attr[name].val);
-}
-
-function cond_set(obj, name, val) {
-    if (!(name in obj.attr)) {
-        log_debug('%s: undefined attribute in cond_set()', name);
-        return false;
-    }
-    at = obj.attr[name];
-    if (at.desc.disable || has_attr(obj, name))
-        return false;
-    set_attr(obj, name, val);
-    return true;
-}
-
-function set_attr(obj, name, val) {
-    if (!(name in obj.attr)) {
-        log_debug('%s: undefined attribute in set_attr()', name);
-        return;
-    }
-    val = trim(val);
-    var at = obj.attr[name];
-    if (at.desc.disable)
-        return;
-    at.val = val;
-    if (val == '')
-        at.state = 'empty';
-    else if (val == at.old)
-        at.state = 'orig';
-    else if (at.desc.visual && val == at.entry.getValue())
-        at.state = 'user';
-    else
-        at.state = 'calc';
-    if (val == '')
-        at.requested = false;
-}
-
-function has_attr(obj, name) {
-    if (!(name in obj.attr)) {
-        log_debug('%s: undefined attribute in has_attr()', name);
-        return false;
-    }
-    switch (obj.attr[name].state) {
-        case 'force':
-        case 'empty':
-        case 'calc':
-            return false;
-        case 'user':
-        case 'orig':
-            return true;
-        default:
-            return trim(obj.attr[name].val) != '';
-    }
-}
-
-function trim(s) {
+function strTrim(s) {
     s = (s == undefined ? '' : '' + s);
     return s.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
 }
 
-function str_translate(s, from, to) {
+function strTranslate(s, from, to) {
     var sl = s.length;
     var tl = to.length;
     var xlat = [];
@@ -294,7 +29,7 @@ function str_translate(s, from, to) {
 function str2bool(s) {
     if (s == undefined || s == null)
         return false;
-    s = trim(s);
+    s = strTrim(s);
     if (s.length < 1)
         return false;
     return ("yto1".indexOf(s.charAt(0).toLowerCase()) >= 0);
@@ -305,8 +40,6 @@ function bool2str(v) {
 }
 
 function string2id(s) {
-    var max_id_len = 16;
-
     // initialize conversion tables
     if (! string2id.rus2lat) {
         // russian to latin
@@ -337,10 +70,10 @@ function string2id(s) {
         }
     }
 
-    s = trim(s);
+    s = strTrim(s);
     var n = s.length;
-    if (n > max_id_len)
-        n = max_id_len;
+    if (n > MAX_ID_LEN)
+        n = MAX_ID_LEN;
 
     var r = '';
     for (var i = 0; i < n; i++) {
@@ -352,103 +85,8 @@ function string2id(s) {
 	return r;
 }
 
-function get_obj_config (obj, what, override) {
-    var dn = trim((what in config) ? config[what] : '');
-    var name;
-	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
-		name = name[1];
-		var val = '';
-		if (override != undefined && override != null && (name in override))
-		    val = trim(override[name]);
-		if (val == '')
-		    val = get_attr(obj, name);
-		if (val == '') {
-			dn = '';
-			break;
-		}
-		dn = dn.replace(/\$\((\w+)\)/, val);
-	}
-	return dn;
-}
-
-function obj_setup (obj) {
-    if (! obj.form_is_setup) {
-        for (var name in obj.attr) {
-            var at = obj.attr[name];
-            if (at.entry)
-                at.val = trim(at.entry.getValue());
-        }
-        obj.form_is_setup = true;
-    }
-}
-
-function obj_load (obj, rec) {
-    obj_setup(obj);
-    params = {};
-    params[obj.id_attr] = rec.get(obj.id_attr);
-    obj.form.load({
-        method: 'GET',
-        url: obj.read_url,
-        params: params,
-        waitMsg: _T('Loading...')
-    });
-}
-
-function obj_save (obj) {
-    obj_setup(obj);
-    obj.form.submit();
-}
-
-function update_obj_gui (obj, only) {
-    for (var name in obj.attr) {
-        var at = obj.attr[name];
-        if (!at.desc.disable
-                && at.desc.visual
-                && !at.desc.popup
-                && (!only || name == only)
-                && at.val != trim(at.entry.getValue()))
-            at.entry.setValue(at.val);
-    }
-}
-
-function obj_fill_defs (obj) {
-    for (var name in obj.attr) {
-        var desc = obj.attr[name].desc;
-        if (desc.defval != null)
-            cond_set(obj, name, desc.defval);
-        if (desc.copyfrom != null && has_attr(obj, desc.copyfrom))
-            cond_set(obj, name, get_attr(obj, desc.copyfrom));
-    }
-}
-
-function request_next_id (which, obj, name, format) {
-    if (has_attr(obj, name))
-        return;
-    var at = obj.attr[name];
-    if (at.requesting || (at.requested && at.val != ''))
-        return;
-    at.requesting = at.requested = true;
-    log_debug('request_id(%s,%s,%s) in progress (state=%s)', which, obj.name, name, obj.attr[name].state);
-    Ext.Ajax.request({
-        url: 'next-id.php?which=' + which,
-        success: function (resp, opts) {
-            at.requesting = false;
-            var id = trim(resp.responseText).replace(/[^0-9]/g, '');
-            if (format)
-                id = format(id);
-            if (cond_set(obj, name, id))
-                update_obj_gui(obj, name);
-            log_debug('request_id(%s,%s,%s) returns "%s"', which, obj.name, name, id);
-        },
-        failure: function (resp, opts) {
-            at.requesting = false;
-            log_debug('request_id(%s,%s,%s) failed', which, obj.name, name);
-        }
-    });
-}
-
-function format_telnum (telnum) {
-    telnum = trim(telnum).replace(/[^0-9]/g, '');
+function formatTelnum (telnum) {
+    telnum = strTrim(telnum).replace(/[^0-9]/g, '');
     var len = config.telnum_len;
     if (telnum.length < len) {
         while (telnum.length < len)
@@ -460,103 +98,6 @@ function format_telnum (telnum) {
     return telnum;
 }
 
-function user_rework (usr) {
-    var uid = get_attr(usr, 'uid');
-    var cn = get_attr(usr, 'cn');
-    var gn = get_attr(usr, 'givenName');
-    var sn = get_attr(usr, 'sn');
-
-    // ############# POSIX ############
-
-    // name
-    if (! has_attr(usr, 'cn'))
-        cond_set(usr, 'cn', (cn = gn + (sn && gn ? ' ' : '') + sn));
-
-    // identifier
-    if (! has_attr(usr, 'uid'))
-        uid = sn == '' ? gn : gn.substr(0, 1) + sn;
-    set_attr(usr, 'uid', (uid = string2id(uid)));
-
-    //#set_attr(usr, 'objectClass', append_list(get_attr(usr, 'objectClass'), config.unix_user_classes));
-
-    cond_set(usr, 'dn', get_obj_config(usr, 'unix_user_dn'));
-    cond_set(usr, 'ntDn', get_obj_config(usr, 'ad_user_dn'));
-
-    // assign next available UID number
-    if (has_attr(usr, 'uidNumber')) {
-        var uidn = get_attr(usr, 'uidNumber');
-        uidn = uidn.replace(/[^0-9]/g, '');
-        set_attr(usr, 'uidNumber', uidn);
-    }
-    request_next_id('unix_uidn', usr, 'uidNumber');
-
-    // mail
-    if (uid != '')
-        cond_set(usr, 'mail', uid + '@' + config.mail_domain);
-
-    // home directory
-    if (uid != '')
-        cond_set(usr, 'homeDirectory', config.home_root + '/' + uid);
-
-    // ############# Active Directory ############
-
-    //#set_attr($usr, 'ntObjectClass', append_list(get_attr($usr, 'ntObjectClass'), config.ad_user_classes));
-
-    //#cond_set($usr, 'objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
-
-    cond_set(usr, 'userPrincipalName', uid+'@'+config.ad_domain);
-
-    //#var pass = get_attr(usr, 'password');
-    //#if (pass == config.OLD_PASS) {
-    //#    set_attr($usr, 'userAccountControl', get_attr($usr, 'userAccountControl', orig => 1));
-    //#} else {
-    //#    my $uac = get_attr($usr, 'userAccountControl');
-    //#    $uac = ADS_UF_NORMAL_ACCOUNT unless $uac;
-    //#    $uac &= ~(ADS_UF_PASSWD_NOT_REQUIRED | ADS_UF_DONT_EXPIRE_PASSWD);
-    //#    $uac |= $pass eq '' ? ADS_UF_PASSWD_NOT_REQUIRED : ADS_UF_DONT_EXPIRE_PASSWD;
-    //#    set_attr($usr, 'userAccountControl', $uac);
-    //#}
-
-    // ######## CommuniGate Pro ########
-    //set_attr(usr, 'cgpObjectClass', append_list(get_attr($usr, 'cgpObjectClass'), config.cgp_user_classes));
-
-    var telnum = get_attr(usr, 'telnum');
-    set_attr(usr, 'telnum', format_telnum(telnum));
-    request_next_id('cgp_telnum', usr, 'telnum', format_telnum);
-
-    set_attr(usr, 'domainIntercept', bool2str(get_attr(usr, 'domainIntercept')) );
-    set_attr(usr, 'userIntercept', bool2str(get_attr(usr, 'userIntercept')) );
-
-    // ###### constant and copy-from fields ########
-    obj_fill_defs(usr);
-}
-
-function group_rework (grp) {
-    set_attr(grp, 'objectClass', config.unix_group_classes);
-
-    var val;
-    val = get_attr(grp, 'cn');
-    set_attr(grp, 'cn', string2id(val));
-
-    set_attr(grp, 'gidNumber', get_attr(grp, 'gidNumber').replace(/[^0-9]/g, ''));
-    request_next_id('unix_gidn', grp, 'gidNumber');
-
-    set_attr(grp, 'dn', get_obj_config(grp, 'unix_group_dn'));
-}
-
-function mailgroup_rework (mgrp) {
-    set_attr(mgrp, 'uid', string2id(get_attr(mgrp, 'uid')));
-    set_attr(mgrp, 'dn', get_obj_config(mgrp, 'cgp_user_dn'));
-    cond_set(mgrp, 'cn', get_attr(mgrp, 'uid'));
-
-    // ###### constant (& not copyfrom) fields ########
-    obj_fill_defs(mgrp);
-}
-
-/////////////////////////////////////////////////////////
-// Messages and logging
-//
-
 function _T() {
 	var args = arguments;
 	var msg = (args[0] in translations) ? translations[args[0]] : args[0];
@@ -565,7 +106,7 @@ function _T() {
 	return msg;
 };
 
-function log_debug() {
+function logDebug() {
     if (!('debug' in config) || !str2bool(config.debug))
         return;
     if ((typeof console === 'undefined') || console == null)
@@ -576,6 +117,7 @@ function log_debug() {
 	    msg = msg.replace('%s', args[i]);
     console.log(msg);
 }
+
 
 /////////////////////////////////////////////////////////
 // AJAX indicator
@@ -616,316 +158,654 @@ AjaxIndicator = Ext.extend(Ext.Button, {
     },
 });
 
+
+/////////////////////////////////////////////////////////
+// Data object
+//
+
+// create namespace
+Ext.ns('Userman');
+
+var std_lists;
+
+Userman.Object = Ext.extend(Ext.util.Observable, {
+
+    RIGHT_GAP: 20,
+    COL_GAP: 2,
+    LABEL_WIDTH: 150,
+    TAB_PADDING: '10px',
+
+    name: undefined,
+    list: undefined,
+    title: undefined,
+
+    list_url: undefined,
+    read_url: undefined,
+    write_url: undefined,
+    id_attr: undefined,
+
+    form_is_setup: false,
+    changed: false,
+    enabled: false,
+    store: undefined,
+    list_panel: undefined,
+    form_panel: undefined,
+    form: undefined,
+    tab_panel: null,
+
+    attr: {},
+    list_cols: [],
+    list_width: 0,
+
+    constructor : function(config){
+        Ext.apply(this, config);
+        this.attr = {};
+        this.list_cols = [];
+        this.list_width = this.COL_GAP + 1;
+        this.store = std_lists[this.list].store;
+    },
+
+    doAdd: function () {
+    },
+
+    doDelete: function () {
+    },
+
+    doRefresh: function () {
+        this.store.reload();
+    },
+
+    doSave: function () {
+        this.save();
+    },
+
+    doRevert: function () {
+    },
+
+    doLeave: function (sm, row, rec) {
+        return true;
+    },
+
+    doLoad: function (sm, row, rec) {
+        this.load(rec);
+    },
+
+    doUnselect: function () {
+    },
+
+    doEntry: function (entry, ev) {
+        var val = strTrim(entry.getValue());
+        if (val == entry._attr.val)
+            return;
+        this.guiSetup();
+        this.setAttr(entry._attr.desc.name, val);
+        this.rework();
+        this.guiUpdate();
+        Ext.getCmp(this.name + '_panel').setTitle(this.recTitle() + ' ...');
+    },
+
+    recTitle: function() {
+        return '';
+    },
+
+    rework: function () {
+    },
+
+    getAttr: function (name) {
+        if (!(name in this.attr)) {
+            logDebug('%s: undefined attribute in getAttr()', name);
+            return '';
+        }
+        return strTrim(this.attr[name].val);
+    },
+
+    condSet: function (name, val) {
+        if (!(name in this.attr)) {
+            logDebug('%s: undefined attribute in condSet()', name);
+            return false;
+        }
+        at = this.attr[name];
+        if (at.desc.disable || this.hasAttr(name))
+            return false;
+        this.setAttr(name, val);
+        return true;
+    },
+
+    setAttr: function (name, val) {
+        if (!(name in this.attr)) {
+            logDebug('%s: undefined attribute in setAttr()', name);
+            return;
+        }
+        val = strTrim(val);
+        var at = this.attr[name];
+        if (at.desc.disable)
+            return;
+        at.val = val;
+        if (val == '')
+            at.state = 'empty';
+        else if (val == at.old)
+            at.state = 'orig';
+        else if (at.desc.visual && val == at.entry.getValue())
+            at.state = 'user';
+        else
+            at.state = 'calc';
+        if (val == '')
+            at.requested = false;
+    },
+
+    hasAttr: function (name) {
+        if (!(name in this.attr)) {
+            logDebug('%s: undefined attribute in hasAttr()', name);
+            return false;
+        }
+        switch (this.attr[name].state) {
+            case 'force':
+            case 'empty':
+            case 'calc':
+                return false;
+            case 'user':
+            case 'orig':
+                return true;
+            default:
+                return( strTrim(this.attr[name].val) != '' );
+        }
+    },
+
+    getConfig: function (what, override) {
+        var dn = strTrim((what in config) ? config[what] : '');
+        var name;
+    	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
+	    	name = name[1];
+	    	var val = '';
+	    	if (override != undefined && override != null && (name in override))
+	    	    val = strTrim(override[name]);
+	    	if (val == '')
+	    	    val = this.getAttr(name);
+         	if (val == '') {
+	            dn = '';
+	            break;
+	        	}
+	        dn = dn.replace(/\$\((\w+)\)/, val);
+	    }
+    	return dn;
+    },
+
+    guiSetup: function () {
+        if (! this.form_is_setup) {
+            for (var name in this.attr) {
+                var at = this.attr[name];
+                if (at.entry)
+                    at.val = strTrim(at.entry.getValue());
+            }
+            this.form_is_setup = true;
+        }
+    },
+
+    load: function (rec) {
+        this.guiSetup();
+        var params = {};
+        params[this.id_attr] = rec.get(this.id_attr);
+        this.form.load({
+            method: 'GET',
+            url: this.read_url,
+            params: params,
+            waitMsg: _T('Loading...')
+        });
+    },
+
+    save: function () {
+        this.guiSetup();
+        this.form.submit();
+    },
+
+    guiUpdate: function (only) {
+        for (var name in this.attr) {
+            var at = this.attr[name];
+            if (!at.desc.disable
+                    && at.desc.visual
+                    && !at.desc.popup
+                    && (!only || name == only)
+                    && at.val != strTrim(at.entry.getValue()))
+                at.entry.setValue(at.val);
+        }
+    },
+
+    fillDefs: function () {
+        for (var name in this.attr) {
+            var desc = this.attr[name].desc;
+            if (desc.defval != null)
+                this.condSet(name, desc.defval);
+            if (desc.copyfrom != null && this.hasAttr(desc.copyfrom))
+                this.condSet(name, this.getAttr(desc.copyfrom));
+        }
+    },
+
+    autoId: function (which, name, format) {
+        if (this.hasAttr(name))
+            return;
+        var at = this.attr[name];
+        if (at.requesting || (at.requested && at.val != ''))
+            return;
+        at.requesting = at.requested = true;
+        logDebug('autoId(%s,%s,%s) in progress (state=%s)',
+                    which, this.name, name, this.attr[name].state);
+        var _this = this;
+        Ext.Ajax.request({
+            url: 'next-id.php',
+            params: {
+                which: which
+            },
+            success: function (resp, opts) {
+                at.requesting = false;
+                var id = strTrim(resp.responseText).replace(/[^0-9]/g, '');
+                if (format)
+                    id = format(id);
+                if (_this.condSet(name, id))
+                    _this.guiUpdate(name);
+                logDebug('request_id(%s,%s,%s) returns "%s"', which, _this.name, name, id);
+            },
+            failure: function (resp, opts) {
+                at.requesting = false;
+                logDebug('request_id(%s,%s,%s) failed', which, _this.name, name);
+            }
+        });
+    },
+
+    btnId: function (op) {
+        return 'btn_' + this.name + '_' + op;
+    },
+
+    initAttr: function (name) {
+        var desc = all_attrs[this.name][name];
+
+        var at = {
+            val: '',
+            old: '',
+            state: 'empty',
+            obj: this,
+            desc: desc,
+            entry: null,
+            id: 'field_' + this.name + '_' + name,
+            requesting: false,
+            requested: false
+        };
+        this.attr[name] = at;
+
+        if (desc.disable || !desc.visual)
+             return at;
+
+        if (desc.colwidth) {
+            this.list_width += desc.colwidth + this.COL_GAP;
+            this.list_cols.push({
+                header: _T(desc.label),
+                dataIndex: name,
+                sortable: true,
+                width: desc.colwidth,
+            });
+        }
+
+        var cfg = {
+            id: at.id,
+            name: name,
+            fieldLabel: _T(desc.label),
+            readonly: desc.readonly,
+            anchor: '-' + this.RIGHT_GAP,
+            _attr: at,
+        };
+
+        if (desc.type == 'pass' && !config.show_password)
+            cfg.inputType = 'password';
+
+        if (desc.popup === 'yesno') {
+            cfg.store = [ 'No', 'Yes' ];
+            cfg.editable = false;
+            cfg.allowBlank = false;
+            cfg.triggerAction = 'all';
+            at.entry = new Ext.form.ComboBox(cfg);
+        } else if (desc.popup === 'gid') {
+            cfg.store = std_lists['groups'].store;
+            cfg.mode = 'local';
+            cfg.allowBlank = false;
+            cfg.forceSelection = false;
+            cfg.triggerAction = 'all';
+            cfg.displayField = cfg.valueField = 'cn';
+            at.entry = new Ext.form.ComboBox(cfg);
+        } else if (desc.popup in std_lists) {
+            cfg.store = std_lists[desc.popup].store;
+            cfg.mode = 'local';
+            cfg.allowBlank = true;
+            cfg.forceSelection = false;
+            cfg.triggerAction = 'all';
+            cfg.hideOnSelect = false;
+            cfg.displayField = cfg.valueField = std_lists[desc.popup].attr;
+            cfg.checkField = 'checked_' + cfg.id;
+            at.entry = new Ext.ux.form.LovCombo(cfg);
+        } else if (! desc.popup) {
+            var _this = this;
+            //cfg.enableKeyEvents = true;
+            //cfg.listeners = { keypress: function(e,ev) { _this.doEntry(e,ev); } };
+            cfg.listeners = { valid: function(e,ev) { _this.doEntry(e,ev); } };
+            at.entry = new Ext.form.TextField(cfg);
+        } else {
+            Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
+        }
+
+        return at;
+    },
+
+    createTab: function () {
+        this.tab_panel = null;
+        var form_attrs = gui_attrs[this.name];
+        if (! form_attrs)
+            return null;
+
+        var obj_attrs = [];
+        for (var name in all_attrs[this.name])
+            obj_attrs.push(name);
+
+        // setup visual attributes
+        var desc_tabs = [];
+
+        for (var i = 0; i < form_attrs.length; i++) {
+
+            var tab_name = form_attrs[i][0];
+            var tab_attrs = form_attrs[i][1];
+            var entries = [];
+
+            for (var j = 0; j < tab_attrs.length; j++) {
+                var at = this.initAttr(tab_attrs[j]);
+                if (at.entry)
+                    entries.push(at.entry);
+            }
+
+            if (entries.length) {
+                desc_tabs.push({
+                    title: _T(tab_name),
+                    layout: 'form',
+                    autoScroll: true,
+                    //autoHeight: true,
+                    bodyStyle: 'padding: ' + this.TAB_PADDING,
+                    labelWidth: this.LABEL_WIDTH,
+                    labelSeparator: '',
+                    items: entries
+                });
+            }
+	    }
+
+        if (! desc_tabs.length)
+            return null;
+
+        // setup non-visual attributes
+        for (var name in all_attrs[this.name]) {
+            if (!(name in this.attr))
+                this.initAttr(name);
+        }
+
+        var _this = this;
+
+        this.form_panel = new Ext.FormPanel({
+            region: 'center',
+            id: this.name + '_panel',
+            title: '...',
+            url: this.write_url,
+            border: false,
+            layout: 'fit',
+
+            reader: new Ext.data.JsonReader({
+                root: 'obj',
+                idProperty: this.id_attr,
+                fields: obj_attrs
+            }),
+
+            items: [{
+                xtype: 'tabpanel',
+                activeItem: 0,
+                items: desc_tabs
+            }],
+
+            bbar: [ '->', {
+                text: _T('Save'),
+                icon: 'images/apply.png',
+                scale: 'medium',
+                ctCls: config.add_button_css,
+                handler: function() { _this.doSave() },
+                id: this.btnId('save')
+            },{
+                text: _T('Revert'),
+                icon: 'images/revert.png',
+                scale: 'medium',
+                ctCls: config.add_button_css,
+                handler: function() { _this.doRevert(); },
+                id: this.btnId('revert')
+            },
+            ' ' ]
+        });
+        this.form = this.form_panel.getForm();
+
+        this.list_panel = new Ext.grid.GridPanel({
+            store: this.store,
+            title: _T(this.title),
+            id: this.name + '_list',
+
+            colModel: new Ext.grid.ColumnModel({
+                columns: this.list_cols
+            }),
+
+            selModel: new Ext.grid.RowSelectionModel({
+                singleSelect: true,
+                listeners: {
+                    rowdeselect: function(sm, row, rec) {
+                        if (_this.doLeave(sm, row, rec))
+                            this.unlock();
+                        else
+                            this.lock();
+                    },
+                    rowselect: function(sm, row, rec) {
+                        _this.doLoad(sm, row, rec);
+                    }
+                }
+            }),
+
+            region: 'west',
+            split: true,
+            collapsible: true,
+            //collapseMode: 'mini',
+            width: this.list_width,
+            minSize: 50
+        });
+
+        var obj_buttons = [ ' ', {
+                text: _T('Create'),
+                icon: 'images/add.png',
+                scale: 'medium',
+                ctCls: config.add_button_css,
+                handler: function() { _this.doAdd(); },
+                id: this.btnId('add')
+            },{
+                text: _T('Delete'),
+                icon: 'images/delete.png',
+                scale: 'medium',
+                ctCls: config.add_button_css,
+                handler: function() { _this.doDelete(); },
+                id: this.btnId('delete')
+            },{
+                text: _T('Refresh'),
+                icon: 'images/refresh.png',
+                scale: 'medium',
+                ctCls: config.add_button_css,
+                handler: function() { _this.doRefresh(); },
+                id: this.btnId('refresh')
+            },
+            '->', new AjaxIndicator()
+            ];
+
+        this.tab_panel = {
+            title: _T(this.title),
+            layout: 'border',
+            items: [ this.list_panel, this.form_panel ],
+            bbar: {
+                xtype: 'toolbar',
+                items: obj_buttons
+            }
+        };
+
+        this.enabled = true;
+        return this.tab_panel;
+    }
+
+});
+
+/////////////////////////////////////////////////////////
+// users
+//
+
+Userman.User = Ext.extend(Userman.Object, {
+    name: 'user',
+    list: 'users',
+    title: ' Users ',
+
+    list_url: 'user-list.php',
+    read_url: 'user-read.php',
+    write_url: 'user-write.php',
+    id_attr: 'uid',
+
+    recTitle: function () {
+        return this.getAttr('uid') + ' (' + this.getAttr('cn') + ')';
+    },
+
+    rework: function () {
+        var uid = this.getAttr('uid');
+        var cn = this.getAttr('cn');
+        var gn = this.getAttr('givenName');
+        var sn = this.getAttr('sn');
+
+        // ############# POSIX ############
+
+        // name
+        if (! this.hasAttr('cn'))
+            this.condSet('cn', (cn = gn + (sn && gn ? ' ' : '') + sn));
+
+        // identifier
+        if (! this.hasAttr('uid'))
+            uid = sn == '' ? gn : gn.substr(0, 1) + sn;
+        this.setAttr('uid', (uid = string2id(uid)));
+
+        //#this.setAttr('objectClass', append_list(this.getAttr('objectClass'), config.unix_user_classes));
+
+        this.condSet('dn', this.getConfig('unix_user_dn'));
+        this.condSet('ntDn', this.getConfig('ad_user_dn'));
+
+        // assign next available UID number
+        if (this.hasAttr('uidNumber')) {
+            var uidn = this.getAttr('uidNumber');
+            uidn = uidn.replace(/[^0-9]/g, '');
+            this.setAttr('uidNumber', uidn);
+        }
+        this.autoId('unix_uidn', 'uidNumber');
+
+        // mail
+        if (uid != '')
+            this.condSet('mail', uid + '@' + config.mail_domain);
+
+        // home directory
+        if (uid != '')
+            this.condSet('homeDirectory', config.home_root + '/' + uid);
+
+        // ############# Active Directory ############
+
+        //#this.setAttr('ntObjectClass', append_list(this.getAttr('ntObjectClass'), config.ad_user_classes));
+
+        //#this.condSet('objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
+
+        this.condSet('userPrincipalName', uid+'@'+config.ad_domain);
+
+        //#var pass = this.getAttr('password');
+        //#if (pass === config.OLD_PASS) {
+        //#    this.setAttr('userAccountControl', this.getAttr('userAccountControl', array(orig => true)));
+        //#} else {
+        //#    var uac = this.getAttr('userAccountControl') || ADS_UF_NORMAL_ACCOUNT;
+        //#    uac &= ~(ADS_UF_PASSWD_NOT_REQUIRED | ADS_UF_DONT_EXPIRE_PASSWD);
+        //#    uac |= (pass == '' ? ADS_UF_PASSWD_NOT_REQUIRED : ADS_UF_DONT_EXPIRE_PASSWD);
+        //#    this.setAttr('userAccountControl', uac);
+        //#}
+
+        // ######## CommuniGate Pro ########
+
+        var telnum = this.getAttr('telnum');
+        this.setAttr('telnum', formatTelnum(telnum));
+        this.autoId('cgp_telnum', 'telnum', formatTelnum);
+
+        this.setAttr('domainIntercept', bool2str(this.getAttr('domainIntercept')) );
+        this.setAttr('userIntercept', bool2str(this.getAttr('userIntercept')) );
+
+        // ###### constant and copy-from fields ########
+        this.fillDefs();
+    }
+
+});
+
+/////////////////////////////////////////////////////////
+// groups
+//
+
+Userman.Group = Ext.extend(Userman.Object, {
+    name: 'group',
+    list: 'groups',
+    title: ' Groups ',
+
+    list_url: 'group-list.php',
+    read_url: 'group-read.php',
+    write_url: 'group-write.php',
+    id_attr: 'cn',
+
+    recTitle: function () {
+        return this.getAttr('cn');
+    },
+
+    rework: function () {
+        this.setAttr('objectClass', config.unix_group_classes);
+        this.setAttr('cn', string2id(this.getAttr('cn')));
+        this.setAttr('gidNumber', this.getAttr('gidNumber').replace(/[^0-9]/g, ''));
+        this.autoId('unix_gidn', 'gidNumber');
+        this.setAttr('dn', this.getConfig('unix_group_dn'));
+    }
+
+});
+
+/////////////////////////////////////////////////////////
+// mailgroups
+//
+
+Userman.Mailgroup = Ext.extend(Userman.Object, {
+    name: 'mailgroup',
+    list: 'mailgroups',
+    title: ' Mail groups ',
+
+    list_url: 'mailgroup-list.php',
+    read_url: 'mailgroup-read.php',
+    write_url: 'mailgroup-write.php',
+    id_attr: 'uid',
+
+    recTitle: function () {
+        return this.getAttr('uid');
+    },
+
+    rework: function () {
+        this.setAttr('uid', string2id(this.getAttr('uid')));
+        this.condSet('cn', this.getAttr('uid'));
+
+        // ###### constant (& not copyfrom) fields ########
+        this.fillDefs();
+    }
+
+});
+
+
 /////////////////////////////////////////////////////////
 // GUI
 //
 
-function btn_id (obj, op) {
-    return 'btn_' + obj.name + '_' + op;
-}
-
-// fixes bug in LovCombo: the value did not change after onblur
-// because auto-inserted blanks do not pass regexp in setValue
-Ext.override(Ext.ux.form.LovCombo, {
-    getCheckedDisplay:function() {
-		return this.getCheckedValue(this.displayField);
-	}
-});
-
-function init_attr (obj, name) {
-    var right_gap = 20;
-    var col_gap = 2;
-    var desc = all_attrs[obj.name][name];
-
-    var at = {
-        val: '',
-        old: '',
-        state: 'empty',
-        obj: obj,
-        desc: desc,
-        entry: null,
-        id: 'field_' + obj.name + '_' + name,
-        requesting: false,
-        requested: false
-    };
-    obj.attr[name] = at;
-
-    if (desc.disable || !desc.visual)
-         return at;
-
-    if (desc.colwidth) {
-        obj.list_width += desc.colwidth + col_gap;
-        obj.list_cols.push({
-            header: _T(desc.label),
-            dataIndex: name,
-            sortable: true,
-            width: desc.colwidth,
-        });
-    }
-
-    var cfg = {
-        id: at.id,
-        name: name,
-        fieldLabel: _T(desc.label),
-        readonly: desc.readonly,
-        anchor: '-' + right_gap,
-        _attr: at,
-    };
-
-    if (desc.type == 'pass' && !config.show_password)
-        cfg.inputType = 'password';
-
-    if (desc.popup === 'yesno') {
-        cfg.store = [ 'No', 'Yes' ];
-        cfg.editable = false;
-        cfg.allowBlank = false;
-        cfg.triggerAction = 'all';
-        at.entry = new Ext.form.ComboBox(cfg);
-    } else if (desc.popup === 'gid') {
-        cfg.store = std_lists['groups'].store;
-        cfg.mode = 'local';
-        cfg.allowBlank = false;
-        cfg.forceSelection = false;
-        cfg.triggerAction = 'all';
-        cfg.displayField = cfg.valueField = 'cn';
-        at.entry = new Ext.form.ComboBox(cfg);
-    } else if (desc.popup in std_lists) {
-        cfg.store = std_lists[desc.popup].store;
-        cfg.mode = 'local';
-        cfg.allowBlank = true;
-        cfg.forceSelection = false;
-        cfg.triggerAction = 'all';
-        cfg.hideOnSelect = false;
-        cfg.displayField = cfg.valueField = std_lists[desc.popup].attr;
-        cfg.checkField = 'checked_' + cfg.id;
-        at.entry = new Ext.ux.form.LovCombo(cfg);
-    } else if (! desc.popup) {
-        cfg.enableKeyEvents = true;
-        cfg.listeners = { keypress: obj.do_entry };
-        //cfg.listeners = { valid: obj.do_entry };
-        at.entry = new Ext.form.TextField(cfg);
-    } else {
-        Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
-    }
-
-    return at;
-}
-
-function create_obj_tab (obj) {
-    var label_width = 150;
-
-    obj.attr = {};
-    obj.form_is_setup = false;
-    obj.changed = false;
-    obj.enabled = false;
-
-    var form_attrs = gui_attrs[obj.name];
-    if (! form_attrs)
-        return null;
-
-    var obj_attrs = [];
-    for (var name in all_attrs[obj.name])
-        obj_attrs.push(name);
-
-    obj.store = std_lists[obj.list].store;
-
-    // setup visual attributes
-    var desc_tabs = [];
-    obj.list_cols = [];
-    obj.list_width = 3;
-
-    for (var i = 0; i < form_attrs.length; i++) {
-
-        var tab_name = form_attrs[i][0];
-        var tab_attrs = form_attrs[i][1];
-        var entries = [];
-
-        for (var j = 0; j < tab_attrs.length; j++) {
-            var at = init_attr(obj, tab_attrs[j]);
-            if (at.entry)
-                entries.push(at.entry);
-        }
-
-        if (entries.length) {
-            desc_tabs.push({
-                title: _T(tab_name),
-                layout: 'form',
-                autoScroll: true,
-                //autoHeight: true,
-                bodyStyle: 'padding: 10px',
-                labelWidth: label_width,
-                labelSeparator: '',
-                items: entries
-            });
-        }
-	}
-
-    if (! desc_tabs.length)
-        return null;
-
-    // setup non-visual attributes
-    for (var name in all_attrs[obj.name]) {
-        if (name in obj.attr)
-            continue;
-        init_attr(obj, name);
-    }
-
-    var form_btn_prefix = '';// + _T(obj.title) + ': ';
-
-    obj.form_panel = new Ext.FormPanel({
-        region: 'center',
-        id: obj.name + '_panel',
-        title: '...',
-        url: obj.write_url,
-        border: false,
-        layout: 'fit',
-
-        reader: new Ext.data.JsonReader({
-            root: 'obj',
-            idProperty: obj.id_attr,
-            fields: obj_attrs
-        }),
-
-        items: [{
-            xtype: 'tabpanel',
-            activeItem: 0,
-            items: desc_tabs
-        }],
-
-        bbar: [ '->', {
-            text: form_btn_prefix + _T('Save'),
-            icon: 'images/apply.png',
-            scale: 'medium',
-            ctCls: config.add_button_css,
-            handler: function() { obj.do_save() },
-            id: btn_id(obj, 'save')
-        },{
-            text: form_btn_prefix + _T('Revert'),
-            icon: 'images/revert.png',
-            scale: 'medium',
-            ctCls: config.add_button_css,
-            handler: function() { obj.do_revert(); },
-            id: btn_id(obj, 'revert')
-        },
-        ' ' ]
-    });
-    obj.form = obj.form_panel.getForm();
-
-    obj.list_panel = new Ext.grid.GridPanel({
-        store: obj.store,
-        title: _T(obj.title),
-        id: obj.name + '_list',
-
-        colModel: new Ext.grid.ColumnModel({
-            columns: obj.list_cols
-        }),
-
-        selModel: new Ext.grid.RowSelectionModel({
-            singleSelect: true,
-            listeners: {
-                rowdeselect: function(sm, row, rec) {
-                    if (obj.do_leave(sm, row, rec))
-                        this.unlock();
-                    else
-                        this.lock();
-                },
-                rowselect: function(sm, row, rec) {
-                    obj.do_load(sm, row, rec);
-                }
-            }
-        }),
-
-        region: 'west',
-        split: true,
-        collapsible: true,
-        //collapseMode: 'mini',
-        width: obj.list_width,
-        minSize: 50
-    });
-
-    var obj_btn_prefix = '';// + _T(obj.title) + ': ';
-
-    var obj_buttons = [ ' ', {
-            text: obj_btn_prefix  + _T('Create'),
-            icon: 'images/add.png',
-            scale: 'medium',
-            ctCls: config.add_button_css,
-            handler: function() { obj.do_add(); },
-            id: btn_id(obj, 'add')
-        },{
-            text: obj_btn_prefix  + _T('Delete'),
-            icon: 'images/delete.png',
-            scale: 'medium',
-            ctCls: config.add_button_css,
-            handler: function() { obj.do_delete(); },
-            id: btn_id(obj, 'delete')
-        },{
-            text: obj_btn_prefix  + _T('Refresh'),
-            icon: 'images/refresh.png',
-            scale: 'medium',
-            ctCls: config.add_button_css,
-            handler: function() { obj.do_refresh(); },
-            id: btn_id(obj, 'refresh')
-        },
-        '->', new AjaxIndicator()
-        ];
-
-    var obj_tab = {
-        title: _T(obj.title),
-        layout: 'border',
-        items: [ obj.list_panel, obj.form_panel ],
-        bbar: {
-            xtype: 'toolbar',
-            items: obj_buttons
-        }
-    };
-
-    obj.enabled = true;
-    return obj_tab;
-}
-
-/////////////////////////////////////////////////////////
-// Main
-//
-
-function main() {
-
-    hide_preloader();
-    Ext.QuickTips.init();
-    setup_std_lists();
-
-    var objs = [ user_obj, group_obj, mailgroup_obj ];
-    var tabs = [];
-    objs.forEach(function(obj) {
-        var tab = create_obj_tab(obj);
-        if (tab != null)
-            tabs.push(tab);
-    });
-
-    new Ext.Viewport({
-        defaults: {
-            bodyStyle: 'padding: 5px;',
-        },
-        layout: 'border',
-        id: 'viewport',
-        items: [{
-            xtype: 'tabpanel',
-            region: 'center',
-            activeTab: 0,
-            items: tabs
-        }]
-    });
-
-    objs.forEach(function(obj) { if (obj.enabled) obj.do_unselect(); });
-
-    //Ext.util.Observable.capture(Ext.getCmp('field_user_sn'), console.info);
-};
-
-/////////////////////////////////////////////////////////
-// preloader
-//
-
-function hide_preloader() {
+function hidePreloader() {
     var pre_mask = Ext.get('preloading-mask');
     var pre_box = Ext.get('preloading-box');
     //	Hide loading message			
@@ -942,6 +822,90 @@ function hide_preloader() {
         easing: 'bounceOut'
     });
 }
+
+////////
+// fixes bug in LovCombo: the value did not change after onblur
+// because auto-inserted blanks do not pass regexp in setValue
+
+Ext.override(Ext.ux.form.LovCombo, {
+    getCheckedDisplay:function() {
+		return this.getCheckedValue(this.displayField);
+	}
+});
+
+
+std_lists = {
+    'users': {
+        url: 'user-list.php',
+        attr: 'uid',
+        fields: [ 'uid', 'cn' ]
+    },
+    'groups': {
+        url: 'group-list.php',
+        attr: 'cn',
+    },
+    'mailgroups': {
+        url: 'mailgroup-list.php',
+        attr: 'uid'
+    },
+    'mailusers': {
+        url: 'mailuser-list.php',
+        attr: 'uid'
+    }
+};
+
+function setupStdLists () {
+    for (var name in std_lists) {
+        var list = std_lists[name];
+        var fields = [ list.attr ];
+        if (list.fields)
+            fields = list.fields;
+        list.store = new Ext.data.JsonStore({
+            url: list.url,
+            root: 'rows',
+            idProperty: list.attr,
+            fields: fields,
+            autoLoad: false
+        });
+        list.store.load();
+    }
+}
+
+function main() {
+
+    hidePreloader();
+    Ext.QuickTips.init();
+    setupStdLists();
+
+    var objs = [
+        new Userman.User()
+        ,new Userman.Group(),
+        ,new Userman.Mailgroup()
+    ];
+    var tabs = [];
+    objs.forEach(function(obj) {
+        var tab = obj.createTab();
+        if (tab)  tabs.push(tab);
+    });
+
+    new Ext.Viewport({
+        defaults: {
+            bodyStyle: 'padding: 5px;',
+        },
+        layout: 'border',
+        id: 'viewport',
+        items: [{
+            xtype: 'tabpanel',
+            region: 'center',
+            activeTab: 0,
+            items: tabs
+        }]
+    });
+
+    objs.forEach(function(obj) { if (obj.enabled) obj.doUnselect(); });
+
+    //Ext.util.Observable.capture(Ext.getCmp('field_user_sn'), console.info);
+};
 
 Ext.onReady(main);
 
