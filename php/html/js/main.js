@@ -400,6 +400,7 @@ function update_obj_gui (obj, only) {
         var at = obj.attr[name];
         if (!at.desc.disable
                 && at.desc.visual
+                && !at.desc.popup
                 && (!only || name == only)
                 && at.val != trim(at.entry.getValue()))
             at.entry.setValue(at.val);
