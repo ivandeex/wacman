@@ -28,6 +28,9 @@ ob_end_clean();
 <?php foreach (split_list(get_config('ext_js')) as $js): ?>
   <script type="text/javascript" src="<?php echo $js ?>"></script>
 <?php endforeach ?>
+  <link rel="stylesheet" type="text/css" href="<?php echo get_config('lovcombo_dir').'/css/Ext.ux.form.LovCombo.css' ?>" />
+  <script type="text/javascript" src="<?php echo get_config('lovcombo_dir').'/js/Ext.ux.util.js' ?>"></script>
+  <script type="text/javascript" src="<?php echo get_config('lovcombo_dir').'/js/Ext.ux.form.LovCombo.js' ?>"></script>
 <?php if ($ext_js_lang): ?>
   <script type="text/javascript" src="<?php echo $ext_js_lang ?>"></script>
 <?php endif ?>

@@ -504,10 +504,6 @@ function mailgroup_rework (mgrp) {
 // Custom fields
 //
 
-Ext.form.FillerField = Ext.extend(Ext.form.TextField, {
-});
-Ext.reg('fillerfield', Ext.form.FillerField);
-
 popup_functions = {
     yesno: 'create_yesno_chooser',
     gid: 'create_group_chooser',
@@ -516,16 +512,6 @@ popup_functions = {
     mgroups: 'create_user_mail_groups_editor',
     mailusers: 'create_mailgroup_users_editor'
 };
-
-Ext.form.PopupField = Ext.extend(Ext.form.TriggerField, {
-    onTriggerClick: function() {
-        if (this._attr.desc.popup in popup_functions) {
-            func = popup_functions[this._attr.desc.popup];
-            Ext.Msg.alert('popup', func);
-        }
-    }
-});
-Ext.reg('popupfield', Ext.form.PopupField);
 
 /////////////////////////////////////////////////////////
 // Messages and logging
@@ -642,8 +628,8 @@ function init_attr (obj, name) {
     if (desc.type == 'pass' && !config.show_password)
         cfg.inputType = 'password';
 
-    at.entry = desc.popup ? new Ext.form.PopupField(cfg)
-                          : new Ext.form.FillerField(cfg);
+    at.entry = desc.popup ? new Ext.ux.form.LovCombo(cfg)
+                          : new Ext.form.TextField(cfg);
     return at;
 }
 

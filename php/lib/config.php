@@ -28,6 +28,7 @@ $config = array(
     'show_splash'       => 0,
     'theme_css'         => 'js/ext/resources/css/ext-all.css',
     'ext_js'            => 'js/ext/adapter/ext/ext-base.js,js/ext/ext-all.js',
+    'lovcombo_dir'      => 'js/lovcombo',
     'btm_button_class'  => ''
 );
 
