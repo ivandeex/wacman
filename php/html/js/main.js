@@ -74,10 +74,11 @@ var user_obj = {
     do_revert: function () {
     },
 
-    do_change: function (sm) {
+    do_leave: function (sm, row, rec) {
+        return true;
     },
 
-    do_load: function (sm, row_idx, rec) {
+    do_load: function (sm, row, rec) {
         obj_load(this, rec);
     },
 
@@ -128,10 +129,11 @@ var group_obj = {
     do_revert: function () {
     },
 
-    do_change: function (sm) {
+    do_leave: function (sm, row, rec) {
+        return true;
     },
 
-    do_load: function (sm, row_idx, rec) {
+    do_load: function (sm, row, rec) {
         obj_load(this, rec);
     },
 
@@ -181,10 +183,12 @@ var mailgroup_obj = {
     do_revert: function () {
     },
 
-    do_change: function (sm) {
+    do_leave: function (sm, row, rec) {
+        return true;
     },
 
-    do_load: function (sm, row_idx, rec) {
+    do_load: function (sm, row, rec) {
+        alert("load row="+row);
         obj_load(this, rec);
     },
 
@@ -819,8 +823,15 @@ function create_obj_tab (obj) {
         selModel: new Ext.grid.RowSelectionModel({
             singleSelect: true,
             listeners: {
-                rowdeselect: function(sm) { obj.do_change(sm); },
-                rowselect: function(sm, row, rec) { obj.do_load(sm, row, rec); }
+                rowdeselect: function(sm, row, rec) {
+                    if (obj.do_leave(sm, row, rec))
+                        this.unlock();
+                    else
+                        this.lock();
+                },
+                rowselect: function(sm, row, rec) {
+                    obj.do_load(sm, row, rec);
+                }
             }
         }),
 
