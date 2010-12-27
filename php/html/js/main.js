@@ -380,9 +380,12 @@ function obj_setup (obj) {
 
 function obj_load (obj, rec) {
     obj_setup(obj);
-    var url = obj.read_url + '?' + obj.id_attr + '=' + rec.get(obj.id_attr);
+    params = {};
+    params[obj.id_attr] = rec.get(obj.id_attr);
     obj.form.load({
-        url: url,
+        method: 'GET',
+        url: obj.read_url,
+        params: params,
         waitMsg: _T('Loading...')
     });
 }
