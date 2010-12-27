@@ -620,6 +620,14 @@ function btn_id (obj, op) {
     return 'btn_' + obj.name + '_' + op;
 }
 
+// fixes bug in LovCombo: the value did not change after onblur
+// because auto-inserted blanks do not pass regexp in setValue
+Ext.override(Ext.ux.form.LovCombo, {
+    getCheckedDisplay:function() {
+		return this.getCheckedValue(this.displayField);
+	}
+});
+
 function init_attr (obj, name) {
     var right_gap = 20;
     var col_gap = 2;
