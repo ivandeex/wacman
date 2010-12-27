@@ -184,7 +184,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     write_url: undefined,
     id_attr: undefined,
 
-    form_is_setup: false,
     changed: false,
     enabled: false,
     store: undefined,
@@ -215,8 +214,19 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.store.reload();
     },
 
+    doLoad: function (sm, row, rec) {
+        var params = {};
+        params[this.id_attr] = rec.get(this.id_attr);
+        this.form.load({
+            method: 'GET',
+            url: this.read_url,
+            params: params,
+            waitMsg: _T('Loading...')
+        });
+    },
+
     doSave: function () {
-        this.save();
+        this.form.submit();
     },
 
     doRevert: function () {
@@ -226,20 +236,16 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         return true;
     },
 
-    doLoad: function (sm, row, rec) {
-        this.load(rec);
-    },
-
     doUnselect: function () {
     },
 
-    doEntry: function (entry, ev) {
-        var val = strTrim(entry.getValue());
-        if (val == entry._attr.val)
+    doEntry: function (field, ev) {
+        var val = strTrim(field.getValue());
+        if (val == this.vget(field._attr.name))
             return;
-        this.guiSetup();
-        this.setAttr(entry._attr.desc.name, val);
+        this.vset(field._attr.name, val);
         this.rework();
+        this.fillDefs();
         this.guiUpdate();
         Ext.getCmp(this.name + '_panel').setTitle(this.recTitle() + ' ...');
     },
@@ -251,29 +257,29 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     rework: function () {
     },
 
-    getAttr: function (name) {
+    vget: function (name) {
         if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in getAttr()', name);
+            logDebug('%s: undefined attribute in vget()', name);
             return '';
         }
         return strTrim(this.attr[name].val);
     },
 
-    condSet: function (name, val) {
+    vsetif: function (name, val) {
         if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in condSet()', name);
+            logDebug('%s: undefined attribute in vsetif()', name);
             return false;
         }
         at = this.attr[name];
-        if (at.desc.disable || this.hasAttr(name))
+        if (at.desc.disable || this.vhas(name))
             return false;
-        this.setAttr(name, val);
+        this.vset(name, val);
         return true;
     },
 
-    setAttr: function (name, val) {
+    vset: function (name, val) {
         if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in setAttr()', name);
+            logDebug('%s: undefined attribute in vset()', name);
             return;
         }
         val = strTrim(val);
@@ -285,7 +291,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             at.state = 'empty';
         else if (val == at.old)
             at.state = 'orig';
-        else if (at.desc.visual && val == at.entry.getValue())
+        else if (at.desc.visual && val == at.field.getValue())
             at.state = 'user';
         else
             at.state = 'calc';
@@ -293,9 +299,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             at.requested = false;
     },
 
-    hasAttr: function (name) {
+    vhas: function (name) {
         if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in hasAttr()', name);
+            logDebug('%s: undefined attribute in vhas()', name);
             return false;
         }
         switch (this.attr[name].state) {
@@ -311,7 +317,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
-    getConfig: function (what, override) {
+    getSubst: function (what, override) {
         var dn = strTrim((what in config) ? config[what] : '');
         var name;
     	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
@@ -320,42 +326,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 	    	if (override != undefined && override != null && (name in override))
 	    	    val = strTrim(override[name]);
 	    	if (val == '')
-	    	    val = this.getAttr(name);
+	    	    val = this.vget(name);
          	if (val == '') {
 	            dn = '';
 	            break;
-	        	}
-	        dn = dn.replace(/\$\((\w+)\)/, val);
+            }
+            dn = dn.replace(/\$\((\w+)\)/, val);
 	    }
     	return dn;
-    },
-
-    guiSetup: function () {
-        if (! this.form_is_setup) {
-            for (var name in this.attr) {
-                var at = this.attr[name];
-                if (at.entry)
-                    at.val = strTrim(at.entry.getValue());
-            }
-            this.form_is_setup = true;
-        }
-    },
-
-    load: function (rec) {
-        this.guiSetup();
-        var params = {};
-        params[this.id_attr] = rec.get(this.id_attr);
-        this.form.load({
-            method: 'GET',
-            url: this.read_url,
-            params: params,
-            waitMsg: _T('Loading...')
-        });
-    },
-
-    save: function () {
-        this.guiSetup();
-        this.form.submit();
     },
 
     guiUpdate: function (only) {
@@ -365,23 +343,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                     && at.desc.visual
                     && !at.desc.popup
                     && (!only || name == only)
-                    && at.val != strTrim(at.entry.getValue()))
-                at.entry.setValue(at.val);
+                    && at.val != strTrim(at.field.getValue()))
+                at.field.setValue(at.val);
         }
     },
 
+    // ###### constant and copy-from fields ########
     fillDefs: function () {
         for (var name in this.attr) {
             var desc = this.attr[name].desc;
             if (desc.defval != null)
-                this.condSet(name, desc.defval);
-            if (desc.copyfrom != null && this.hasAttr(desc.copyfrom))
-                this.condSet(name, this.getAttr(desc.copyfrom));
+                this.vsetif(name, desc.defval);
+            if (desc.copyfrom != null && this.vhas(desc.copyfrom))
+                this.vsetif(name, this.vget(desc.copyfrom));
         }
     },
 
     autoId: function (which, name, format) {
-        if (this.hasAttr(name))
+        if (this.vhas(name))
             return;
         var at = this.attr[name];
         if (at.requesting || (at.requested && at.val != ''))
@@ -400,7 +379,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 var id = strTrim(resp.responseText).replace(/[^0-9]/g, '');
                 if (format)
                     id = format(id);
-                if (_this.condSet(name, id))
+                if (_this.vsetif(name, id))
                     _this.guiUpdate(name);
                 logDebug('request_id(%s,%s,%s) returns "%s"', which, _this.name, name, id);
             },
@@ -415,7 +394,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         return 'btn_' + this.name + '_' + op;
     },
 
-    initAttr: function (name) {
+    setupField: function (name) {
         var desc = all_attrs[this.name][name];
 
         var at = {
@@ -423,8 +402,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             old: '',
             state: 'empty',
             obj: this,
+            name: name,
             desc: desc,
-            entry: null,
+            field: null,
             id: 'field_' + this.name + '_' + name,
             requesting: false,
             requested: false
@@ -461,7 +441,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             cfg.editable = false;
             cfg.allowBlank = false;
             cfg.triggerAction = 'all';
-            at.entry = new Ext.form.ComboBox(cfg);
+            at.field = new Ext.form.ComboBox(cfg);
         } else if (desc.popup === 'gid') {
             cfg.store = std_lists['groups'].store;
             cfg.mode = 'local';
@@ -469,7 +449,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             cfg.forceSelection = false;
             cfg.triggerAction = 'all';
             cfg.displayField = cfg.valueField = 'cn';
-            at.entry = new Ext.form.ComboBox(cfg);
+            at.field = new Ext.form.ComboBox(cfg);
         } else if (desc.popup in std_lists) {
             cfg.store = std_lists[desc.popup].store;
             cfg.mode = 'local';
@@ -479,13 +459,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             cfg.hideOnSelect = false;
             cfg.displayField = cfg.valueField = std_lists[desc.popup].attr;
             cfg.checkField = 'checked_' + cfg.id;
-            at.entry = new Ext.ux.form.LovCombo(cfg);
+            at.field = new Ext.ux.form.LovCombo(cfg);
         } else if (! desc.popup) {
             var _this = this;
             //cfg.enableKeyEvents = true;
             //cfg.listeners = { keypress: function(e,ev) { _this.doEntry(e,ev); } };
             cfg.listeners = { valid: function(e,ev) { _this.doEntry(e,ev); } };
-            at.entry = new Ext.form.TextField(cfg);
+            at.field = new Ext.form.TextField(cfg);
         } else {
             Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
         }
@@ -510,15 +490,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
             var tab_name = form_attrs[i][0];
             var tab_attrs = form_attrs[i][1];
-            var entries = [];
+            var fields = [];
 
             for (var j = 0; j < tab_attrs.length; j++) {
-                var at = this.initAttr(tab_attrs[j]);
-                if (at.entry)
-                    entries.push(at.entry);
+                var at = this.setupField(tab_attrs[j]);
+                if (at.field)
+                    fields.push(at.field);
             }
 
-            if (entries.length) {
+            if (fields.length) {
                 desc_tabs.push({
                     title: _T(tab_name),
                     layout: 'form',
@@ -527,7 +507,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                     bodyStyle: 'padding: ' + this.TAB_PADDING,
                     labelWidth: this.LABEL_WIDTH,
                     labelSeparator: '',
-                    items: entries
+                    items: fields
                 });
             }
 	    }
@@ -538,7 +518,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         // setup non-visual attributes
         for (var name in all_attrs[this.name]) {
             if (!(name in this.attr))
-                this.initAttr(name);
+                this.setupField(name);
         }
 
         var _this = this;
@@ -670,76 +650,73 @@ Userman.User = Ext.extend(Userman.Object, {
     id_attr: 'uid',
 
     recTitle: function () {
-        return this.getAttr('uid') + ' (' + this.getAttr('cn') + ')';
+        return this.vget('uid') + ' (' + this.vget('cn') + ')';
     },
 
     rework: function () {
-        var uid = this.getAttr('uid');
-        var cn = this.getAttr('cn');
-        var gn = this.getAttr('givenName');
-        var sn = this.getAttr('sn');
+        var uid = this.vget('uid');
+        var cn = this.vget('cn');
+        var gn = this.vget('givenName');
+        var sn = this.vget('sn');
 
         // ############# POSIX ############
 
         // name
-        if (! this.hasAttr('cn'))
-            this.condSet('cn', (cn = gn + (sn && gn ? ' ' : '') + sn));
+        if (! this.vhas('cn'))
+            this.vsetif('cn', (cn = gn + (sn && gn ? ' ' : '') + sn));
 
         // identifier
-        if (! this.hasAttr('uid'))
+        if (! this.vhas('uid'))
             uid = sn == '' ? gn : gn.substr(0, 1) + sn;
-        this.setAttr('uid', (uid = string2id(uid)));
+        this.vset('uid', (uid = string2id(uid)));
 
-        //#this.setAttr('objectClass', append_list(this.getAttr('objectClass'), config.unix_user_classes));
+        //#this.vset('objectClass', append_list(this.vget('objectClass'), config.unix_user_classes));
 
-        this.condSet('dn', this.getConfig('unix_user_dn'));
-        this.condSet('ntDn', this.getConfig('ad_user_dn'));
+        this.vsetif('dn', this.getSubst('unix_user_dn'));
+        this.vsetif('ntDn', this.getSubst('ad_user_dn'));
 
         // assign next available UID number
-        if (this.hasAttr('uidNumber')) {
-            var uidn = this.getAttr('uidNumber');
+        if (this.vhas('uidNumber')) {
+            var uidn = this.vget('uidNumber');
             uidn = uidn.replace(/[^0-9]/g, '');
-            this.setAttr('uidNumber', uidn);
+            this.vset('uidNumber', uidn);
         }
         this.autoId('unix_uidn', 'uidNumber');
 
         // mail
         if (uid != '')
-            this.condSet('mail', uid + '@' + config.mail_domain);
+            this.vsetif('mail', uid + '@' + config.mail_domain);
 
         // home directory
         if (uid != '')
-            this.condSet('homeDirectory', config.home_root + '/' + uid);
+            this.vsetif('homeDirectory', config.home_root + '/' + uid);
 
         // ############# Active Directory ############
 
-        //#this.setAttr('ntObjectClass', append_list(this.getAttr('ntObjectClass'), config.ad_user_classes));
+        //#this.vset('ntObjectClass', append_list(this.vget('ntObjectClass'), config.ad_user_classes));
 
-        //#this.condSet('objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
+        //#this.vsetif('objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
 
-        this.condSet('userPrincipalName', uid+'@'+config.ad_domain);
+        this.vsetif('userPrincipalName', uid+'@'+config.ad_domain);
 
-        //#var pass = this.getAttr('password');
+        //#var pass = this.vget('password');
         //#if (pass === config.OLD_PASS) {
-        //#    this.setAttr('userAccountControl', this.getAttr('userAccountControl', array(orig => true)));
+        //#    this.vset('userAccountControl', this.vget('userAccountControl', array(orig => true)));
         //#} else {
-        //#    var uac = this.getAttr('userAccountControl') || ADS_UF_NORMAL_ACCOUNT;
+        //#    var uac = this.vget('userAccountControl') || ADS_UF_NORMAL_ACCOUNT;
         //#    uac &= ~(ADS_UF_PASSWD_NOT_REQUIRED | ADS_UF_DONT_EXPIRE_PASSWD);
         //#    uac |= (pass == '' ? ADS_UF_PASSWD_NOT_REQUIRED : ADS_UF_DONT_EXPIRE_PASSWD);
-        //#    this.setAttr('userAccountControl', uac);
+        //#    this.vset('userAccountControl', uac);
         //#}
 
         // ######## CommuniGate Pro ########
 
-        var telnum = this.getAttr('telnum');
-        this.setAttr('telnum', formatTelnum(telnum));
+        var telnum = this.vget('telnum');
+        this.vset('telnum', formatTelnum(telnum));
         this.autoId('cgp_telnum', 'telnum', formatTelnum);
 
-        this.setAttr('domainIntercept', bool2str(this.getAttr('domainIntercept')) );
-        this.setAttr('userIntercept', bool2str(this.getAttr('userIntercept')) );
-
-        // ###### constant and copy-from fields ########
-        this.fillDefs();
+        this.vset('domainIntercept', bool2str(this.vget('domainIntercept')) );
+        this.vset('userIntercept', bool2str(this.vget('userIntercept')) );
     }
 
 });
@@ -759,15 +736,15 @@ Userman.Group = Ext.extend(Userman.Object, {
     id_attr: 'cn',
 
     recTitle: function () {
-        return this.getAttr('cn');
+        return this.vget('cn');
     },
 
     rework: function () {
-        this.setAttr('objectClass', config.unix_group_classes);
-        this.setAttr('cn', string2id(this.getAttr('cn')));
-        this.setAttr('gidNumber', this.getAttr('gidNumber').replace(/[^0-9]/g, ''));
+        this.vset('objectClass', config.unix_group_classes);
+        this.vset('cn', string2id(this.vget('cn')));
+        this.vset('gidNumber', this.vget('gidNumber').replace(/[^0-9]/g, ''));
         this.autoId('unix_gidn', 'gidNumber');
-        this.setAttr('dn', this.getConfig('unix_group_dn'));
+        this.vset('dn', this.getSubst('unix_group_dn'));
     }
 
 });
@@ -787,12 +764,12 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
     id_attr: 'uid',
 
     recTitle: function () {
-        return this.getAttr('uid');
+        return this.vget('uid');
     },
 
     rework: function () {
-        this.setAttr('uid', string2id(this.getAttr('uid')));
-        this.condSet('cn', this.getAttr('uid'));
+        this.vset('uid', string2id(this.vget('uid')));
+        this.vsetif('cn', this.vget('uid'));
 
         // ###### constant (& not copyfrom) fields ########
         this.fillDefs();
