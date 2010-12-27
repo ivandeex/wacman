@@ -148,6 +148,7 @@ function uldap_value ($data, $name, $asarray = false) {
     return $val;
 }
 
+
 function uldap_entries ($res) {
     $entries = array();
     if (isset($res['data']['count'])) {
@@ -160,20 +161,26 @@ function uldap_entries ($res) {
     return $entries;
 }
 
+
 function uldap_pop ($res) {
     if (isset($res['data']['count']) && $res['data']['count'] > 0)
         return $res['data'][0];
     return null;
 }
 
+
 function uldap_dn (&$ldap) {
     return isset($ldap[0]['dn']) ? $ldap[0]['dn'] : null;
 }
 
-function uldap_json_encode ($res, $func = null) {
+
+function uldap_json_encode ($res, $func = null, $remove_dn = false) {
     if ($res['code'])
         return json_error($res['error']);
     $res = uldap_convert_array($res['data']);
+    if ($remove_dn) {
+        foreach ($res as &$elem)  unset($elem['dn']);
+    }
     if (!is_null($func))
         usort($res, $func);
     return "{success:true,rows:" . json_encode($res) . "}\n";

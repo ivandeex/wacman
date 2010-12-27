@@ -572,16 +572,9 @@ function btn_id (obj, op) {
 
 var std_popups = {
     'users': [ 'user-list.php', 'uid' ],
-    'gid': [ 'group-list.php', 'gidNumber' ],
     'groups': [ 'group-list.php', 'cn' ],
     'mgroups': [ 'mailgroup-list.php', 'uid' ],
     'mailusers': [ 'mailuser-list.php', 'uid' ]
-};
-
-var combo_always_all = {        
-    beforequery: function (e) {
-        e.forceAll = true;
-    }
 };
 
 function init_attr (obj, name) {
@@ -630,19 +623,22 @@ function init_attr (obj, name) {
 
     if (desc.popup === 'yesno') {
         cfg.store = [ 'No', 'Yes' ];
-        cfg.listeners = combo_always_all;
+        cfg.editable = false;
+        cfg.allowBlank = false;
+        cfg.triggerAction = 'all';
         at.entry = new Ext.form.ComboBox(cfg);
     } else if (desc.popup === 'gid') {
         cfg.store = new Ext.data.JsonStore({
             url: 'group-list.php',
-            autoLoad: true,
             root: 'rows',
-            idProperty: 'cn',
             fields: [ 'cn' ],
+            autoLoad: true
         });
-        //cfg.mode = 'local';
-        //cfg.listeners = combo_always_all;
-        //cfg.triggerAction = 'all';
+        cfg.store.load();
+        cfg.mode = 'local';
+        cfg.allowBlank = false;
+        cfg.forceSelection = false;
+        cfg.triggerAction = 'all';
         cfg.displayField = cfg.valueField = 'cn';
         at.entry = new Ext.form.ComboBox(cfg);
     } else if (desc.popup in std_popups) {
@@ -650,17 +646,18 @@ function init_attr (obj, name) {
         var fld = std_popups[desc.popup][1];
         cfg.store = new Ext.data.JsonStore({
             url: url,
-            autoLoad: true,
             root: 'rows',
-            idProperty: fld,
             fields: [ fld ],
+            autoLoad: true
         });
+        cfg.store.load();
         cfg.mode = 'local';
-        //cfg.listeners = combo_always_all;
+        cfg.allowBlank = true;
+        cfg.forceSelection = false;
         cfg.triggerAction = 'all';
         cfg.hideOnSelect = false;
         cfg.displayField = cfg.valueField = fld;
-        cfg.checkField = cfg.id + '_checked';
+        cfg.checkField = 'checked_' + cfg.id;
         at.entry = new Ext.ux.form.LovCombo(cfg);
     } else if (! desc.popup) {
         at.entry = new Ext.form.TextField(cfg);
