@@ -170,10 +170,13 @@ function uldap_dn (&$ldap) {
     return isset($ldap[0]['dn']) ? $ldap[0]['dn'] : null;
 }
 
-function uldap_json_encode ($res) {
+function uldap_json_encode ($res, $func = null) {
     if ($res['code'])
         return json_error($res['error']);
-    return "{success:true,rows:" . json_encode(uldap_convert_array($res['data'])) . "}\n";
+    $res = uldap_convert_array($res['data']);
+    if (!is_null($func))
+        usort($res, $func);
+    return "{success:true,rows:" . json_encode($res) . "}\n";
 }
 
 
