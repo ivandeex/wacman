@@ -174,12 +174,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     COL_GAP: 2,
     LABEL_WIDTH: 150,
     TAB_PADDING: '10px',
-    FORM_TIMEOUT: 10,
+    FORM_TIMEOUT: 15,
 
     name: undefined,
     list: undefined,
     title: undefined,
-    enabled: false,
 
     list_url: undefined,
     read_url: undefined,
@@ -195,6 +194,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     form_tabs: undefined,
     form: undefined,
     obj_attrs: undefined,
+    first_field_id: undefined,
     Data: undefined,
     data: undefined,
     changed: false,
@@ -256,14 +256,20 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.data = new this.Data ();
     },
 
-    onCreate: function () {
+    create: function () {
         for (var i = 0; i < this.obj_attrs.length; i++)
             this.vset(this.obj_attrs[i], '');
         this.form.loadRecord(this.data);
-        this.onUnselect();
+        this.list_panel.getSelectionModel().clearSelections();
+        // Activate first field in first tab
+        Ext.getCmp(this.name + '_form_tabs').setActiveTab(0);
+        Ext.getCmp(this.first_field_id).focus(false);
+        // force UI changes
+        this.changed = true;
+        this.markChanged(false);
     },
 
-    delete: function () {
+    remove: function () {
     },
 
     refresh: function () {
@@ -317,14 +323,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
     onLeave: function (sm, row, rec) {
         return true;
-    },
-
-    onUnselect: function () {
-        if (this.list_panel.rendered)
-            this.list_panel.getSelectionModel().clearSelections();
-        // force UI changes
-        this.changed = true;
-        this.markChanged(false);
     },
 
     onModified: function (field, ev) {
@@ -556,10 +554,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
         }
 
+        if (!this.first_field_id)
+            this.first_field_id = at.id;
+
         return at;
     },
 
-    createTab: function () {
+    createPanel: function () {
         if (! this.form_tabs.length)
             return null;
         var _this = this;
@@ -582,7 +583,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             items: [{
                 xtype: 'tabpanel',
                 activeItem: 0,
-                items: this.form_tabs
+                items: this.form_tabs,
+                id: this.name + '_form_tabs'
             }],
 
             bbar: [ '->', {
@@ -608,6 +610,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             store: this.list_store,
             title: _T(this.title),
             id: this.name + '_list',
+
+            listeners: {
+                render: function () { _this.create(); }
+            },
 
             colModel: new Ext.grid.ColumnModel({
                 columns: this.list_cols
@@ -641,14 +647,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 icon: 'images/add.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.onCreate(); },
+                handler: function() { _this.create(); },
                 id: this.btnId('add')
             },{
                 text: _T('Delete'),
                 icon: 'images/delete.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.delete(); },
+                handler: function() { _this.remove(); },
                 id: this.btnId('delete')
             },{
                 text: _T('Refresh'),
@@ -671,7 +677,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             }
         };
 
-        this.enabled = true;
         return this.tab_panel;
     }
 
@@ -889,10 +894,9 @@ function main() {
         ,new Userman.Group(),
         ,new Userman.Mailgroup()
     ];
-    var tabs = [];
+    var tab, tabs = [];
     objs.forEach(function(obj) {
-        var tab = obj.createTab();
-        if (tab)  tabs.push(tab);
+        if (obj.createPanel())  tabs.push(obj.tab_panel);
     });
 
     new Ext.Viewport({
@@ -908,12 +912,6 @@ function main() {
             items: tabs
         }]
     });
-
-    objs.forEach(function(obj) {
-        if (obj.enabled)  obj.onUnselect();
-    });
-
-    //Ext.util.Observable.capture(Ext.getCmp('field_user_sn'), console.info);
 };
 
 Ext.onReady(main);
