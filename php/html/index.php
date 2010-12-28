@@ -34,8 +34,8 @@ ob_end_clean();
 <?php if ($ext_js_lang): ?>
   <script type="text/javascript" src="<?php echo $ext_js_lang ?>"></script>
 <?php endif ?>
+  <script type="text/javascript" src="js/userman.js"></script>
   <script type="text/javascript" src="config-config.php"></script>
-  <script type="text/javascript" src="js/main.js"></script>
 </head>
 <body>
   <div id="preloading-mask"></div>
