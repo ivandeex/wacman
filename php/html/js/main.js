@@ -174,23 +174,28 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     COL_GAP: 2,
     LABEL_WIDTH: 150,
     TAB_PADDING: '10px',
+    FORM_TIMEOUT: 10,
 
     name: undefined,
     list: undefined,
     title: undefined,
+    enabled: false,
 
     list_url: undefined,
     read_url: undefined,
     write_url: undefined,
+    delete_url: undefined,
     id_attr: undefined,
 
-    changed: false,
-    enabled: false,
-    store: undefined,
-    list_panel: undefined,
-    form_panel: undefined,
-    form: undefined,
     tab_panel: null,
+    list_panel: undefined,
+    list_store: undefined,
+
+    form_panel: undefined,
+    form_tabs: undefined,
+    form: undefined,
+    obj_attrs: undefined,
+    changed: false,
 
     attr: {},
     list_cols: [],
@@ -201,45 +206,93 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.attr = {};
         this.list_cols = [];
         this.list_width = this.COL_GAP + 1;
-        this.store = std_lists[this.list].store;
+        this.list_store = std_lists[this.list].store;
+        this.form_tabs = [];
+
+        this.list_url = this.list_url || this.name + '-list.php';
+        this.read_url = this.read_url || this.name + '-read.php';
+        this.write_url = this.write_url || this.name + '-write.php';
+        this.delete_url = this.delete_url || this.name + '-delete.php';
+
+        // setup visual attributes
+        var form_attrs = gui_attrs[this.name] || [];
+        for (var i = 0; i < form_attrs.length; i++) {
+            var tab_name = form_attrs[i][0];
+            var tab_attrs = form_attrs[i][1];
+            var fields = [];
+
+            for (var j = 0; j < tab_attrs.length; j++) {
+                var at = this.setupField(tab_attrs[j]);
+                if (at.field)
+                    fields.push(at.field);
+            }
+
+            if (fields.length) {
+                this.form_tabs.push({
+                    title: _T(tab_name),
+                    layout: 'form',
+                    autoScroll: true,
+                    //autoHeight: true,
+                    bodyStyle: 'padding: ' + this.TAB_PADDING,
+                    labelWidth: this.LABEL_WIDTH,
+                    labelSeparator: '',
+                    items: fields
+                });
+            }
+	    }
+
+        // setup non-visual attributes
+        for (var name in all_attrs[this.name]) {
+            if (!(name in this.attr))
+                this.setupField(name);
+        }
+
+        this.obj_attrs = [];
+        for (var name in all_attrs[this.name])
+            this.obj_attrs.push(name);
     },
 
-    doAdd: function () {
+    add: function () {
     },
 
-    doDelete: function () {
+    delete: function () {
     },
 
-    doRefresh: function () {
-        this.store.reload();
+    refresh: function () {
+        this.list_store.reload();
     },
 
-    doLoad: function (sm, row, rec) {
+    load: function (sm, row, rec) {
         var params = {};
         params[this.id_attr] = rec.get(this.id_attr);
+        var _this = this;
         this.form.load({
             method: 'GET',
             url: this.read_url,
             params: params,
-            waitMsg: _T('Loading...')
+            waitMsg: _T('Loading...'),
+            failure: function(form, action) {
+                _this.form.reset();
+                Ext.Msg.alert(_T(action.failureType), _T(action.response.statusText));
+            }
         });
     },
 
-    doSave: function () {
+    save: function () {
         this.form.submit();
     },
 
-    doRevert: function () {
+    revert: function () {
     },
 
-    doLeave: function (sm, row, rec) {
+    onLeave: function (sm, row, rec) {
         return true;
     },
 
-    doUnselect: function () {
+    onUnselect: function () {
     },
 
-    doEntry: function (field, ev) {
+    onModified: function (field, ev) {
         var val = strTrim(field.getValue());
         if (val == this.vget(field._attr.name))
             return;
@@ -286,6 +339,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var at = this.attr[name];
         if (at.desc.disable)
             return;
+        if (val == '')
+            at.requested = false;
         at.val = val;
         if (val == '')
             at.state = 'empty';
@@ -295,8 +350,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             at.state = 'user';
         else
             at.state = 'calc';
-        if (val == '')
-            at.requested = false;
     },
 
     vhas: function (name) {
@@ -305,7 +358,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             return false;
         }
         switch (this.attr[name].state) {
-            case 'force':
             case 'empty':
             case 'calc':
                 return false;
@@ -437,34 +489,42 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             cfg.inputType = 'password';
 
         if (desc.popup === 'yesno') {
-            cfg.store = [ 'No', 'Yes' ];
-            cfg.editable = false;
-            cfg.allowBlank = false;
-            cfg.triggerAction = 'all';
+            Ext.apply(cfg, {
+                store: [ 'No', 'Yes' ],
+                editable: false,
+                allowBlank: false,
+                triggerAction: 'all'
+            });
             at.field = new Ext.form.ComboBox(cfg);
         } else if (desc.popup === 'gid') {
-            cfg.store = std_lists['groups'].store;
-            cfg.mode = 'local';
-            cfg.allowBlank = false;
-            cfg.forceSelection = false;
-            cfg.triggerAction = 'all';
-            cfg.displayField = cfg.valueField = 'cn';
+            Ext.apply(cfg, {
+                store: std_lists['groups'].store,
+                mode: 'local',
+                allowBlank: false,
+                forceSelection: false,
+                triggerAction: 'all',
+                displayField: 'cn',
+                valueField: 'cn'
+            });
             at.field = new Ext.form.ComboBox(cfg);
         } else if (desc.popup in std_lists) {
-            cfg.store = std_lists[desc.popup].store;
-            cfg.mode = 'local';
-            cfg.allowBlank = true;
-            cfg.forceSelection = false;
-            cfg.triggerAction = 'all';
-            cfg.hideOnSelect = false;
-            cfg.displayField = cfg.valueField = std_lists[desc.popup].attr;
-            cfg.checkField = 'checked_' + cfg.id;
+            Ext.apply(cfg, {
+                store: std_lists[desc.popup].store,
+                mode: 'local',
+                allowBlank: true,
+                forceSelection: false,
+                triggerAction: 'all',
+                hideOnSelect: false,
+                displayField: std_lists[desc.popup].attr,
+                valueField: std_lists[desc.popup].attr,
+                checkField: 'checked_' + cfg.id
+            });
             at.field = new Ext.ux.form.LovCombo(cfg);
         } else if (! desc.popup) {
             var _this = this;
             //cfg.enableKeyEvents = true;
-            //cfg.listeners = { keypress: function(e,ev) { _this.doEntry(e,ev); } };
-            cfg.listeners = { valid: function(e,ev) { _this.doEntry(e,ev); } };
+            //cfg.listeners = { keypress: function(e,ev) { _this.onModified(e,ev); } };
+            cfg.listeners = { valid: function(e,ev) { _this.onModified(e,ev); } };
             at.field = new Ext.form.TextField(cfg);
         } else {
             Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
@@ -474,52 +534,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     createTab: function () {
-        this.tab_panel = null;
-        var form_attrs = gui_attrs[this.name];
-        if (! form_attrs)
+        if (! this.form_tabs.length)
             return null;
-
-        var obj_attrs = [];
-        for (var name in all_attrs[this.name])
-            obj_attrs.push(name);
-
-        // setup visual attributes
-        var desc_tabs = [];
-
-        for (var i = 0; i < form_attrs.length; i++) {
-
-            var tab_name = form_attrs[i][0];
-            var tab_attrs = form_attrs[i][1];
-            var fields = [];
-
-            for (var j = 0; j < tab_attrs.length; j++) {
-                var at = this.setupField(tab_attrs[j]);
-                if (at.field)
-                    fields.push(at.field);
-            }
-
-            if (fields.length) {
-                desc_tabs.push({
-                    title: _T(tab_name),
-                    layout: 'form',
-                    autoScroll: true,
-                    //autoHeight: true,
-                    bodyStyle: 'padding: ' + this.TAB_PADDING,
-                    labelWidth: this.LABEL_WIDTH,
-                    labelSeparator: '',
-                    items: fields
-                });
-            }
-	    }
-
-        if (! desc_tabs.length)
-            return null;
-
-        // setup non-visual attributes
-        for (var name in all_attrs[this.name]) {
-            if (!(name in this.attr))
-                this.setupField(name);
-        }
 
         var _this = this;
 
@@ -530,17 +546,18 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             url: this.write_url,
             border: false,
             layout: 'fit',
+            timeout: this.FORM_TIMEOUT,
 
             reader: new Ext.data.JsonReader({
                 root: 'obj',
                 idProperty: this.id_attr,
-                fields: obj_attrs
+                fields: this.obj_attrs
             }),
 
             items: [{
                 xtype: 'tabpanel',
                 activeItem: 0,
-                items: desc_tabs
+                items: this.form_tabs
             }],
 
             bbar: [ '->', {
@@ -548,14 +565,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 icon: 'images/apply.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.doSave() },
+                handler: function() { _this.save() },
                 id: this.btnId('save')
             },{
                 text: _T('Revert'),
                 icon: 'images/revert.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.doRevert(); },
+                handler: function() { _this.revert(); },
                 id: this.btnId('revert')
             },
             ' ' ]
@@ -563,7 +580,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.form = this.form_panel.getForm();
 
         this.list_panel = new Ext.grid.GridPanel({
-            store: this.store,
+            store: this.list_store,
             title: _T(this.title),
             id: this.name + '_list',
 
@@ -575,13 +592,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 singleSelect: true,
                 listeners: {
                     rowdeselect: function(sm, row, rec) {
-                        if (_this.doLeave(sm, row, rec))
+                        if (_this.onLeave(sm, row, rec))
                             this.unlock();
                         else
                             this.lock();
                     },
                     rowselect: function(sm, row, rec) {
-                        _this.doLoad(sm, row, rec);
+                        _this.load(sm, row, rec);
                     }
                 }
             }),
@@ -599,21 +616,21 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 icon: 'images/add.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.doAdd(); },
+                handler: function() { _this.add(); },
                 id: this.btnId('add')
             },{
                 text: _T('Delete'),
                 icon: 'images/delete.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.doDelete(); },
+                handler: function() { _this.delete(); },
                 id: this.btnId('delete')
             },{
                 text: _T('Refresh'),
                 icon: 'images/refresh.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.doRefresh(); },
+                handler: function() { _this.refresh(); },
                 id: this.btnId('refresh')
             },
             '->', new AjaxIndicator()
@@ -643,10 +660,6 @@ Userman.User = Ext.extend(Userman.Object, {
     name: 'user',
     list: 'users',
     title: ' Users ',
-
-    list_url: 'user-list.php',
-    read_url: 'user-read.php',
-    write_url: 'user-write.php',
     id_attr: 'uid',
 
     recTitle: function () {
@@ -729,10 +742,6 @@ Userman.Group = Ext.extend(Userman.Object, {
     name: 'group',
     list: 'groups',
     title: ' Groups ',
-
-    list_url: 'group-list.php',
-    read_url: 'group-read.php',
-    write_url: 'group-write.php',
     id_attr: 'cn',
 
     recTitle: function () {
@@ -757,10 +766,6 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
     name: 'mailgroup',
     list: 'mailgroups',
     title: ' Mail groups ',
-
-    list_url: 'mailgroup-list.php',
-    read_url: 'mailgroup-read.php',
-    write_url: 'mailgroup-write.php',
     id_attr: 'uid',
 
     recTitle: function () {
@@ -879,7 +884,9 @@ function main() {
         }]
     });
 
-    objs.forEach(function(obj) { if (obj.enabled) obj.doUnselect(); });
+    objs.forEach(function(obj) {
+        if (obj.enabled)  obj.onUnselect();
+    });
 
     //Ext.util.Observable.capture(Ext.getCmp('field_user_sn'), console.info);
 };
