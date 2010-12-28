@@ -890,7 +890,12 @@ Userman.std_lists = {
     }
 };
 
-Userman.setupStdLists = function () {
+Userman.main = function () {
+
+    Userman.hidePreloader();
+    Ext.QuickTips.init();
+
+    // create data stores for all standard lists
     for (var name in Userman.std_lists) {
         var list = Userman.std_lists[name];
         var fields = list.fields || [ list.attr ];
@@ -901,26 +906,21 @@ Userman.setupStdLists = function () {
             fields: fields,
             autoLoad: false
         });
-        list.store.load();
     }
-}
 
-Userman.main = function () {
-
-    Userman.hidePreloader();
-    Userman.setupStdLists();
-    Ext.QuickTips.init();
-
+    // create tabbed panels for all objects
     var tabs = [];
-    [
-        new Userman.User()
-        ,new Userman.Group()
-        ,new Userman.Mailgroup()
+    [ new Userman.User(), new Userman.Group(), new Userman.Mailgroup()
     ].forEach(function(obj) {
         if (obj.isComplete())
             tabs.push(obj.createPanel());
     });
 
+    // fire up loading of list stores
+    for (var name in Userman.std_lists)
+        Userman.std_lists[name].store.load();
+
+    // create main UI
     new Ext.Viewport({
         defaults: {
             bodyStyle: "padding: " + Userman.VIEWPORT_PADDING,
