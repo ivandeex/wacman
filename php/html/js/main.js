@@ -256,7 +256,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.data = new this.Data ();
     },
 
-    add: function () {
+    onCreate: function () {
+        for (var i = 0; i < this.obj_attrs.length; i++)
+            this.vset(this.obj_attrs[i], '');
+        this.form.loadRecord(this.data);
+        this.onUnselect();
     },
 
     delete: function () {
@@ -290,9 +294,25 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
     save: function () {
         this.form.submit();
+        this.markChanged(false);
     },
 
-    revert: function () {
+    onRevert: function () {
+        if (!this.changed)
+            return;
+        var _this = this;
+        Ext.Msg.confirm(this.vget(this.id_attr), _T('Really revert changes ?'),
+                        function (reply) {
+                            if (reply == 'yes') {
+                                _this.doRevert();
+                            }
+                        });
+    },
+
+    doRevert: function () {
+        this.data.reject();
+        this.form.loadRecord(this.data);
+        this.markChanged(false);
     },
 
     onLeave: function (sm, row, rec) {
@@ -300,6 +320,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     onUnselect: function () {
+        if (this.list_panel.grid)
+            this.list_panel.getSelectionModel().clearSelections();
+        // force UI changes
+        this.changed = true;
+        this.markChanged(false);
     },
 
     onModified: function (field, ev) {
@@ -307,13 +332,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         if (val == this.vget(field._attr.name))
             return;
         this.vset(field._attr.name, val);
+
         this.rework();
         this.fillDefs();
-        this.guiUpdate();
-        Ext.getCmp(this.name + '_panel').setTitle(this.recTitle() + ' ...');
+        this.form.loadRecord(this.data);
+        this.markChanged(this.data.dirty);
+        Ext.getCmp(this.name + '_panel').setTitle(this.formTitle() + ' ...');
     },
 
-    recTitle: function() {
+    formTitle: function() {
         return '';
     },
 
@@ -322,20 +349,45 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
     loadData: function (data) {
         this.data = new this.Data (data);
+        this.markChanged(false);
+    },
+
+    markChanged: function (changed) {
+        if (changed == this.changed)
+            return;
+        this.changed = changed;
+        var ids1 = [
+            this.name + '_list',
+            this.btnId('add'),
+            this.btnId('delete'),
+            this.btnId('refresh')
+            ];
+        var ids0 = [
+            this.btnId('save'),
+            this.btnId('revert'),
+        ];
+        if (changed) {
+            // swap two sets
+            var tmp = ids1;
+            ids1 = ids0;
+            ids0 = tmp;
+        }
+        ids1.forEach(function(id) { Ext.getCmp(id).enable(); });
+        ids0.forEach(function(id) { Ext.getCmp(id).disable(); });
     },
 
     vset: function (name, val) {
         var at = this.attr[name];
-        if (at.desc.disable)
+        if (at.disable)
             return;
         val = strTrim(val);
         this.data.set(name, val);
         if (val == '') {
-            at.requested = false; // re-enable autoId() requests
+            at.requested = false; // re-enable nextSeq() requests
             at.can_set = true; // empty - modifiable
         } else if (!this.data.isModified(name)) {
             at.can_set = false; // original - not modifiable
-        } else if (at.desc.visual && val == at.field.getValue()) {
+        } else if (at.field && at.field.getValue() == val) {
             at.can_set = false; // entered by user - not modifiable
         } else {
             at.can_set = true; // calculated - modifiable
@@ -343,7 +395,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     isAuto: function (name) {
-        return (this.attr[name].can_set && !this.attr[name].desc.disable);
+        return (this.attr[name].can_set && !this.attr[name].disable);
     },
 
     vget: function (name) {
@@ -377,19 +429,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     	return dn;
     },
 
-    guiUpdate: function (only) {
-        for (var name in this.attr) {
-            var at = this.attr[name];
-            if (!at.desc.disable
-                    && at.desc.visual
-                    && !at.desc.popup
-                    && (!only || name == only)
-                    && this.vget(name) !== strTrim(at.field.getValue())
-                    )
-                at.field.setValue(this.vget(name));
-        }
-    },
-
     // ###### constant and copy-from fields ########
     fillDefs: function () {
         for (var name in this.attr) {
@@ -401,14 +440,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
-    autoId: function (which, name, format) {
+    nextSeq: function (which, name, format) {
         if (!this.isAuto(name))
             return;
         var at = this.attr[name];
         if (at.requesting || (at.requested && this.vget(name) != ''))
             return;
         at.requesting = at.requested = true;
-        debug('autoId(%s,%s,%s)...', which, this.name, name);
+        //debug('nextSeq(%s,%s/%s)...', which, this.name, name);
         var _this = this;
         Ext.Ajax.request({
             url: 'next-id.php',
@@ -421,13 +460,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 var id = strTrim(resp.responseText).replace(/[^0-9]/g, '');
                 if (format)
                     id = format(id);
-                if (this.setIf(name, id))
-                    this.guiUpdate(name);
-                debug('autoId(%s,%s,%s)="%s"', which, _this.name, name, id);
+                if (this.setIf(name, id) && this.attr[name].field)
+                    this.attr[name].field.setValue(id);
+                debug('nextSeq(%s,%s/%s)="%s"', which, _this.name, name, id);
             },
             failure: function (resp, opts) {
                 at.requesting = false;
-                debug('autoId(%s,%s,%s):FAIL', which, _this.name, name);
+                debug('nextSeq(%s,%s/%s):FAIL', which, _this.name, name);
             }
         });
     },
@@ -442,6 +481,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var at = this.attr[name] = {
             can_set: true,
             name: name,
+            disable: desc.disable,
             desc: desc,
             field: null,
             id: 'field_' + this.name + '_' + name,
@@ -522,7 +562,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     createTab: function () {
         if (! this.form_tabs.length)
             return null;
-
         var _this = this;
 
         this.form_panel = new Ext.FormPanel({
@@ -558,7 +597,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 icon: 'images/revert.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.revert(); },
+                handler: function() { _this.onRevert(); },
                 id: this.btnId('revert')
             },
             ' ' ]
@@ -602,7 +641,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 icon: 'images/add.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.add(); },
+                handler: function() { _this.onCreate(); },
                 id: this.btnId('add')
             },{
                 text: _T('Delete'),
@@ -648,7 +687,7 @@ Userman.User = Ext.extend(Userman.Object, {
     title: ' Users ',
     id_attr: 'uid',
 
-    recTitle: function () {
+    formTitle: function () {
         return this.vget('uid') + ' (' + this.vget('cn') + ')';
     },
 
@@ -680,7 +719,7 @@ Userman.User = Ext.extend(Userman.Object, {
             uidn = uidn.replace(/[^0-9]/g, '');
             this.vset('uidNumber', uidn);
         }
-        this.autoId('unix_uidn', 'uidNumber');
+        this.nextSeq('unix_uidn', 'uidNumber');
 
         // mail
         if (uid != '')
@@ -712,7 +751,7 @@ Userman.User = Ext.extend(Userman.Object, {
 
         var telnum = this.vget('telnum');
         this.vset('telnum', formatTelnum(telnum));
-        this.autoId('cgp_telnum', 'telnum', formatTelnum);
+        this.nextSeq('cgp_telnum', 'telnum', formatTelnum);
 
         this.vset('domainIntercept', bool2str(this.vget('domainIntercept')) );
         this.vset('userIntercept', bool2str(this.vget('userIntercept')) );
@@ -730,7 +769,7 @@ Userman.Group = Ext.extend(Userman.Object, {
     title: ' Groups ',
     id_attr: 'cn',
 
-    recTitle: function () {
+    formTitle: function () {
         return this.vget('cn');
     },
 
@@ -738,7 +777,7 @@ Userman.Group = Ext.extend(Userman.Object, {
         this.vset('objectClass', config.unix_group_classes);
         this.vset('cn', string2id(this.vget('cn')));
         this.vset('gidNumber', this.vget('gidNumber').replace(/[^0-9]/g, ''));
-        this.autoId('unix_gidn', 'gidNumber');
+        this.nextSeq('unix_gidn', 'gidNumber');
         this.vset('dn', this.getSubst('unix_group_dn'));
     }
 
@@ -754,7 +793,7 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
     title: ' Mail groups ',
     id_attr: 'uid',
 
-    recTitle: function () {
+    formTitle: function () {
         return this.vget('uid');
     },
 
