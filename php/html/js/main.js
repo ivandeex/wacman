@@ -273,26 +273,27 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     refresh: function () {
+        this.create();
         this.list_store.reload();
     },
 
     load: function (sm, row, rec) {
         var params = {};
         params[this.id_attr] = rec.get(this.id_attr);
-        var _this = this;
         this.form.load({
             method: 'GET',
             url: this.read_url,
             params: params,
             waitTitle: params[this.id_attr],
             waitMsg: _T('Loading...'),
+            scope: this,
 
             success: function (form, action) {
-                _this.loadData(action.result.data);
+                this.loadData(action.result.data);
             },
 
             failure: function (form, action) {
-                _this.form.reset();
+                this.create();
                 Ext.Msg.alert(_T(action.failureType), _T(action.response.statusText));
             }
         });
@@ -307,11 +308,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         if (!this.changed)
             return;
         var _this = this;
-        Ext.Msg.confirm(this.vget(this.id_attr), _T('Really revert changes ?'),
+        Ext.Msg.confirm(this.vget(this.id_attr), _T('Really revert changes?'),
                         function (reply) {
-                            if (reply == 'yes') {
-                                _this.doRevert();
-                            }
+                            if (reply == 'yes')  _this.doRevert();
                         });
     },
 
@@ -446,13 +445,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             return;
         at.requesting = at.requested = true;
         //debug('nextSeq(%s,%s/%s)...', which, this.name, name);
-        var _this = this;
         Ext.Ajax.request({
             url: 'next-id.php',
             method: 'GET',
             params: { which: which },
             timeout: this.FORM_TIMEOUT * 1000,
-            scope: this,
             success: function (resp, opts) {
                 at.requesting = false;
                 var id = strTrim(resp.responseText).replace(/[^0-9]/g, '');
@@ -460,12 +457,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                     id = format(id);
                 if (this.setIf(name, id) && this.attr[name].field)
                     this.attr[name].field.setValue(id);
-                debug('nextSeq(%s,%s/%s)="%s"', which, _this.name, name, id);
+                debug('nextSeq(%s,%s/%s)="%s"', which, this.name, name, id);
             },
             failure: function (resp, opts) {
                 at.requesting = false;
-                debug('nextSeq(%s,%s/%s):FAIL', which, _this.name, name);
-            }
+                debug('nextSeq(%s,%s/%s):FAIL', which, this.name, name);
+            },
+            scope: this
         });
     },
 
@@ -592,14 +590,16 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 icon: 'images/apply.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.save() },
+                handler: this.save,
+                scope: this,
                 id: this.btnId('save')
             },{
                 text: _T('Revert'),
                 icon: 'images/revert.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.onRevert(); },
+                handler: this.onRevert,
+                scope: this,
                 id: this.btnId('revert')
             },
             ' ' ]
@@ -647,21 +647,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 icon: 'images/add.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.create(); },
+                handler: this.create,
+                scope: this,
                 id: this.btnId('add')
             },{
                 text: _T('Delete'),
                 icon: 'images/delete.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.remove(); },
+                handler: this.remove,
+                scope: this,
                 id: this.btnId('delete')
             },{
                 text: _T('Refresh'),
                 icon: 'images/refresh.png',
                 scale: 'medium',
                 ctCls: config.add_button_css,
-                handler: function() { _this.refresh(); },
+                handler: _this.refresh,
+                scope: this,
                 id: this.btnId('refresh')
             },
             '->', new AjaxIndicator()
