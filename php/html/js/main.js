@@ -106,7 +106,7 @@ function _T() {
 	return msg;
 };
 
-function logDebug() {
+function debug() {
     if (!('debug' in config) || !str2bool(config.debug))
         return;
     if ((typeof console === 'undefined') || console == null)
@@ -195,6 +195,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     form_tabs: undefined,
     form: undefined,
     obj_attrs: undefined,
+    Data: undefined,
+    data: undefined,
     changed: false,
 
     attr: {},
@@ -250,6 +252,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.obj_attrs = [];
         for (var name in all_attrs[this.name])
             this.obj_attrs.push(name);
+        this.Data = Ext.data.Record.create(this.obj_attrs);
+        this.data = new this.Data ();
     },
 
     add: function () {
@@ -270,8 +274,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             method: 'GET',
             url: this.read_url,
             params: params,
+            waitTitle: params[this.id_attr],
             waitMsg: _T('Loading...'),
-            failure: function(form, action) {
+
+            success: function (form, action) {
+                _this.loadData(action.result.data);
+            },
+
+            failure: function (form, action) {
                 _this.form.reset();
                 Ext.Msg.alert(_T(action.failureType), _T(action.response.statusText));
             }
@@ -310,63 +320,42 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     rework: function () {
     },
 
-    vget: function (name) {
-        if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in vget()', name);
-            return '';
-        }
-        return strTrim(this.attr[name].val);
-    },
-
-    vsetif: function (name, val) {
-        if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in vsetif()', name);
-            return false;
-        }
-        at = this.attr[name];
-        if (at.desc.disable || this.vhas(name))
-            return false;
-        this.vset(name, val);
-        return true;
+    loadData: function (data) {
+        this.data = new this.Data (data);
     },
 
     vset: function (name, val) {
-        if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in vset()', name);
-            return;
-        }
-        val = strTrim(val);
         var at = this.attr[name];
         if (at.desc.disable)
             return;
-        if (val == '')
-            at.requested = false;
-        at.val = val;
-        if (val == '')
-            at.state = 'empty';
-        else if (val == at.old)
-            at.state = 'orig';
-        else if (at.desc.visual && val == at.field.getValue())
-            at.state = 'user';
-        else
-            at.state = 'calc';
+        val = strTrim(val);
+        this.data.set(name, val);
+        if (val == '') {
+            at.requested = false; // re-enable autoId() requests
+            at.can_set = true; // empty - modifiable
+        } else if (!this.data.isModified(name)) {
+            at.can_set = false; // original - not modifiable
+        } else if (at.desc.visual && val == at.field.getValue()) {
+            at.can_set = false; // entered by user - not modifiable
+        } else {
+            at.can_set = true; // calculated - modifiable
+        }
     },
 
-    vhas: function (name) {
-        if (!(name in this.attr)) {
-            logDebug('%s: undefined attribute in vhas()', name);
-            return false;
+    isAuto: function (name) {
+        return (this.attr[name].can_set && !this.attr[name].desc.disable);
+    },
+
+    vget: function (name) {
+        return strTrim(this.data.get(name));
+    },
+
+    setIf: function (name, val) {
+        if (this.isAuto(name)) {
+            this.vset(name, val);
+            return true;
         }
-        switch (this.attr[name].state) {
-            case 'empty':
-            case 'calc':
-                return false;
-            case 'user':
-            case 'orig':
-                return true;
-            default:
-                return( strTrim(this.attr[name].val) != '' );
-        }
+        return false;
     },
 
     getSubst: function (what, override) {
@@ -395,8 +384,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                     && at.desc.visual
                     && !at.desc.popup
                     && (!only || name == only)
-                    && at.val != strTrim(at.field.getValue()))
-                at.field.setValue(at.val);
+                    && this.vget(name) !== strTrim(at.field.getValue())
+                    )
+                at.field.setValue(this.vget(name));
         }
     },
 
@@ -405,39 +395,39 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         for (var name in this.attr) {
             var desc = this.attr[name].desc;
             if (desc.defval != null)
-                this.vsetif(name, desc.defval);
-            if (desc.copyfrom != null && this.vhas(desc.copyfrom))
-                this.vsetif(name, this.vget(desc.copyfrom));
+                this.setIf(name, desc.defval);
+            if (desc.copyfrom != null && !this.isAuto(desc.copyfrom))
+                this.setIf(name, this.vget(desc.copyfrom));
         }
     },
 
     autoId: function (which, name, format) {
-        if (this.vhas(name))
+        if (!this.isAuto(name))
             return;
         var at = this.attr[name];
-        if (at.requesting || (at.requested && at.val != ''))
+        if (at.requesting || (at.requested && this.vget(name) != ''))
             return;
         at.requesting = at.requested = true;
-        logDebug('autoId(%s,%s,%s) in progress (state=%s)',
-                    which, this.name, name, this.attr[name].state);
+        debug('autoId(%s,%s,%s)...', which, this.name, name);
         var _this = this;
         Ext.Ajax.request({
             url: 'next-id.php',
-            params: {
-                which: which
-            },
+            method: 'GET',
+            params: { which: which },
+            timeout: this.FORM_TIMEOUT * 1000,
+            scope: this,
             success: function (resp, opts) {
                 at.requesting = false;
                 var id = strTrim(resp.responseText).replace(/[^0-9]/g, '');
                 if (format)
                     id = format(id);
-                if (_this.vsetif(name, id))
-                    _this.guiUpdate(name);
-                logDebug('request_id(%s,%s,%s) returns "%s"', which, _this.name, name, id);
+                if (this.setIf(name, id))
+                    this.guiUpdate(name);
+                debug('autoId(%s,%s,%s)="%s"', which, _this.name, name, id);
             },
             failure: function (resp, opts) {
                 at.requesting = false;
-                logDebug('request_id(%s,%s,%s) failed', which, _this.name, name);
+                debug('autoId(%s,%s,%s):FAIL', which, _this.name, name);
             }
         });
     },
@@ -449,11 +439,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     setupField: function (name) {
         var desc = all_attrs[this.name][name];
 
-        var at = {
-            val: '',
-            old: '',
-            state: 'empty',
-            obj: this,
+        var at = this.attr[name] = {
+            can_set: true,
             name: name,
             desc: desc,
             field: null,
@@ -461,7 +448,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             requesting: false,
             requested: false
         };
-        this.attr[name] = at;
 
         if (desc.disable || !desc.visual)
              return at;
@@ -675,21 +661,21 @@ Userman.User = Ext.extend(Userman.Object, {
         // ############# POSIX ############
 
         // name
-        if (! this.vhas('cn'))
-            this.vsetif('cn', (cn = gn + (sn && gn ? ' ' : '') + sn));
+        if (this.isAuto('cn'))
+            this.setIf('cn', (cn = gn + (sn && gn ? ' ' : '') + sn));
 
         // identifier
-        if (! this.vhas('uid'))
+        if (this.isAuto('uid'))
             uid = sn == '' ? gn : gn.substr(0, 1) + sn;
         this.vset('uid', (uid = string2id(uid)));
 
         //#this.vset('objectClass', append_list(this.vget('objectClass'), config.unix_user_classes));
 
-        this.vsetif('dn', this.getSubst('unix_user_dn'));
-        this.vsetif('ntDn', this.getSubst('ad_user_dn'));
+        this.setIf('dn', this.getSubst('unix_user_dn'));
+        this.setIf('ntDn', this.getSubst('ad_user_dn'));
 
         // assign next available UID number
-        if (this.vhas('uidNumber')) {
+        if (this.isAuto('uidNumber')) {
             var uidn = this.vget('uidNumber');
             uidn = uidn.replace(/[^0-9]/g, '');
             this.vset('uidNumber', uidn);
@@ -698,19 +684,19 @@ Userman.User = Ext.extend(Userman.Object, {
 
         // mail
         if (uid != '')
-            this.vsetif('mail', uid + '@' + config.mail_domain);
+            this.setIf('mail', uid + '@' + config.mail_domain);
 
         // home directory
         if (uid != '')
-            this.vsetif('homeDirectory', config.home_root + '/' + uid);
+            this.setIf('homeDirectory', config.home_root + '/' + uid);
 
         // ############# Active Directory ############
 
         //#this.vset('ntObjectClass', append_list(this.vget('ntObjectClass'), config.ad_user_classes));
 
-        //#this.vsetif('objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
+        //#this.setIf('objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
 
-        this.vsetif('userPrincipalName', uid+'@'+config.ad_domain);
+        this.setIf('userPrincipalName', uid+'@'+config.ad_domain);
 
         //#var pass = this.vget('password');
         //#if (pass === config.OLD_PASS) {
@@ -774,7 +760,7 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
 
     rework: function () {
         this.vset('uid', string2id(this.vget('uid')));
-        this.vsetif('cn', this.vget('uid'));
+        this.setIf('cn', this.vget('uid'));
 
         // ###### constant (& not copyfrom) fields ########
         this.fillDefs();
