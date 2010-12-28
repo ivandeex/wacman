@@ -1,93 +1,136 @@
 // $Id$
 
+//
+// Userman namespace
+//
+Ext.ns('Userman');
+
+/////////////////////////////////////////////////////////
+// Global constants
+//
+
+Userman.MAX_ID_LEN = 16;
+Userman.THROBBER_ACTIVE = 'images/throbber-24.gif';
+Userman.THROBBER_IDLE = 'images/userman-32.png';
+Userman.RIGHT_GAP = 20;
+Userman.COL_GAP = 2;
+Userman.LABEL_WIDTH = 150;
+Userman.TAB_PADDING = '10px';
+Userman.FORM_TIMEOUT = 15;
+
+//
+// Global variables
+//
+
+Userman.translations = [];
+Userman.config = {};
+Userman.all_attrs = {};
+Userman.gui_attrs = {};
+
+//
+// Translates and formats a string
+//
+Userman.T = function (msg /*, ... */) {
+    var args = arguments;
+    var msg = arguments[0];
+    msg = Userman.translations[msg] || msg;
+    for (var i = 1; i < arguments.length; i++)
+        msg = msg.replace('%s', arguments[i]);
+    return msg;
+};
+
+//
+// Formats, translates and prints a debugging message
+//
+Userman.debug = function (msg /*, ...*/) {
+    if (Userman.toBool(Userman.getConfig('debug'))) {
+        var msg = Userman._.apply(Userman, arguments);
+        if (typeof console !== 'undefined' && console)
+            console.log(msg);
+    }
+}
+
+//
+// Returns value of a configuration parameter
+//
+Userman.getConfig = function (name) {
+    return (name in Userman.config ? Userman[name] : null);
+}
 
 /////////////////////////////////////////////////////////
 // String utilities
 //
 
-var MAX_ID_LEN = 16;
-
-function strTrim(s) {
+Userman.trim = function (s) {
     s = (s == undefined ? '' : '' + s);
     return s.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
 }
 
-function strTranslate(s, from, to) {
-    var sl = s.length;
-    var tl = to.length;
-    var xlat = [];
-    if (sl<1 || tl<1) return s;
-    var i;
-    for (i = 0; i < 256; i++)  xlat[i] = i;
-    for (i = 0; i < tl; i++)  xlat[ from.charCodeAt(i) ] = to.charCodeAt(i);
-    var r = '';
-    for (i = 0; i < sl; i++)
-        r += String.fromCharCode( xlat[ s.charCodeAt(i) ] );
-    return r.replace(/_+/g, '_');
-}
-
-function str2bool(s) {
-    if (s == undefined || s == null)
+Userman.toBool = function (s) {
+    if (!s)
         return false;
-    s = strTrim(s);
+    s = Userman.trim(s);
     if (s.length < 1)
         return false;
     return ("yto1".indexOf(s.charAt(0).toLowerCase()) >= 0);
 }
 
-function bool2str(v) {
-    return str2bool(v) ? 'Yes' : 'No';
-}
-
-function string2id(s) {
-    // initialize conversion tables
-    if (! string2id.rus2lat) {
-        // russian to latin
-        string2id.rus2lat = [];
+Userman.toId = function (s) {
+    // This conversion table performs simple conversion
+    // from cyrillic unicode letters to latin
+    if (! Userman._rus2lat) {
+        Userman._rus2lat = [];
         var rus_b = "\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417\u0418\u0419\u041a\u041b\u041c\u041d\u041e\u041f\u0420\u0421\u0422\u0423\u0424\u0425\u0426\u0427\u0428\u0429\u042a\u042b\u042c\u042d\u042e\u042f";
         var lat_b = "ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ";
         var rus_s = "\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437\u0438\u0439\u043a\u043b\u043c\u043d\u043e\u043f\u0440\u0441\u0442\u0443\u0444\u0445\u0446\u0447\u0448\u0449\u044a\u044b\u044c\u044d\u044e\u044f";
         var lat_s = "abvgdewzijklmnoprstufhc4wwxyxeuq";
         var i;
         for (i = 0; i < 0x450 - 0x400; i++)
-            string2id.rus2lat[i] = i;
+            Userman._rus2lat[i] = i;
         for (i = 0; i < rus_b.length; i++)
-            string2id.rus2lat[rus_b.charCodeAt(i) - 0x400] = lat_b.charCodeAt(i);
+            Userman._rus2lat[rus_b.charCodeAt(i) - 0x400] = lat_b.charCodeAt(i);
         for (i = 0; i < rus_s.length; i++)
-            string2id.rus2lat[rus_s.charCodeAt(i) - 0x400] = lat_s.charCodeAt(i);            
+            Userman._rus2lat[rus_s.charCodeAt(i) - 0x400] = lat_s.charCodeAt(i);            
+    }
 
-        // convert uppercase to lowercase latin, leave only latin and digits
-        string2id.char2id = [];
+    // The following table converts uppercase to lowercase latin
+    // and leaves only latin and digits
+    if (! Userman._char2id) {
+        Userman._char2id = [];
         for (i = 0; i < 256; i++) {
             if (i >= '0'.charCodeAt(0) && i <= '9'.charCodeAt(0))
-                string2id.char2id[i] = i;
+                Userman._char2id[i] = i;
             else if (i >= 'a'.charCodeAt(0) && i <= 'z'.charCodeAt(0))
-                string2id.char2id[i] = i;
+                Userman._char2id[i] = i;
             else if (i >= 'A'.charCodeAt(0) && i <= 'Z'.charCodeAt(0))
-                string2id.char2id[i] = i + 'a'.charCodeAt(0) - 'A'.charCodeAt(0);
+                Userman._char2id[i] = i + 'a'.charCodeAt(0) - 'A'.charCodeAt(0);
             else
-                string2id.char2id[i] = '_'.charCodeAt(0);
+                Userman._char2id[i] = '_'.charCodeAt(0);
         }
     }
 
-    s = strTrim(s);
+    s = Userman.trim(s);
     var n = s.length;
-    if (n > MAX_ID_LEN)
-        n = MAX_ID_LEN;
+    if (n > Userman.MAX_ID_LEN)
+        n = Userman.MAX_ID_LEN;
 
     var r = '';
     for (var i = 0; i < n; i++) {
         var c = s.charCodeAt(i);
-        c = (c >= 0x400 && c < 0x450) ? string2id.rus2lat[c - 0x400] : c;
-        c = (c > 0 && c < 256) ? string2id.char2id[c] : '_';
+        c = (c >= 0x400 && c < 0x450) ? Userman._rus2lat[c - 0x400] : c;
+        c = (c > 0 && c < 256) ? Userman._char2id[c] : '_';
         r += String.fromCharCode(c);
     }
-	return r;
+
+    return r;
 }
 
-function formatTelnum (telnum) {
-    telnum = strTrim(telnum).replace(/[^0-9]/g, '');
-    var len = config.telnum_len;
+//
+// Formats internal telephone as left zero-padded 
+//
+Userman.formatTelnum = function (telnum) {
+    telnum = Userman.trim(telnum).replace(/[^0-9]/g, '');
+    var len = Userman.getConfig(telnum_len);
     if (telnum.length < len) {
         while (telnum.length < len)
             telnum = '0' + telnum;
@@ -98,83 +141,54 @@ function formatTelnum (telnum) {
     return telnum;
 }
 
-function _T() {
-	var args = arguments;
-	var msg = (args[0] in translations) ? translations[args[0]] : args[0];
-	for (i = 1; i < args.length; i++)
-	    msg = msg.replace('%s', args[i]);
-	return msg;
-};
-
-function debug() {
-    if (!('debug' in config) || !str2bool(config.debug))
-        return;
-    if ((typeof console === 'undefined') || console == null)
-        return;
-	var args = arguments;
-	var msg = args[0];
-	for (i = 1; i < args.length; i++)
-	    msg = msg.replace('%s', args[i]);
-    console.log(msg);
-}
-
-
 /////////////////////////////////////////////////////////
-// AJAX indicator
+// AJAX indicator icon
 //
 
-AjaxIndicator = Ext.extend(Ext.Button, {
+Userman.Throbber = Ext.extend(Ext.Button, {
     disabled: true,
     scale: 'medium',
     ajax_urls : null,
+    icon: Userman.THROBBER_IDLE,
 
     initComponent : function() {
         this.ajax_urls = [];
         Ext.Ajax.on('beforerequest', function(c,o) { this.addReq(c,o); }, this);
         Ext.Ajax.on('requestcomplete', function(c,r,o) { this.remReq(c,r,o); }, this);
         Ext.Ajax.on('requestexception', function(c,r,o) { this.remReq(c,r,o); }, this);
-        this.hideProgress();
     },
 
     addReq: function (conn, o) {
         if (this.ajax_urls.indexOf(o.url) < 0) {
             this.ajax_urls.push(o.url);
-            this.showProgress();
+            this.setIcon(Userman.THROBBER_ACTIVE);
         }
     },
 
     remReq: function (conn, resp, o) {
         this.ajax_urls.remove(o.url);
         if (this.ajax_urls.length <= 0)
-            this.hideProgress();
-    },
-
-    showProgress: function() {
-        this.setIcon('images/throbber-24.gif');
-    },
-
-    hideProgress: function() {
-        this.setIcon('images/userman-32.png');
+            this.setIcon(Userman.THROBBER_IDLE);
     },
 });
 
+/////////////////////////////////////////////////////////
+// Fix a bug in LovCombo.
+// The value did not change after onblur because
+// auto-inserted blanks don't pass regexp in setValue
+//
+
+Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
+    getCheckedDisplay:function() {
+		return this.getCheckedValue(this.displayField);
+	}
+});
 
 /////////////////////////////////////////////////////////
 // Data object
 //
 
-// create namespace
-Ext.ns('Userman');
-
-var std_lists;
-
 Userman.Object = Ext.extend(Ext.util.Observable, {
-
-    RIGHT_GAP: 20,
-    COL_GAP: 2,
-    LABEL_WIDTH: 150,
-    TAB_PADDING: '10px',
-    FORM_TIMEOUT: 15,
 
     name: undefined,
     list: undefined,
@@ -186,7 +200,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     delete_url: undefined,
     id_attr: undefined,
 
-    tab_panel: null,
+    obj_panel: null,
     list_panel: undefined,
     list_store: undefined,
 
@@ -195,6 +209,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     form: undefined,
     obj_attrs: undefined,
     first_field_id: undefined,
+
     Data: undefined,
     data: undefined,
     changed: false,
@@ -203,12 +218,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     list_cols: [],
     list_width: 0,
 
-    constructor : function(config){
-        Ext.apply(this, config);
+    constructor : function(cfg) {
+
+        Ext.apply(this, cfg);
+
         this.attr = {};
         this.list_cols = [];
         this.list_width = this.COL_GAP + 1;
-        this.list_store = std_lists[this.list].store;
+        this.list_store = Userman.std_lists[this.list].store;
         this.form_tabs = [];
 
         this.list_url = this.list_url || this.name + '-list.php';
@@ -217,7 +234,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.delete_url = this.delete_url || this.name + '-delete.php';
 
         // setup visual attributes
-        var form_attrs = gui_attrs[this.name] || [];
+        var form_attrs = Userman.gui_attrs[this.name] || [];
         for (var i = 0; i < form_attrs.length; i++) {
             var tab_name = form_attrs[i][0];
             var tab_attrs = form_attrs[i][1];
@@ -231,7 +248,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
             if (fields.length) {
                 this.form_tabs.push({
-                    title: _T(tab_name),
+                    title: Userman.T(tab_name),
                     layout: 'form',
                     autoScroll: true,
                     //autoHeight: true,
@@ -244,13 +261,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 	    }
 
         // setup non-visual attributes
-        for (var name in all_attrs[this.name]) {
+        for (var name in Userman.all_attrs[this.name]) {
             if (!(name in this.attr))
                 this.setupField(name);
         }
 
         this.obj_attrs = [];
-        for (var name in all_attrs[this.name])
+        for (var name in Userman.all_attrs[this.name])
             this.obj_attrs.push(name);
         this.Data = Ext.data.Record.create(this.obj_attrs);
         this.data = new this.Data ();
@@ -285,7 +302,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             url: this.read_url,
             params: params,
             waitTitle: params[this.id_attr],
-            waitMsg: _T('Loading...'),
+            waitMsg: Userman.T('Loading...'),
             scope: this,
 
             success: function (form, action) {
@@ -294,7 +311,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
             failure: function (form, action) {
                 this.create();
-                Ext.Msg.alert(_T(action.failureType), _T(action.response.statusText));
+                Ext.Msg.alert(Userman.T(action.failureType),
+                                Userman.T(action.response.statusText));
             }
         });
     },
@@ -308,7 +326,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         if (!this.changed)
             return;
         var _this = this;
-        Ext.Msg.confirm(this.vget(this.id_attr), _T('Really revert changes?'),
+        Ext.Msg.confirm(this.vget(this.id_attr),
+                        Userman.T('Really revert changes?'),
                         function (reply) {
                             if (reply == 'yes')  _this.doRevert();
                         });
@@ -325,7 +344,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     onModified: function (field, ev) {
-        var val = strTrim(field.getValue());
+        var val = Userman.trim(field.getValue());
         if (val == this.vget(field._attr.name))
             return;
         this.vset(field._attr.name, val);
@@ -377,7 +396,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var at = this.attr[name];
         if (at.disable)
             return;
-        val = strTrim(val);
+        val = Userman.trim(val);
         this.data.set(name, val);
         if (val == '') {
             at.requested = false; // re-enable nextSeq() requests
@@ -396,7 +415,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     vget: function (name) {
-        return strTrim(this.data.get(name));
+        return Userman.trim(this.data.get(name));
     },
 
     setIf: function (name, val) {
@@ -408,13 +427,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     getSubst: function (what, override) {
-        var dn = strTrim((what in config) ? config[what] : '');
+        var dn = Userman.trim((what in config) ? config[what] : '');
         var name;
     	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
 	    	name = name[1];
 	    	var val = '';
 	    	if (override != undefined && override != null && (name in override))
-	    	    val = strTrim(override[name]);
+	    	    val = Userman.trim(override[name]);
 	    	if (val == '')
 	    	    val = this.vget(name);
          	if (val == '') {
@@ -444,24 +463,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         if (at.requesting || (at.requested && this.vget(name) != ''))
             return;
         at.requesting = at.requested = true;
-        //debug('nextSeq(%s,%s/%s)...', which, this.name, name);
+        //Userman.debug('nextSeq(%s,%s/%s)...', which, this.name, name);
         Ext.Ajax.request({
             url: 'next-id.php',
             method: 'GET',
             params: { which: which },
-            timeout: this.FORM_TIMEOUT * 1000,
+            timeout: Userman.FORM_TIMEOUT * 1000,
             success: function (resp, opts) {
                 at.requesting = false;
-                var id = strTrim(resp.responseText).replace(/[^0-9]/g, '');
+                var id = Userman.trim(resp.responseText).replace(/[^0-9]/g, '');
                 if (format)
                     id = format(id);
                 if (this.setIf(name, id) && this.attr[name].field)
                     this.attr[name].field.setValue(id);
-                debug('nextSeq(%s,%s/%s)="%s"', which, this.name, name, id);
+                Userman.debug('nextSeq(%s,%s/%s)="%s"', which, this.name, name, id);
             },
             failure: function (resp, opts) {
                 at.requesting = false;
-                debug('nextSeq(%s,%s/%s):FAIL', which, this.name, name);
+                Userman.debug('nextSeq(%s,%s/%s):FAIL', which, this.name, name);
             },
             scope: this
         });
@@ -472,7 +491,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     setupField: function (name) {
-        var desc = all_attrs[this.name][name];
+        var desc = Userman.all_attrs[this.name][name];
 
         var at = this.attr[name] = {
             can_set: true,
@@ -489,9 +508,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
              return at;
 
         if (desc.colwidth) {
-            this.list_width += desc.colwidth + this.COL_GAP;
+            this.list_width += desc.colwidth + Userman.COL_GAP;
             this.list_cols.push({
-                header: _T(desc.label),
+                header: Userman.T(desc.label),
                 dataIndex: name,
                 sortable: true,
                 width: desc.colwidth,
@@ -501,13 +520,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var cfg = {
             id: at.id,
             name: name,
-            fieldLabel: _T(desc.label),
+            fieldLabel: Userman.T(desc.label),
             readonly: desc.readonly,
-            anchor: '-' + this.RIGHT_GAP,
+            anchor: '-' + Userman.RIGHT_GAP,
             _attr: at,
         };
 
-        if (desc.type == 'pass' && !config.show_password)
+        if (desc.type == 'pass' && !Userman.getConfig.show_password)
             cfg.inputType = 'password';
 
         if (desc.popup === 'yesno') {
@@ -520,7 +539,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             at.field = new Ext.form.ComboBox(cfg);
         } else if (desc.popup === 'gid') {
             Ext.apply(cfg, {
-                store: std_lists['groups'].store,
+                store: Userman.std_lists['groups'].store,
                 mode: 'local',
                 allowBlank: false,
                 forceSelection: false,
@@ -529,19 +548,19 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 valueField: 'cn'
             });
             at.field = new Ext.form.ComboBox(cfg);
-        } else if (desc.popup in std_lists) {
+        } else if (desc.popup in Userman.std_lists) {
             Ext.apply(cfg, {
-                store: std_lists[desc.popup].store,
+                store: Userman.std_lists[desc.popup].store,
                 mode: 'local',
                 allowBlank: true,
                 forceSelection: false,
                 triggerAction: 'all',
                 hideOnSelect: false,
-                displayField: std_lists[desc.popup].attr,
-                valueField: std_lists[desc.popup].attr,
+                displayField: Userman.std_lists[desc.popup].attr,
+                valueField: Userman.std_lists[desc.popup].attr,
                 checkField: 'checked_' + cfg.id
             });
-            at.field = new Ext.ux.form.LovCombo(cfg);
+            at.field = new Userman.MultiComboBox(cfg);
         } else if (! desc.popup) {
             var _this = this;
             //cfg.enableKeyEvents = true;
@@ -549,7 +568,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             cfg.listeners = { valid: function(e,ev) { _this.onModified(e,ev); } };
             at.field = new Ext.form.TextField(cfg);
         } else {
-            Ext.Msg.alert(_T('Unknown popup type "%s"', desc.popup));
+            Ext.Msg.alert(Userman.T('Unknown popup type "%s"', desc.popup));
         }
 
         if (!this.first_field_id)
@@ -558,9 +577,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         return at;
     },
 
+    isComplete: function () {
+        return (this.form_tabs.length > 0);
+    },
+
     createPanel: function () {
-        if (! this.form_tabs.length)
-            return null;
         var _this = this;
 
         this.form_panel = new Ext.FormPanel({
@@ -570,7 +591,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             url: this.write_url,
             border: false,
             layout: 'fit',
-            timeout: this.FORM_TIMEOUT,
+            timeout: Userman.FORM_TIMEOUT,
 
             reader: new Ext.data.JsonReader({
                 root: 'obj',
@@ -586,29 +607,30 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             }],
 
             bbar: [ '->', {
-                text: _T('Save'),
+                text: Userman.T('Save'),
                 icon: 'images/apply.png',
                 scale: 'medium',
-                ctCls: config.add_button_css,
+                ctCls: Userman.getConfig("add_button_css"),
                 handler: this.save,
                 scope: this,
                 id: this.btnId('save')
             },{
-                text: _T('Revert'),
+                text: Userman.T('Revert'),
                 icon: 'images/revert.png',
                 scale: 'medium',
-                ctCls: config.add_button_css,
+                ctCls: Userman.getConfig("add_button_css"),
                 handler: this.onRevert,
                 scope: this,
                 id: this.btnId('revert')
             },
             ' ' ]
         });
+
         this.form = this.form_panel.getForm();
 
         this.list_panel = new Ext.grid.GridPanel({
             store: this.list_store,
-            title: _T(this.title),
+            title: Userman.T(this.title),
             id: this.name + '_list',
 
             listeners: {
@@ -642,51 +664,51 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             minSize: 50
         });
 
-        var obj_buttons = [ ' ', {
-                text: _T('Create'),
+        var buttons = [ ' ', {
+                text: Userman.T('Create'),
                 icon: 'images/add.png',
                 scale: 'medium',
-                ctCls: config.add_button_css,
+                ctCls: Userman.getConfig("add_button_css"),
                 handler: this.create,
                 scope: this,
                 id: this.btnId('add')
             },{
-                text: _T('Delete'),
+                text: Userman.T('Delete'),
                 icon: 'images/delete.png',
                 scale: 'medium',
-                ctCls: config.add_button_css,
+                ctCls: Userman.getConfig("add_button_css"),
                 handler: this.remove,
                 scope: this,
                 id: this.btnId('delete')
             },{
-                text: _T('Refresh'),
+                text: Userman.T('Refresh'),
                 icon: 'images/refresh.png',
                 scale: 'medium',
-                ctCls: config.add_button_css,
-                handler: _this.refresh,
+                ctCls: Userman.getConfig("add_button_css"),
+                handler: this.refresh,
                 scope: this,
                 id: this.btnId('refresh')
             },
-            '->', new AjaxIndicator()
+            '->', new Userman.Throbber()
             ];
 
-        this.tab_panel = {
-            title: _T(this.title),
+        this.obj_panel = new Ext.Panel({
+            title: Userman.T(this.title),
             layout: 'border',
             items: [ this.list_panel, this.form_panel ],
             bbar: {
                 xtype: 'toolbar',
-                items: obj_buttons
+                items: buttons
             }
-        };
+        });
 
-        return this.tab_panel;
+        return this.obj_panel;
     }
 
 });
 
 /////////////////////////////////////////////////////////
-// users
+// Users
 //
 
 Userman.User = Ext.extend(Userman.Object, {
@@ -714,9 +736,10 @@ Userman.User = Ext.extend(Userman.Object, {
         // identifier
         if (this.isAuto('uid'))
             uid = sn == '' ? gn : gn.substr(0, 1) + sn;
-        this.vset('uid', (uid = string2id(uid)));
+        this.vset('uid', (uid = Userman.toId(uid)));
 
-        //#this.vset('objectClass', append_list(this.vget('objectClass'), config.unix_user_classes));
+        //#this.vset('objectClass', append_list(this.vget('objectClass'),
+        //#             Userman.getConfig("unix_user_classes"));
 
         this.setIf('dn', this.getSubst('unix_user_dn'));
         this.setIf('ntDn', this.getSubst('ad_user_dn'));
@@ -731,22 +754,24 @@ Userman.User = Ext.extend(Userman.Object, {
 
         // mail
         if (uid != '')
-            this.setIf('mail', uid + '@' + config.mail_domain);
+            this.setIf('mail', uid + '@' + Userman.getConfig("mail_domain"));
 
         // home directory
         if (uid != '')
-            this.setIf('homeDirectory', config.home_root + '/' + uid);
+            this.setIf('homeDirectory', Userman.getConfig("home_root") + '/' + uid);
 
         // ############# Active Directory ############
 
-        //#this.vset('ntObjectClass', append_list(this.vget('ntObjectClass'), config.ad_user_classes));
+        //#this.vset('ntObjectClass', append_list(this.vget('ntObjectClass'),
+        //#             Userman.getConfig("ad_user_classes")));
 
-        //#this.setIf('objectCategory', config.ad_user_category+','+path2dn(config.ad_domain));
+        //#this.setIf('objectCategory', Userman.getConfig("ad_user_category")
+        //#             + ',' + path2dn(Userman.getConfig("ad_domain")));
 
-        this.setIf('userPrincipalName', uid+'@'+config.ad_domain);
+        this.setIf('userPrincipalName', uid + "@" + Userman.getConfig("ad_domain"));
 
         //#var pass = this.vget('password');
-        //#if (pass === config.OLD_PASS) {
+        //#if (pass === Userman.getConfig("OLD_PASS")) {
         //#    this.vset('userAccountControl', this.vget('userAccountControl', array(orig => true)));
         //#} else {
         //#    var uac = this.vget('userAccountControl') || ADS_UF_NORMAL_ACCOUNT;
@@ -768,7 +793,7 @@ Userman.User = Ext.extend(Userman.Object, {
 });
 
 /////////////////////////////////////////////////////////
-// groups
+// Groups
 //
 
 Userman.Group = Ext.extend(Userman.Object, {
@@ -782,8 +807,8 @@ Userman.Group = Ext.extend(Userman.Object, {
     },
 
     rework: function () {
-        this.vset('objectClass', config.unix_group_classes);
-        this.vset('cn', string2id(this.vget('cn')));
+        this.vset('objectClass', Userman.getConfig("unix_group_classes"));
+        this.vset('cn', Userman.toId(this.vget('cn')));
         this.vset('gidNumber', this.vget('gidNumber').replace(/[^0-9]/g, ''));
         this.nextSeq('unix_gidn', 'gidNumber');
         this.vset('dn', this.getSubst('unix_group_dn'));
@@ -792,7 +817,7 @@ Userman.Group = Ext.extend(Userman.Object, {
 });
 
 /////////////////////////////////////////////////////////
-// mailgroups
+// Mail groups
 //
 
 Userman.Mailgroup = Ext.extend(Userman.Object, {
@@ -806,7 +831,7 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
     },
 
     rework: function () {
-        this.vset('uid', string2id(this.vget('uid')));
+        this.vset('uid', Userman.toId(this.vget('uid')));
         this.setIf('cn', this.vget('uid'));
 
         // ###### constant (& not copyfrom) fields ########
@@ -820,11 +845,13 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
 // GUI
 //
 
-function hidePreloader() {
+Userman.hidePreloader = function () {
     var pre_mask = Ext.get('preloading-mask');
     var pre_box = Ext.get('preloading-box');
-    //	Hide loading message			
+
+    //	Hide loading message	
     pre_box.fadeOut({ duration: 0.2, remove: true });
+
     //	Hide loading mask
     pre_mask.setOpacity(0.9);
     pre_mask.shift({
@@ -838,18 +865,7 @@ function hidePreloader() {
     });
 }
 
-////////
-// fixes bug in LovCombo: the value did not change after onblur
-// because auto-inserted blanks do not pass regexp in setValue
-
-Ext.override(Ext.ux.form.LovCombo, {
-    getCheckedDisplay:function() {
-		return this.getCheckedValue(this.displayField);
-	}
-});
-
-
-std_lists = {
+Userman.std_lists = {
     'users': {
         url: 'user-list.php',
         attr: 'uid',
@@ -869,12 +885,10 @@ std_lists = {
     }
 };
 
-function setupStdLists () {
-    for (var name in std_lists) {
-        var list = std_lists[name];
-        var fields = [ list.attr ];
-        if (list.fields)
-            fields = list.fields;
+Userman.setupStdLists = function () {
+    for (var name in Userman.std_lists) {
+        var list = Userman.std_lists[name];
+        var fields = list.fields || [ list.attr ];
         list.store = new Ext.data.JsonStore({
             url: list.url,
             root: 'rows',
@@ -886,20 +900,20 @@ function setupStdLists () {
     }
 }
 
-function main() {
+Userman.main = function () {
 
-    hidePreloader();
+    Userman.hidePreloader();
+    Userman.setupStdLists();
     Ext.QuickTips.init();
-    setupStdLists();
 
-    var objs = [
+    var tabs = [];
+    [
         new Userman.User()
-        ,new Userman.Group(),
+        ,new Userman.Group()
         ,new Userman.Mailgroup()
-    ];
-    var tab, tabs = [];
-    objs.forEach(function(obj) {
-        if (obj.createPanel())  tabs.push(obj.tab_panel);
+    ].forEach(function(obj) {
+        if (obj.isComplete())
+            tabs.push(obj.createPanel());
     });
 
     new Ext.Viewport({
@@ -917,5 +931,7 @@ function main() {
     });
 };
 
-Ext.onReady(main);
+Ext.onReady(Userman.main);
+
+/////////////////////////////////////////////////////////////
 
