@@ -320,7 +320,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     onUnselect: function () {
-        if (this.list_panel.grid)
+        if (this.list_panel.rendered)
             this.list_panel.getSelectionModel().clearSelections();
         // force UI changes
         this.changed = true;
