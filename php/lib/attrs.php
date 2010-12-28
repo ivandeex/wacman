@@ -375,12 +375,12 @@ $all_attrs = array(
 
 
 $gui_attrs = array(
-	'user' => array(
-		array( 'Common', array(
+    'user' => array(
+        array( 'Common', array(
                 'givenName', 'sn', 'cn', 'uid', 'mail', 'password', 'password2',
                 'uidNumber', 'gidNumber', 'moreGroups', 'homeDirectory', 'telnum'
         )),
-		array( 'Windows', array(
+        array( 'Windows', array(
                 'ntUserHomeDir', 'ntUserHomeDirDrive',
                 'ntUserProfile', 'ntUserScriptPath',
                 'userPrincipalName'

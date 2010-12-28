@@ -31,7 +31,6 @@ Userman.gui_attrs = {};
 // Translates and formats a string
 //
 Userman.T = function (msg /*, ... */) {
-    var args = arguments;
     var msg = arguments[0];
     msg = Userman.translations[msg] || msg;
     for (var i = 1; i < arguments.length; i++)
@@ -44,7 +43,7 @@ Userman.T = function (msg /*, ... */) {
 //
 Userman.debug = function (msg /*, ...*/) {
     if (Userman.toBool(Userman.getConfig('debug'))) {
-        var msg = Userman._.apply(Userman, arguments);
+        var msg = Userman.T.apply(Userman, arguments);
         if (typeof console !== 'undefined' && console)
             console.log(msg);
     }
@@ -54,7 +53,7 @@ Userman.debug = function (msg /*, ...*/) {
 // Returns value of a configuration parameter
 //
 Userman.getConfig = function (name) {
-    return (name in Userman.config ? Userman[name] : null);
+    return (name in Userman.config ? Userman.config[name] : null);
 }
 
 /////////////////////////////////////////////////////////
@@ -73,6 +72,10 @@ Userman.toBool = function (s) {
     if (s.length < 1)
         return false;
     return ("yto1".indexOf(s.charAt(0).toLowerCase()) >= 0);
+}
+
+Userman.fromBool = function (v) {
+    return (Userman.toBool(v) ? 'Yes' : 'No');
 }
 
 Userman.toId = function (s) {
@@ -130,7 +133,7 @@ Userman.toId = function (s) {
 //
 Userman.formatTelnum = function (telnum) {
     telnum = Userman.trim(telnum).replace(/[^0-9]/g, '');
-    var len = Userman.getConfig(telnum_len);
+    var len = Userman.getConfig("telnum_len");
     if (telnum.length < len) {
         while (telnum.length < len)
             telnum = '0' + telnum;
@@ -224,7 +227,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         this.attr = {};
         this.list_cols = [];
-        this.list_width = this.COL_GAP + 1;
+        this.list_width = Userman.COL_GAP + 1;
         this.list_store = Userman.std_lists[this.list].store;
         this.form_tabs = [];
 
@@ -258,7 +261,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                     items: fields
                 });
             }
-	    }
+        }
 
         // setup non-visual attributes
         for (var name in Userman.all_attrs[this.name]) {
@@ -427,7 +430,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     getSubst: function (what, override) {
-        var dn = Userman.trim((what in config) ? config[what] : '');
+        var dn = Userman.getConfig(what) || '';
         var name;
     	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
 	    	name = name[1];
@@ -526,7 +529,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             _attr: at,
         };
 
-        if (desc.type == 'pass' && !Userman.getConfig.show_password)
+        if (desc.type == 'pass' && !Userman.getConfig("show_password"))
             cfg.inputType = 'password';
 
         if (desc.popup === 'yesno') {
@@ -738,8 +741,7 @@ Userman.User = Ext.extend(Userman.Object, {
             uid = sn == '' ? gn : gn.substr(0, 1) + sn;
         this.vset('uid', (uid = Userman.toId(uid)));
 
-        //#this.vset('objectClass', append_list(this.vget('objectClass'),
-        //#             Userman.getConfig("unix_user_classes"));
+        //#this.vset('objectClass', append_list(this.vget('objectClass'), Userman.getConfig("unix_user_classes"));
 
         this.setIf('dn', this.getSubst('unix_user_dn'));
         this.setIf('ntDn', this.getSubst('ad_user_dn'));
@@ -762,8 +764,7 @@ Userman.User = Ext.extend(Userman.Object, {
 
         // ############# Active Directory ############
 
-        //#this.vset('ntObjectClass', append_list(this.vget('ntObjectClass'),
-        //#             Userman.getConfig("ad_user_classes")));
+        //#this.vset('ntObjectClass', append_list(this.vget('ntObjectClass'), Userman.getConfig("ad_user_classes")));
 
         //#this.setIf('objectCategory', Userman.getConfig("ad_user_category")
         //#             + ',' + path2dn(Userman.getConfig("ad_domain")));
@@ -783,11 +784,11 @@ Userman.User = Ext.extend(Userman.Object, {
         // ######## CommuniGate Pro ########
 
         var telnum = this.vget('telnum');
-        this.vset('telnum', formatTelnum(telnum));
-        this.nextSeq('cgp_telnum', 'telnum', formatTelnum);
+        this.vset('telnum', Userman.formatTelnum(telnum));
+        this.nextSeq('cgp_telnum', 'telnum', Userman.formatTelnum);
 
-        this.vset('domainIntercept', bool2str(this.vget('domainIntercept')) );
-        this.vset('userIntercept', bool2str(this.vget('userIntercept')) );
+        this.vset('domainIntercept', Userman.fromBool(this.vget('domainIntercept')) );
+        this.vset('userIntercept', Userman.fromBool(this.vget('userIntercept')) );
     }
 
 });
@@ -930,6 +931,7 @@ Userman.main = function () {
         }]
     });
 };
+
 
 Ext.onReady(Userman.main);
 
