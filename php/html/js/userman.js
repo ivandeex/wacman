@@ -205,6 +205,21 @@ Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
 });
 
 /////////////////////////////////////////////////////////
+// API with PHP
+//
+
+Userman.ActionGetById = Ext.extend(Ext.form.Action.Load, {
+    constructor: function (obj, options) {
+        options.params = {};
+        options.params[obj.id_attr] = obj.id_value;
+        options.method = "GET";
+        options.waitTitle = obj.id_value;
+        this.obj = obj;
+        this.superclass().constructor.call(this, obj.form, options);
+    }
+});
+
+/////////////////////////////////////////////////////////
 // Data object
 //
 
@@ -412,31 +427,25 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Load form from server
     //
     load: function (sm, row, rec) {
-        // prepare the request id parameter
-        var params = {};
-        params[this.id_attr] = rec.get(this.id_attr);
-
-        this.form.load({
-            method: "GET",
+        this.id_value = rec.get(this.id_attr);
+        this.form.doAction(new Userman.ActionGetById(this, {
             url: this.read_url,
-            params: params,
-            waitTitle: params[this.id_attr],
             waitMsg: Userman.T("Loading..."),
-            scope: this,
-
             success: function (form, action) {
-                this.data = new this.Data (action.result.data);
-                this.id_value = params[this.id_attr];
-                this.refocus();
-                this.markChanged(false, true);
+                with (this) {
+                    // intercept data from server and put into local record
+                    data = new Data (action.result.data);
+                    refocus();
+                    markChanged(false, true);
+                }
             },
-
             failure: function (form, action) {
                 this.clear();
                 Ext.Msg.alert(Userman.T(action.failureType),
                                 Userman.T(action.response.statusText));
-            }
-        });
+            },
+            scope: this
+        }));
     },
 
     //
