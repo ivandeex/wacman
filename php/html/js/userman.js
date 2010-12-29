@@ -208,34 +208,66 @@ Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
 // API with PHP
 //
 
-Userman.ActionLoad = Ext.extend(Ext.form.Action.Load, {
-    constructor: function (obj, options) {
-        options.method = "GET";
-        options.waitTitle = obj.id_value;
-        this.obj = obj;
-        Ext.form.Action.Load.call(this, obj.form, options);
-    },
-    getParams: function () {
-        var params = {};
-        params[this.obj.id_attr] = this.obj.id_value;
-        return params;
-    }
-});
+Userman.FormAction = Ext.extend(Ext.form.Action, {
 
-Userman.ActionDelete = Ext.extend(Userman.ActionLoad, {
-    success: function (response) {
-        var result = this.processResponse(response);
-        if (result === true || !result.success || !result.data) {
-            this.failureType = Ext.form.Action.LOAD_FAILURE;
-            this.form.afterAction(this, false);
+    constructor: function (obj, options) {
+        Ext.form.Action.call(this, obj.form, options);
+        this.obj = obj;
+    },
+
+    run: function () {
+        var o = this.options;
+        var request = {
+            method: o.method,
+            url: o.url,
+            headers: o.headers,
+            timeout: Userman.FORM_TIMEOUT * 1000,
+            success: function (response) { this.handler(response, true); },
+            failure: function (response) { this.handler(response, false); },
+            scope: this
+        };
+        if (o.method == "GET")
+            request.url = Ext.urlAppend(o.url, Ext.urlEncode(o.params));
+        else
+            request.params = o.params;
+        Ext.Ajax.request(request);
+    },
+
+    handler: function (response, conn_ok) {
+        var result = conn_ok ? Ext.decode(response.responseText) : {};
+        if (!(typeof result == "object"))
+            result = {};
+        var data = result.data || result.obj || null;
+        var success = result.success || false;
+        var o = this.options;
+        if (o._isLoad && !data)
+            success = false;
+
+        this._success = success;
+        this._data = data;
+
+        if (success) {
+            this.form.afterAction(this, true);
             return;
         }
-        // do not clear form
-        // ...
+
+        this.form.afterAction(this, false);
+
+        if (!response.conn_ok) {
+            Ext.Msg.alert(o.waitTitle,
+                        Userman.T("Connection failed: %s", response.statusText));
+            return;
+        }
+
+        if (response.errors) {
+            this.form.markInvalid(result.errors);
+        }
+
+        var title = o.waitTitle + ": " + Userman.T("error");
+        var msg = result.message || result.errorMessage || "Server error";
+        Ext.Msg.alert(title, Userman.T(msg));
     },
-    handleResponse: function(response) {
-        return Ext.form.Action.Submit.prototype.handleResponse.call(this, response);
-    }
+
 });
 
 /////////////////////////////////////////////////////////
@@ -415,18 +447,19 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Delete current record
     //
     doDelete: function() {
-        this.form.doAction(new Userman.ActionDelete(this, {
+        var params = {};
+        params[this.id_attr] = this.id_value;
+        this.form.doAction(new Userman.FormAction(this, {
             url: this.delete_url,
+            method: "GET",
+            params: params,
+            waitTitle: this.id_value,
             waitMsg: Userman.T("Deleting..."),
+            _isLoad: false,
+            scope: this,
             success: function (form, action) {
                 this.refresh();
-            },
-            failure: function (form, action) {
-                this.clear();
-                Ext.Msg.alert(Userman.T("Deleting failed"),
-                                Userman.T(action.response.statusText));
-            },
-            scope: this
+            }
         }));
     },
 
@@ -442,24 +475,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Load form from server
     //
     load: function (sm, row, rec) {
-        this.id_value = rec.get(this.id_attr);
-        this.form.doAction(new Userman.ActionLoad(this, {
+        var params = {};
+        params[this.id_attr] = this.id_value = rec.get(this.id_attr);
+        this.form.doAction(new Userman.FormAction(this, {
             url: this.read_url,
+            method: "GET",
+            params: params,
+            waitTitle: this.id_value,
             waitMsg: Userman.T("Loading..."),
+            _isLoad: true,
+            scope: this,
             success: function (form, action) {
-                with (this) {
-                    // intercept data from server and put into local record
-                    data = new Data (action.result.data);
-                    refocus();
-                    markChanged(false, true);
-                }
+                // intercept data from server and put into local record
+                this.data = new this.Data (action._data);
+                this.form.clearInvalid();
+                this.form.setValues(action._data);
+                this.refocus();
+                this.markChanged(false, true);
             },
-            failure: function (form, action) {
-                this.clear();
-                Ext.Msg.alert(Userman.T("Loading failed"),
-                                Userman.T(action.response.statusText));
-            },
-            scope: this
         }));
     },
 
