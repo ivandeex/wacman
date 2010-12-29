@@ -91,59 +91,59 @@ Userman.fromBool = function (v) {
 // by latin equivalents, makes it lower case and removes all non
 // alphanumeric letters replacing them by underscores.
 //
-Userman.toId = function (s) {
+Userman.toId = (function() { // begin closure
+
     // This conversion table performs simple conversion
     // from cyrillic unicode letters to latin
-    if (! Userman._rus2lat) {
-        var xlat = Userman._rus2lat = [];
-        var rus_b = "\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417\u0418\u0419\u041a"
-                  + "\u041b\u041c\u041d\u041e\u041f\u0420\u0421\u0422\u0423\u0424\u0425"
-                  + "\u0426\u0427\u0428\u0429\u042a\u042b\u042c\u042d\u042e\u042f";
-        var lat_b = "ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ";
-        var rus_s = "\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437\u0438\u0439\u043a"
-                  + "\u043b\u043c\u043d\u043e\u043f\u0440\u0441\u0442\u0443\u0444\u0445"
-                  + "\u0446\u0447\u0448\u0449\u044a\u044b\u044c\u044d\u044e\u044f";
-        var lat_s = "abvgdewzijklmnoprstufhc4wwxyxeuq";
-        var i;
-        for (i = 0; i < 0x450 - 0x400; i++)
-            xlat[i] = i;
-        for (i = 0; i < rus_b.length; i++)
-            xlat[rus_b.charCodeAt(i) - 0x400] = lat_b.charCodeAt(i);
-        for (i = 0; i < rus_s.length; i++)
-            xlat[rus_s.charCodeAt(i) - 0x400] = lat_s.charCodeAt(i);            
-    }
+    var rus2lat = [];
+    var rus_b = "\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417\u0418\u0419\u041a"
+              + "\u041b\u041c\u041d\u041e\u041f\u0420\u0421\u0422\u0423\u0424\u0425"
+              + "\u0426\u0427\u0428\u0429\u042a\u042b\u042c\u042d\u042e\u042f";
+    var lat_b = "ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ";
+    var rus_s = "\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437\u0438\u0439\u043a"
+              + "\u043b\u043c\u043d\u043e\u043f\u0440\u0441\u0442\u0443\u0444\u0445"
+              + "\u0446\u0447\u0448\u0449\u044a\u044b\u044c\u044d\u044e\u044f";
+    var lat_s = "abvgdewzijklmnoprstufhc4wwxyxeuq";
+
+    for (var i = 0; i < 0x450 - 0x400; i++)
+        rus2lat[i] = i;
+    for (i = 0; i < rus_b.length; i++)
+        rus2lat[rus_b.charCodeAt(i) - 0x400] = lat_b.charCodeAt(i);
+    for (i = 0; i < rus_s.length; i++)
+        rus2lat[rus_s.charCodeAt(i) - 0x400] = lat_s.charCodeAt(i);            
 
     // The following table converts uppercase to lowercase latin
     // and leaves only latin and digits
-    if (! Userman._char2id) {
-        xlat = Userman._char2id = [];
-        for (i = 0; i < 256; i++) {
-            if (i >= "0".charCodeAt(0) && i <= "9".charCodeAt(0))
-                xlat[i] = i;
-            else if (i >= "a".charCodeAt(0) && i <= "z".charCodeAt(0))
-                xlat[i] = i;
-            else if (i >= "A".charCodeAt(0) && i <= "Z".charCodeAt(0))
-                xlat[i] = i + "a".charCodeAt(0) - "A".charCodeAt(0);
-            else
-                xlat[i] = "_".charCodeAt(0);
+    var char2id = [];
+    for (i = 0; i < 256; i++) {
+        if (i >= "0".charCodeAt(0) && i <= "9".charCodeAt(0))
+            char2id[i] = i;
+        else if (i >= "a".charCodeAt(0) && i <= "z".charCodeAt(0))
+            char2id[i] = i;
+        else if (i >= "A".charCodeAt(0) && i <= "Z".charCodeAt(0))
+            char2id[i] = i + "a".charCodeAt(0) - "A".charCodeAt(0);
+        else
+            char2id[i] = "_".charCodeAt(0);
+    }
+
+    function _toId (s) {
+        s = Userman.trim(s);
+        var n = s.length;
+        if (n > Userman.MAX_ID_LEN)
+            n = Userman.MAX_ID_LEN;
+        var r = "";
+        for (var i = 0; i < n; i++) {
+            var c = s.charCodeAt(i);
+            c = (c >= 0x400 && c < 0x450) ? rus2lat[c - 0x400] : c;
+            c = (c > 0 && c < 256) ? char2id[c] : "_";
+            r += String.fromCharCode(c);
         }
+        return r;
     }
 
-    s = Userman.trim(s);
-    var n = s.length;
-    if (n > Userman.MAX_ID_LEN)
-        n = Userman.MAX_ID_LEN;
+    return _toId;
 
-    var r = "";
-    for (var i = 0; i < n; i++) {
-        var c = s.charCodeAt(i);
-        c = (c >= 0x400 && c < 0x450) ? Userman._rus2lat[c - 0x400] : c;
-        c = (c > 0 && c < 256) ? Userman._char2id[c] : "_";
-        r += String.fromCharCode(c);
-    }
-
-    return r;
-}
+})(); // end closure
 
 //
 // Format internal telephone as left zero-padded 
