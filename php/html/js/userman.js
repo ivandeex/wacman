@@ -210,34 +210,33 @@ Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
 
 Userman.Object = Ext.extend(Ext.util.Observable, {
 
-    name: undefined,
-    list: undefined,
-    title: undefined,
+    // configuration attributes
+    name: undefined,    // object name
+    list: undefined,    // index in Userman.std_lists
+    title: undefined,   // title for the list panel
 
-    list_url: undefined,
-    read_url: undefined,
-    write_url: undefined,
-    delete_url: undefined,
+    // AJAX URLs for interaction with PHP
+    read_url: undefined,    // for reading the record
+    write_url: undefined,   // for creating/updating the record
+    delete_url: undefined,  // for deleting the record
 
-    obj_panel: null,
-    list_panel: undefined,
-    list_store: undefined,
+    // UI elements
+    obj_panel: null,        // main object panel
+    list_panel: undefined,  // grid with list of records
+    list_cols: [],          // data attributes to be shown in the list
+    list_width: 0,          // calculated width of the list
+    list_store: undefined,  // store with list of records
+    form_panel: undefined,  // right-side panel with form
+    form_tabs: undefined,   // list of form tab configurators
+    changed: false,         // used by markChanged(), true if record was modified
 
-    form_panel: undefined,
-    form: undefined,
-
-    obj_attrs: undefined,
-    form_tabs: undefined,
-    id_attr: undefined,
-    id_value: undefined,
-
-    Data: undefined,
-    data: undefined,
-    changed: false,
-
-    attr: {},
-    list_cols: [],
-    list_width: 0,
+    form: undefined,        // the form
+    obj_attrs: undefined,   // name of the object attributes
+    attr: {},               // attribute descriptors
+    id_attr: undefined,     // name of the id attribute
+    id_value: undefined,    // id of loaded record or null for fresh new records
+    Data: undefined,        // constructor for the record object
+    data: undefined,        // current record under control
 
     //
     // Object constructor
@@ -254,7 +253,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             form_tabs = [];
 
             // setup AJAX URLs
-            list_url = list_url || name + "-list.php";
             read_url = read_url || name + "-read.php";
             write_url = write_url || name + "-write.php";
             delete_url = delete_url || name + "-delete.php";
@@ -330,19 +328,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     //
-    // Deselect the list.
+    // Activate first field in first tab
     //
-    unselect: function () {
-        // Activate first field in first tab
+    refocus: function () {
         // The form panel contains a single TabPanel item
         var tab_panel = this.form_panel.items.first();
         tab_panel.setActiveTab(0);
         tab_panel.getActiveTab().items.first().focus(false);
-
-        this.form_panel.setTitle("...");
-        if (this.list_panel.getSelectionModel().grid)
-            this.list_panel.getSelectionModel().clearSelections(false);
-        this.markChanged(false, true);
     },
 
     //
@@ -350,11 +342,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     //
     clear: function () {
         with (this) {
+            // deselect items in the list
+            var sel = list_panel.getSelectionModel();
+            if (sel.grid)
+                sel.clearSelections(false);
+
+            // mark the record as new
             id_value = null;
+
+            // blank the form
             for (var i = 0; i < obj_attrs.length; i++)
                 vset(obj_attrs[i], '');
             form.loadRecord(data);
-            unselect();
+            form_panel.setTitle("...");
+
+            // set focus on the first field in the first tab
+            refocus();
+            // update UI buttons
+            this.markChanged(false, true);
         }
     },
 
@@ -422,7 +427,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             success: function (form, action) {
                 this.data = new this.Data (action.result.data);
                 this.id_value = params[this.id_attr];
-                this.unselect();
+                this.refocus();
+                this.markChanged(false, true);
             },
 
             failure: function (form, action) {
