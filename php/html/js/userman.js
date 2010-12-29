@@ -208,14 +208,33 @@ Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
 // API with PHP
 //
 
-Userman.ActionGetById = Ext.extend(Ext.form.Action.Load, {
+Userman.ActionLoad = Ext.extend(Ext.form.Action.Load, {
     constructor: function (obj, options) {
-        options.params = {};
-        options.params[obj.id_attr] = obj.id_value;
         options.method = "GET";
         options.waitTitle = obj.id_value;
         this.obj = obj;
-        this.superclass().constructor.call(this, obj.form, options);
+        Ext.form.Action.Load.call(this, obj.form, options);
+    },
+    getParams: function () {
+        var params = {};
+        params[this.obj.id_attr] = this.obj.id_value;
+        return params;
+    }
+});
+
+Userman.ActionDelete = Ext.extend(Userman.ActionLoad, {
+    success: function (response) {
+        var result = this.processResponse(response);
+        if (result === true || !result.success || !result.data) {
+            this.failureType = Ext.form.Action.LOAD_FAILURE;
+            this.form.afterAction(this, false);
+            return;
+        }
+        // do not clear form
+        // ...
+    },
+    handleResponse: function(response) {
+        return Ext.form.Action.Submit.prototype.handleResponse.call(this, response);
     }
 });
 
@@ -396,23 +415,19 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Delete current record
     //
     doDelete: function() {
-        var params = {};
-        params[this.id_attr] = this.id_value;
-        this.form.submit({
-            clientValidation: false,
+        this.form.doAction(new Userman.ActionDelete(this, {
             url: this.delete_url,
-            method: 'GET',
-            params: params,
+            waitMsg: Userman.T("Deleting..."),
             success: function (form, action) {
                 this.refresh();
             },
             failure: function (form, action) {
-                var title = Userman.T('Delete failed');
-                Ext.Msg.alert(title, Userman.T(action.response.statusText));
                 this.clear();
+                Ext.Msg.alert(Userman.T("Deleting failed"),
+                                Userman.T(action.response.statusText));
             },
             scope: this
-        });
+        }));
     },
 
     //
@@ -428,7 +443,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     //
     load: function (sm, row, rec) {
         this.id_value = rec.get(this.id_attr);
-        this.form.doAction(new Userman.ActionGetById(this, {
+        this.form.doAction(new Userman.ActionLoad(this, {
             url: this.read_url,
             waitMsg: Userman.T("Loading..."),
             success: function (form, action) {
@@ -441,7 +456,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             },
             failure: function (form, action) {
                 this.clear();
-                Ext.Msg.alert(Userman.T(action.failureType),
+                Ext.Msg.alert(Userman.T("Loading failed"),
                                 Userman.T(action.response.statusText));
             },
             scope: this
