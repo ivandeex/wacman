@@ -61,11 +61,18 @@ Userman.getConfig = function (name) {
 // String utilities
 //
 
+//
+// Remove blanks at front and end of the string
+//
 Userman.trim = function (s) {
     s = (s == undefined ? "" : "" + s);
     return s.replace(/^\s\s*/, "").replace(/\s\s*$/, "");
 }
 
+//
+// Strings "yes", "true", "on" or "1" (case insensitive)
+// are true, all others are false.
+//
 Userman.toBool = function (s) {
     if (!s)
         return false;
@@ -79,37 +86,46 @@ Userman.fromBool = function (v) {
     return (Userman.toBool(v) ? "Yes" : "No");
 }
 
+//
+// Converts a string to identifier with non-latin letters substituted
+// by latin equivalents, makes it lower case and removes all non
+// alphanumeric letters replacing them by underscores.
+//
 Userman.toId = function (s) {
     // This conversion table performs simple conversion
     // from cyrillic unicode letters to latin
     if (! Userman._rus2lat) {
-        Userman._rus2lat = [];
-        var rus_b = "\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417\u0418\u0419\u041a\u041b\u041c\u041d\u041e\u041f\u0420\u0421\u0422\u0423\u0424\u0425\u0426\u0427\u0428\u0429\u042a\u042b\u042c\u042d\u042e\u042f";
+        var xlat = Userman._rus2lat = [];
+        var rus_b = "\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417\u0418\u0419\u041a"
+                  + "\u041b\u041c\u041d\u041e\u041f\u0420\u0421\u0422\u0423\u0424\u0425"
+                  + "\u0426\u0427\u0428\u0429\u042a\u042b\u042c\u042d\u042e\u042f";
         var lat_b = "ABVGDEWZIJKLMNOPRSTUFHC4WWXYXEUQ";
-        var rus_s = "\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437\u0438\u0439\u043a\u043b\u043c\u043d\u043e\u043f\u0440\u0441\u0442\u0443\u0444\u0445\u0446\u0447\u0448\u0449\u044a\u044b\u044c\u044d\u044e\u044f";
+        var rus_s = "\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437\u0438\u0439\u043a"
+                  + "\u043b\u043c\u043d\u043e\u043f\u0440\u0441\u0442\u0443\u0444\u0445"
+                  + "\u0446\u0447\u0448\u0449\u044a\u044b\u044c\u044d\u044e\u044f";
         var lat_s = "abvgdewzijklmnoprstufhc4wwxyxeuq";
         var i;
         for (i = 0; i < 0x450 - 0x400; i++)
-            Userman._rus2lat[i] = i;
+            xlat[i] = i;
         for (i = 0; i < rus_b.length; i++)
-            Userman._rus2lat[rus_b.charCodeAt(i) - 0x400] = lat_b.charCodeAt(i);
+            xlat[rus_b.charCodeAt(i) - 0x400] = lat_b.charCodeAt(i);
         for (i = 0; i < rus_s.length; i++)
-            Userman._rus2lat[rus_s.charCodeAt(i) - 0x400] = lat_s.charCodeAt(i);            
+            xlat[rus_s.charCodeAt(i) - 0x400] = lat_s.charCodeAt(i);            
     }
 
     // The following table converts uppercase to lowercase latin
     // and leaves only latin and digits
     if (! Userman._char2id) {
-        Userman._char2id = [];
+        xlat = Userman._char2id = [];
         for (i = 0; i < 256; i++) {
             if (i >= "0".charCodeAt(0) && i <= "9".charCodeAt(0))
-                Userman._char2id[i] = i;
+                xlat[i] = i;
             else if (i >= "a".charCodeAt(0) && i <= "z".charCodeAt(0))
-                Userman._char2id[i] = i;
+                xlat[i] = i;
             else if (i >= "A".charCodeAt(0) && i <= "Z".charCodeAt(0))
-                Userman._char2id[i] = i + "a".charCodeAt(0) - "A".charCodeAt(0);
+                xlat[i] = i + "a".charCodeAt(0) - "A".charCodeAt(0);
             else
-                Userman._char2id[i] = "_".charCodeAt(0);
+                xlat[i] = "_".charCodeAt(0);
         }
     }
 
@@ -130,7 +146,7 @@ Userman.toId = function (s) {
 }
 
 //
-// Formats internal telephone as left zero-padded 
+// Format internal telephone as left zero-padded 
 //
 Userman.formatTelnum = function (telnum) {
     telnum = Userman.trim(telnum).replace(/[^0-9]/g, "");
@@ -222,6 +238,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     list_cols: [],
     list_width: 0,
 
+    //
+    // Object constructor
+    //
     constructor : function(cfg) {
 
         Ext.apply(this, cfg);
@@ -232,6 +251,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.list_store = Userman.std_lists[this.list].store;
         this.form_tabs = [];
 
+        // setup AJAX URLs
         this.list_url = this.list_url || this.name + "-list.php";
         this.read_url = this.read_url || this.name + "-read.php";
         this.write_url = this.write_url || this.name + "-write.php";
@@ -277,6 +297,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.data = new this.Data ();
     },
 
+    // Clears up the form and deselects the list.
     create: function () {
         for (var i = 0; i < this.obj_attrs.length; i++)
             this.vset(this.obj_attrs[i], "");
@@ -293,17 +314,21 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.markChanged(false);
     },
 
-    remove: function () {
+    onDelete: function () {
     },
 
+    // Rejects changes and refreshes lists.
     refresh: function () {
         this.create();
         this.list_store.reload();
     },
 
+    // Load form from server
     load: function (sm, row, rec) {
+        // prepare the request id parameter
         var params = {};
         params[this.id_attr] = rec.get(this.id_attr);
+
         this.form.load({
             method: "GET",
             url: this.read_url,
@@ -313,7 +338,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             scope: this,
 
             success: function (form, action) {
-                this.loadData(action.result.data);
+                this.data = new this.Data (action.result.data);
+                this.markChanged(false);
             },
 
             failure: function (form, action) {
@@ -324,11 +350,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         });
     },
 
+    // Submit form to server
     save: function () {
         this.form.submit();
         this.markChanged(false);
     },
 
+    // Called when user clicks the "revert" button.
+    // Asks user whether he is sure.
     onRevert: function () {
         if (!this.changed)
             return;
@@ -340,16 +369,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                         });
     },
 
+    // Actually rejects the changes.
     doRevert: function () {
         this.data.reject();
         this.form.loadRecord(this.data);
         this.markChanged(false);
     },
 
-    onLeave: function (sm, row, rec) {
-        return true;
-    },
-
+    // This function is called after each key press
+    // It will auto-fill some fields
     onModified: function (field, ev) {
         var val = Userman.trim(field.getValue());
         if (val == this.vget(field._attr.name))
@@ -363,18 +391,18 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         Ext.getCmp(this.name + "_panel").setTitle(this.formTitle() + " ...");
     },
 
+    // Return title of the form (usually the id field)s
     formTitle: function() {
         return "";
     },
 
+    // Auto-fill some fields after key pressed
     rework: function () {
     },
 
-    loadData: function (data) {
-        this.data = new this.Data (data);
-        this.markChanged(false);
-    },
-
+    // Disable or enable form and list buttons depending on:
+    //   * whether form is empty or loaded from server
+    //   * form values are changed
     markChanged: function (changed) {
         if (changed == this.changed)
             return;
@@ -399,12 +427,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         ids0.forEach(function(id) { Ext.getCmp(id).disable(); });
     },
 
+    // Change field value and update the auto-filled status.
     vset: function (name, val) {
         var at = this.attr[name];
         if (at.disable)
             return;
         val = Userman.trim(val);
         this.data.set(name, val);
+
+        // Define whether field can be auto-filled
         if (val == "") {
             at.requested = false; // re-enable nextSeq() requests
             at.can_set = true; // empty - modifiable
@@ -417,14 +448,18 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
+    // Return true if the field can be auto-filled
     isAuto: function (name) {
         return (this.attr[name].can_set && !this.attr[name].disable);
     },
 
+    // Return field value
     vget: function (name) {
         return Userman.trim(this.data.get(name));
     },
 
+    // Change field value only if it was not loaded from server as non-empty
+    // or not modified by user or if was deliberately cleared by user.
     setIf: function (name, val) {
         if (this.isAuto(name)) {
             this.vset(name, val);
@@ -433,6 +468,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         return false;
     },
 
+    // Return a standard auto-calculated field which can
+    // contain values of other fields substitued in.
     getSubst: function (what, override) {
         var dn = Userman.getConfig(what) || "";
         var name;
@@ -452,7 +489,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     	return dn;
     },
 
-    // ###### constant and copy-from fields ########
+    // Aatomatically fill constant fields and copies
     fillDefs: function () {
         for (var name in this.attr) {
             var desc = this.attr[name].desc;
@@ -463,28 +500,44 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
+    //
+    // Request next available value for auto-increment fields.
+    // Request is fired automatically when the field is
+    // initially empty or deliberately cleared by user.
+    //
     nextSeq: function (which, name, format) {
+        // do not send request if:
+        //   * another request is being processed for this field
+        //   * this field is already requested and not yet cleared by user
         if (!this.isAuto(name))
             return;
         var at = this.attr[name];
         if (at.requesting || (at.requested && this.vget(name) != ""))
             return;
         at.requesting = at.requested = true;
+
         //Userman.debug("nextSeq(%s,%s/%s)...", which, this.name, name);
         Ext.Ajax.request({
             url: "next-id.php",
             method: "GET",
             params: { which: which },
             timeout: Userman.FORM_TIMEOUT * 1000,
+
             success: function (resp, opts) {
                 at.requesting = false;
                 var id = Userman.trim(resp.responseText).replace(/[^0-9]/g, "");
                 if (format)
                     id = format(id);
-                if (this.setIf(name, id) && this.attr[name].field)
-                    this.attr[name].field.setValue(id);
+                // user might have already filled the value while the request
+                // was processing, don't touch the value then.
+                if (this.setIf(name, id)) {
+                    // for visual fields, also update the UI
+                    if (this.attr[name].field)
+                        this.attr[name].field.setValue(id);
+                }
                 Userman.debug("nextSeq(%s,%s/%s)=\"%s\"", which, this.name, name, id);
             },
+
             failure: function (resp, opts) {
                 at.requesting = false;
                 Userman.debug("nextSeq(%s,%s/%s):FAIL", which, this.name, name);
@@ -493,28 +546,34 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         });
     },
 
+    // return DOM id of a given button: "save", "revert" etc
     btnId: function (op) {
         return this.name + "_btn_" + op;
     },
 
+    // setup visual/hidden data field
     setupField: function (name) {
         var desc = Userman.all_attrs[this.name][name];
 
         var at = this.attr[name] = {
+            // can_set = true if field can be auto-calculatable,
+            //           returned by isAuto()
             can_set: true,
             name: name,
             disable: desc.disable,
             desc: desc,
-            field: null,
+            field: null, // visual field or null for hidden fields
             id: this.name + "_field_" + name,
-            requesting: false,
-            requested: false
+            requesting: false, // true = ajax request is activated by the field helper
+            requested: false // true = the field is already loaded via ajax
         };
 
         if (desc.disable || !desc.visual)
              return at;
 
         if (desc.colwidth) {
+            // non-zero column width means that the field
+            // should be included in the record list
             this.list_width += desc.colwidth + Userman.COL_GAP;
             this.list_cols.push({
                 header: Userman.T(desc.label),
@@ -533,10 +592,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             _attr: at,
         };
 
-        if (desc.type == "pass" && !Userman.toBool(Userman.getConfig("show_password")))
+        if (desc.type == "pass"
+                && !Userman.toBool(Userman.getConfig("show_password")))
             cfg.inputType = "password";
 
+        // the popup property controls whether field is a
+        // simple text entry field or some kind of combo box
+
         if (desc.popup === "yesno") {
+            // the field can take only two values, yes or no
             Ext.apply(cfg, {
                 store: [ "No", "Yes" ],
                 editable: false,
@@ -544,7 +608,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 triggerAction: "all"
             });
             at.field = new Ext.form.ComboBox(cfg);
+
         } else if (desc.popup === "gid") {
+            // add single-select drop-down list of groups to the field
             Ext.apply(cfg, {
                 store: Userman.std_lists["groups"].store,
                 mode: "local",
@@ -555,7 +621,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 valueField: "cn"
             });
             at.field = new Ext.form.ComboBox(cfg);
+
         } else if (desc.popup in Userman.std_lists) {
+            // add multi-select drop-down list with a given dictionary
             Ext.apply(cfg, {
                 store: Userman.std_lists[desc.popup].store,
                 mode: "local",
@@ -568,32 +636,52 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 checkField: "_checked_" + cfg.id
             });
             at.field = new Userman.MultiComboBox(cfg);
+
         } else if (! desc.popup) {
+            // it's a simple text entry field
             var _this = this;
             //cfg.enableKeyEvents = true;
             //cfg.listeners = { keypress: function(e,ev) { _this.onModified(e,ev); } };
             cfg.listeners = { valid: function(e,ev) { _this.onModified(e,ev); } };
             at.field = new Ext.form.TextField(cfg);
+
         } else {
+            // shame on me!
             Ext.Msg.alert(Userman.T("Unknown popup type \"%s\"", desc.popup));
         }
 
+        // save identifier of the first active visual field
+        // we will focus this field when the form is cleared
         if (!this.first_field_id)
             this.first_field_id = at.id;
 
         return at;
     },
 
+    //
+    // Return true if any non-disabled visual attributes exist for the object
+    //
     isComplete: function () {
         return (this.form_tabs.length > 0);
     },
 
+    //
+    // Create panel for data object, including:
+    //   form_panel:
+    //     * entry form packed with visual fields
+    //     * form title reflects the current record id
+    //     * form contains "save" and "revert" buttons
+    //   list_panel:
+    //     list of all object records
+    //
     createPanel: function () {
         var _this = this;
 
+        // Entry form packed with visual fields
         this.form_panel = new Ext.FormPanel({
             region: "center",
             id: this.name + "_panel",
+            // form title reflects the record id, initially nothing
             title: "...",
             url: this.write_url,
             border: false,
@@ -607,21 +695,28 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             }),
 
             items: [{
+                // this is tabbed form
                 xtype: "tabpanel",
                 activeItem: 0,
+                // tab descriptors are created during object construction
                 items: this.form_tabs,
+                // this id will let us switch to the first tab
                 id: this.name + "_form_tabs"
             }],
 
             bbar: [ "->", {
+                // this button submits the form
                 text: Userman.T("Save"),
                 icon: "images/apply.png",
                 scale: "medium",
+                // add_button_css is a CSS selector which allows
+                // for additional button effects, e.g. gentle border
                 ctCls: Userman.getConfig("add_button_css"),
                 handler: this.save,
                 scope: this,
                 id: this.btnId("save")
             },{
+                // this button reverts changes
                 text: Userman.T("Revert"),
                 icon: "images/revert.png",
                 scale: "medium",
@@ -635,12 +730,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         this.form = this.form_panel.getForm();
 
+        // list of all object records
         this.list_panel = new Ext.grid.GridPanel({
             store: this.list_store,
             title: Userman.T(this.title),
             id: this.name + "_list",
 
             listeners: {
+                // when the panels, both list and form, are rendered,
+                // we can setup the form UI
                 render: function () { _this.create(); }
             },
 
@@ -651,15 +749,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             selModel: new Ext.grid.RowSelectionModel({
                 singleSelect: true,
                 listeners: {
-                    rowdeselect: function(sm, row, rec) {
-                        if (_this.onLeave(sm, row, rec))
-                            this.unlock();
-                        else
-                            this.lock();
-                    },
-                    rowselect: function(sm, row, rec) {
-                        _this.load(sm, row, rec);
-                    }
+                    // load new record into form when its row is selected
+                    rowselect: function(sm, row, rec) { _this.load(sm, row, rec); }
                 }
             }),
 
@@ -672,6 +763,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         });
 
         var buttons = [ " ", {
+                // "create" button will clear up the form
                 text: Userman.T("Create"),
                 icon: "images/add.png",
                 scale: "medium",
@@ -680,14 +772,16 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 scope: this,
                 id: this.btnId("add")
             },{
+                // "delete" button will send request to delete current record
                 text: Userman.T("Delete"),
                 icon: "images/delete.png",
                 scale: "medium",
                 ctCls: Userman.getConfig("add_button_css"),
-                handler: this.remove,
+                handler: this.onDelete,
                 scope: this,
                 id: this.btnId("delete")
             },{
+                // refresh record list and clear up the form
                 text: Userman.T("Refresh"),
                 icon: "images/refresh.png",
                 scale: "medium",
@@ -696,9 +790,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 scope: this,
                 id: this.btnId("refresh")
             },
-            "->", new Userman.Throbber()
+            // on the bottom right is the ajax activity indicator
+            "->",
+            new Userman.Throbber()
             ];
 
+        // combine list and form into single panel
         this.obj_panel = new Ext.Panel({
             title: Userman.T(this.title),
             layout: "border",
@@ -850,6 +947,9 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
 // GUI
 //
 
+//
+// Creates a nice animated effect ending the UI preloading message.
+//
 Userman.hidePreloader = function () {
     var pre_mask = Ext.get("preloading-mask");
     var pre_box = Ext.get("preloading-box");
@@ -870,6 +970,11 @@ Userman.hidePreloader = function () {
     });
 }
 
+//
+// Initializers for data stores of all main object lists
+// are kept in a central place to avoid extra requests
+// due to their use both in object lists and in helper fields.
+//
 Userman.std_lists = {
     "users": {
         url: "user-list.php",
@@ -890,6 +995,9 @@ Userman.std_lists = {
     }
 };
 
+//
+// Main routine
+//
 Userman.main = function () {
 
     Userman.hidePreloader();
