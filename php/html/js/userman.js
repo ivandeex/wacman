@@ -268,29 +268,30 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             var fields = [];
 
             for (var j = 0; j < tab_attrs.length; j++) {
-                var at = this.setupField(tab_attrs[j]);
-                if (at.field)
-                    fields.push(at.field);
+                var at = this.initAttr(tab_attrs[j]);
+                if (at.desc.visual && !at.desc.disable)
+                    fields.push(this.setupField(at));
             }
 
             if (fields.length) {
                 this.form_tabs.push({
+                    xtype: "panel",
                     title: Userman.T(tab_name),
                     layout: "form",
                     autoScroll: true,
-                    //autoHeight: true,
                     bodyStyle: "padding: " + Userman.TAB_PADDING,
                     labelWidth: Userman.LABEL_WIDTH,
                     labelSeparator: "",
+                    activeItem: 0,
                     items: fields
                 });
             }
         }
 
-        // setup non-visual attributes
+        // setup hidden attributes
         for (var name in Userman.all_attrs[this.name]) {
             if (!(name in this.attr))
-                this.setupField(name);
+                this.initAttr(name);
         }
 
         with (this) {
@@ -302,7 +303,35 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
+    //
+    // setup data attribute
+    //
+    initAttr: function (name) {
+        var desc = Userman.all_attrs[this.name][name];
+        this.attr[name] = {
+            // can_set=true: if field can be auto-calculatable,
+            can_set: true,
+            // field: form field or null for hidden attributes
+            field: null,
+            // id of the form field, if any
+            id: this.name + "_field_" + name,
+            // requesting = true : ajax request is activated by the field helper
+            requesting: false,
+            // requested = true : the field is already loaded via ajax
+            requested: false,
+            // link to the attribute descriptor
+            desc: desc,
+            // attribute name (copied for convenience)
+            name: desc.name,
+            // disable=true: attribute is disabled (copied for convenience)
+            disable: desc.disable
+        };
+        return this.attr[name];
+    },
+
+    //
     // Deselect the list.
+    //
     unselect: function () {
         // Activate first field in first tab
         // The form panel contains a single TabPanel item
@@ -316,7 +345,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.markChanged(false, true);
     },
 
+    //
     // Clear up the form and deselect the list.
+    //
     clear: function () {
         with (this) {
             id_value = null;
@@ -327,7 +358,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
+    //
     // Ask user if he is sure and proceed to record deletion if yes
+    //
     onDelete: function () {
         if (! this.id_value)
             return;
@@ -339,7 +372,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                         });
     },
 
+    //
     // Delete current record
+    //
     doDelete: function() {
         var params = {};
         params[this.id_attr] = this.id_value;
@@ -360,13 +395,17 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         });
     },
 
+    //
     // Rejects changes and refreshes lists.
+    //
     refresh: function () {
         this.clear();
         this.list_store.reload();
     },
 
+    //
     // Load form from server
+    //
     load: function (sm, row, rec) {
         // prepare the request id parameter
         var params = {};
@@ -394,14 +433,18 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         });
     },
 
+    //
     // Submit form to server
+    //
     save: function () {
         this.form.submit();
         this.markChanged(false);
     },
 
+    //
     // Called when user clicks the "revert" button.
     // Asks user whether he is sure.
+    //
     onRevert: function () {
         if (!this.changed)
             return;
@@ -413,7 +456,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                         });
     },
 
+    //
     // Actually rejects the changes.
+    //
     doRevert: function () {
         if (this.id_value) {
             this.data.reject();
@@ -424,8 +469,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
+    //
     // This function is called after each key press
     // It will auto-fill some fields
+    //
     onModified: function (field, ev) {
         var val = Userman.trim(field.getValue());
         if (val == this.vget(field._attr.name))
@@ -439,18 +486,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.form_panel.setTitle(this.formTitle() + " ...");
     },
 
+    //
     // Return title of the form (usually the id field)s
+    //
     formTitle: function() {
         return "";
     },
 
+    //
     // Auto-fill some fields after key pressed
+    //
     rework: function () {
     },
 
+    //
     // Disable or enable form and list buttons depending on:
     //   * whether form is empty or loaded from server
     //   * form values are changed
+    //
     markChanged: function (changed, force) {
         if (changed == this.changed && !force)
             return;
@@ -473,7 +526,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         ids0.forEach(function(id) { Ext.getCmp(id).disable(); });
     },
 
+    //
     // Change field value and update the auto-filled status.
+    //
     vset: function (name, val) {
         var at = this.attr[name];
         if (at.disable)
@@ -494,18 +549,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
     },
 
+    //
     // Return true if the field can be auto-filled
+    //
     isAuto: function (name) {
         return (this.attr[name].can_set && !this.attr[name].disable);
     },
 
+    //
     // Return field value
+    //
     vget: function (name) {
         return Userman.trim(this.data.get(name));
     },
 
+    //
     // Change field value only if it was not loaded from server as non-empty
     // or not modified by user or if was deliberately cleared by user.
+    //
     setIf: function (name, val) {
         if (this.isAuto(name)) {
             this.vset(name, val);
@@ -514,8 +575,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         return false;
     },
 
+    //
     // Return a standard auto-calculated field which can
     // contain values of other fields substitued in.
+    //
     getSubst: function (what, override) {
         var dn = Userman.getConfig(what) || "";
         var name;
@@ -535,7 +598,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     	return dn;
     },
 
-    // Aatomatically fill constant fields and copies
+    //
+    // Automatically fill constant fields and copies
+    //
     fillDefs: function () {
         for (var name in this.attr) {
             var desc = this.attr[name].desc;
@@ -592,60 +657,58 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         });
     },
 
+    //
     // return DOM id of a given button: "save", "revert" etc
+    //
     btnId: function (op) {
         return this.name + "_btn_" + op;
     },
 
-    // setup visual/hidden data field
-    setupField: function (name) {
-        var desc = Userman.all_attrs[this.name][name];
+    //
+    // setup form field associated with attribute
+    //
+    setupField: function (at) {
+        var desc = at.desc;
 
-        var at = this.attr[name] = {
-            // can_set = true if field can be auto-calculatable,
-            //           returned by isAuto()
-            can_set: true,
-            name: name,
-            disable: desc.disable,
-            desc: desc,
-            field: null, // visual field or null for hidden fields
-            id: this.name + "_field_" + name,
-            requesting: false, // true = ajax request is activated by the field helper
-            requested: false // true = the field is already loaded via ajax
-        };
-
-        if (desc.disable || !desc.visual)
-             return at;
-
+        // non-zero column width means that the field
+        // should be included in the record list
         if (desc.colwidth) {
-            // non-zero column width means that the field
-            // should be included in the record list
             this.list_width += desc.colwidth + Userman.COL_GAP;
             this.list_cols.push({
                 header: Userman.T(desc.label),
-                dataIndex: name,
+                dataIndex: at.name,
                 sortable: true,
                 width: desc.colwidth,
             });
         }
 
+        // generic field configurator
         var cfg = {
             id: at.id,
-            name: name,
+            name: at.name,
             fieldLabel: Userman.T(desc.label),
             readonly: desc.readonly,
             anchor: "-" + Userman.RIGHT_GAP,
             _attr: at,
         };
 
+        // hide keystrokes in password fields
         if (desc.type == "pass"
                 && !Userman.toBool(Userman.getConfig("show_password")))
             cfg.inputType = "password";
 
         // the popup property controls whether field is a
         // simple text entry field or some kind of combo box
+        var popup = desc.popup;
 
-        if (desc.popup === "yesno") {
+        if (!popup) {
+            // it's a simple text entry field
+            at.field = new Ext.form.TextField(cfg);
+            at.field.on("valid", this.onModified, this);
+            //cfg.enableKeyEvents = true;
+            //at.field.on("keyup", this.onModified, this);
+
+        } else if (popup == "yesno") {
             // the field can take only two values, yes or no
             Ext.apply(cfg, {
                 store: [ "No", "Yes" ],
@@ -655,46 +718,43 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             });
             at.field = new Ext.form.ComboBox(cfg);
 
-        } else if (desc.popup === "gid") {
+        } else if (popup == "gid") {
             // add single-select drop-down list of groups to the field
+            var list = Userman.std_lists["groups"];
             Ext.apply(cfg, {
-                store: Userman.std_lists["groups"].store,
+                store: list.store,
                 mode: "local",
                 allowBlank: false,
                 forceSelection: false,
                 triggerAction: "all",
-                displayField: "cn",
-                valueField: "cn"
+                displayField: list.attr,
+                valueField: list.attr
             });
             at.field = new Ext.form.ComboBox(cfg);
 
-        } else if (desc.popup in Userman.std_lists) {
+        } else if (popup in Userman.std_lists) {
             // add multi-select drop-down list with a given dictionary
+            var list = Userman.std_lists[popup];
             Ext.apply(cfg, {
-                store: Userman.std_lists[desc.popup].store,
-                mode: "local",
+                store: list.store,
+                mode: "local",  // standard lists are auto-loaded at startup
                 allowBlank: true,
                 forceSelection: false,
-                triggerAction: "all",
+                triggerAction: "all", // do not filter
                 hideOnSelect: false,
-                displayField: Userman.std_lists[desc.popup].attr,
-                valueField: Userman.std_lists[desc.popup].attr,
+                displayField: list.attr,
+                valueField: list.attr,
                 checkField: "_checked_" + cfg.id
             });
             at.field = new Userman.MultiComboBox(cfg);
 
-        } else if (! desc.popup) {
-            // it's a simple text entry field
-            at.field = new Ext.form.TextField(cfg);
-            at.field.on("valid", this.onModified, this);
-            //cfg.enableKeyEvents = true;
-            //at.field.on("keyup", this.onModified, this);
         } else {
             // shame on me!
-            Ext.Msg.alert(Userman.T("Unknown popup type \"%s\"", desc.popup));
+            alert(Userman.T("Unknown popup type \"%s\"", popup));
+            at.field = null;
         }
 
-        return at;
+        return at.field;
     },
 
     //
@@ -705,7 +765,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     //
-    // Create panel for data object, including:
+    // Create the data object panel including:
     //   form_panel:
     //     * entry form packed with visual fields
     //     * form title reflects the current record id
@@ -714,7 +774,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     //     list of all object records
     //
     createPanel: function () {
-        var _this = this;
 
         // Entry form packed with visual fields
         this.form_panel = new Ext.FormPanel({
@@ -723,7 +782,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             // form title reflects the record id, initially nothing
             title: "...",
             url: this.write_url,
-            border: false,
+            activeItem: 0,
+            frame: false,
             layout: "fit",
             timeout: Userman.FORM_TIMEOUT,
 
