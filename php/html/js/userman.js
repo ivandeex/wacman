@@ -218,24 +218,24 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     read_url: undefined,
     write_url: undefined,
     delete_url: undefined,
-    id_attr: undefined,
 
     obj_panel: null,
     list_panel: undefined,
     list_store: undefined,
 
     form_panel: undefined,
-    form_tabs: undefined,
     form: undefined,
+
     obj_attrs: undefined,
-    first_field_id: undefined,
+    form_tabs: undefined,
+    id_attr: undefined,
+    id_value: undefined,
 
     Data: undefined,
     data: undefined,
     changed: false,
 
     attr: {},
-    id_value: undefined,
     list_cols: [],
     list_width: 0,
 
@@ -246,17 +246,19 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         Ext.apply(this, cfg);
 
-        this.attr = {};
-        this.list_cols = [];
-        this.list_width = Userman.COL_GAP + 1;
-        this.list_store = Userman.std_lists[this.list].store;
-        this.form_tabs = [];
+        with (this) {
+            attr = {};
+            list_cols = [];
+            list_width = Userman.COL_GAP + 1;
+            list_store = Userman.std_lists[list].store;
+            form_tabs = [];
 
-        // setup AJAX URLs
-        this.list_url = this.list_url || this.name + "-list.php";
-        this.read_url = this.read_url || this.name + "-read.php";
-        this.write_url = this.write_url || this.name + "-write.php";
-        this.delete_url = this.delete_url || this.name + "-delete.php";
+            // setup AJAX URLs
+            list_url = list_url || name + "-list.php";
+            read_url = read_url || name + "-read.php";
+            write_url = write_url || name + "-write.php";
+            delete_url = delete_url || name + "-delete.php";
+        }
 
         // setup visual attributes
         var form_attrs = Userman.gui_attrs[this.name] || [];
@@ -291,33 +293,38 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 this.setupField(name);
         }
 
-        this.obj_attrs = [];
-        for (var name in Userman.all_attrs[this.name])
-            this.obj_attrs.push(name);
-        this.Data = Ext.data.Record.create(this.obj_attrs);
-        this.data = new this.Data ();
+        with (this) {
+            obj_attrs = [];
+            for (var name in Userman.all_attrs[name])
+                obj_attrs.push(name);
+            Data = Ext.data.Record.create(obj_attrs);
+            data = new Data ();
+        }
     },
 
     // Deselect the list.
     unselect: function () {
-        this.list_panel.getSelectionModel().clearSelections();
-        this.form_panel.setTitle("...");
-
         // Activate first field in first tab
-        Ext.getCmp(this.name + "_form_tabs").setActiveTab(0);
-        Ext.getCmp(this.first_field_id).focus(false);
+        // The form panel contains a single TabPanel item
+        var tab_panel = this.form_panel.items.first();
+        tab_panel.setActiveTab(0);
+        tab_panel.getActiveTab().items.first().focus(false);
 
-        this.changed = true;  // force markChanged() to modify UI
-        this.markChanged(false);
+        this.form_panel.setTitle("...");
+        if (this.list_panel.getSelectionModel().grid)
+            this.list_panel.getSelectionModel().clearSelections(false);
+        this.markChanged(false, true);
     },
 
     // Clear up the form and deselect the list.
-    create: function () {
-        this.id_value = null;
-        for (var i = 0; i < this.obj_attrs.length; i++)
-            this.vset(this.obj_attrs[i], '');
-        this.form.loadRecord(this.data);
-        this.unselect();
+    clear: function () {
+        with (this) {
+            id_value = null;
+            for (var i = 0; i < obj_attrs.length; i++)
+                vset(obj_attrs[i], '');
+            form.loadRecord(data);
+            unselect();
+        }
     },
 
     // Ask user if he is sure and proceed to record deletion if yes
@@ -347,7 +354,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             failure: function (form, action) {
                 var title = Userman.T('Delete failed');
                 Ext.Msg.alert(title, Userman.T(action.response.statusText));
-                this.create();
+                this.clear();
             },
             scope: this
         });
@@ -355,7 +362,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
     // Rejects changes and refreshes lists.
     refresh: function () {
-        this.create();
+        this.clear();
         this.list_store.reload();
     },
 
@@ -380,7 +387,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             },
 
             failure: function (form, action) {
-                this.create();
+                this.clear();
                 Ext.Msg.alert(Userman.T(action.failureType),
                                 Userman.T(action.response.statusText));
             }
@@ -413,7 +420,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             this.form.loadRecord(this.data);
             this.markChanged(false);
         } else {
-            this.create();
+            this.clear();
         }
     },
 
@@ -429,7 +436,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.fillDefs();
         this.form.loadRecord(this.data);
         this.markChanged(this.data.dirty);
-        Ext.getCmp(this.name + "_panel").setTitle(this.formTitle() + " ...");
+        this.form_panel.setTitle(this.formTitle() + " ...");
     },
 
     // Return title of the form (usually the id field)s
@@ -444,8 +451,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Disable or enable form and list buttons depending on:
     //   * whether form is empty or loaded from server
     //   * form values are changed
-    markChanged: function (changed) {
-        if (changed == this.changed)
+    markChanged: function (changed, force) {
+        if (changed == this.changed && !force)
             return;
         this.changed = changed;
 
@@ -678,21 +685,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         } else if (! desc.popup) {
             // it's a simple text entry field
-            var _this = this;
-            //cfg.enableKeyEvents = true;
-            //cfg.listeners = { keypress: function(e,ev) { _this.onModified(e,ev); } };
-            cfg.listeners = { valid: function(e,ev) { _this.onModified(e,ev); } };
             at.field = new Ext.form.TextField(cfg);
-
+            at.field.on("valid", this.onModified, this);
+            //cfg.enableKeyEvents = true;
+            //at.field.on("keyup", this.onModified, this);
         } else {
             // shame on me!
             Ext.Msg.alert(Userman.T("Unknown popup type \"%s\"", desc.popup));
         }
-
-        // save identifier of the first active visual field
-        // we will focus this field when the form is cleared
-        if (!this.first_field_id)
-            this.first_field_id = at.id;
 
         return at;
     },
@@ -719,7 +719,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         // Entry form packed with visual fields
         this.form_panel = new Ext.FormPanel({
             region: "center",
-            id: this.name + "_panel",
+            id: this.name + "_form",
             // form title reflects the record id, initially nothing
             title: "...",
             url: this.write_url,
@@ -734,13 +734,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             }),
 
             items: [{
-                // this is tabbed form
+                // this form is tabbed, its panel contains a single TabPanel item
                 xtype: "tabpanel",
+                id: this.name + "_subtabs",
                 activeItem: 0,
                 // tab descriptors are created during object construction
-                items: this.form_tabs,
-                // this id will let us switch to the first tab
-                id: this.name + "_form_tabs"
+                items: this.form_tabs
             }],
 
             bbar: [ "->", {
@@ -775,22 +774,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             title: Userman.T(this.title),
             id: this.name + "_list",
 
-            listeners: {
-                // when the panels, both list and form, are rendered,
-                // we can setup the form UI
-                render: function () { _this.create(); }
-            },
-
             colModel: new Ext.grid.ColumnModel({
                 columns: this.list_cols
             }),
 
             selModel: new Ext.grid.RowSelectionModel({
                 singleSelect: true,
-                listeners: {
-                    // load new record into form when its row is selected
-                    rowselect: function(sm, row, rec) { _this.load(sm, row, rec); }
-                }
             }),
 
             region: "west",
@@ -801,13 +790,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             minSize: 50
         });
 
+        this.list_panel.getSelectionModel().on("rowselect", this.load, this);
+
         var buttons = [ " ", {
                 // "create" button will clear up the form
                 text: Userman.T("Create"),
                 icon: "images/add.png",
                 scale: "medium",
                 ctCls: Userman.getConfig("add_button_css"),
-                handler: this.create,
+                handler: this.clear,
                 scope: this,
                 id: this.btnId("add")
             },{
@@ -837,10 +828,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         // combine list and form into single panel
         this.obj_panel = new Ext.Panel({
             title: Userman.T(this.title),
+            id: this.name + "_gui",
             layout: "border",
             items: [ this.list_panel, this.form_panel ],
             bbar: {
                 xtype: "toolbar",
+                id: this.name + "_tb",
                 items: buttons
             }
         });
@@ -1057,8 +1050,8 @@ Userman.main = function () {
 
     // create tabbed panels for all objects
     var tabs = [];
-    [ new Userman.User(), new Userman.Group(), new Userman.Mailgroup()
-    ].forEach(function(obj) {
+    var objs = [ new Userman.User(), new Userman.Group(), new Userman.Mailgroup() ];
+    objs.forEach(function(obj) {
         if (obj.isComplete())
             tabs.push(obj.createPanel());
     });
@@ -1074,6 +1067,14 @@ Userman.main = function () {
         },
         layout: "border",
         id: "viewport",
+        listeners: {
+            afterrender: function() {
+                objs.forEach(function(obj) {
+                    if (obj.isComplete())
+                        obj.clear();
+                });
+            }
+        },
         items: [{
             xtype: "tabpanel",
             region: "center",
