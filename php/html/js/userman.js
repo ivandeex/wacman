@@ -235,6 +235,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     changed: false,
 
     attr: {},
+    id_value: undefined,
     list_cols: [],
     list_width: 0,
 
@@ -297,13 +298,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.data = new this.Data ();
     },
 
-    // Clears up the form and deselects the list.
-    create: function () {
-        for (var i = 0; i < this.obj_attrs.length; i++)
-            this.vset(this.obj_attrs[i], "");
-        this.form.loadRecord(this.data);
+    // Deselect the list.
+    unselect: function () {
         this.list_panel.getSelectionModel().clearSelections();
-
         this.form_panel.setTitle("...");
 
         // Activate first field in first tab
@@ -314,7 +311,46 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.markChanged(false);
     },
 
+    // Clear up the form and deselect the list.
+    create: function () {
+        this.id_value = null;
+        for (var i = 0; i < this.obj_attrs.length; i++)
+            this.vset(this.obj_attrs[i], '');
+        this.form.loadRecord(this.data);
+        this.unselect();
+    },
+
+    // Ask user if he is sure and proceed to record deletion if yes
     onDelete: function () {
+        if (! this.id_value)
+            return;
+        var _this = this;
+        Ext.Msg.confirm(this.id_value,
+                        Userman.T("Really delete?"),
+                        function (reply) {
+                            if (reply == "yes")  _this.doDelete();
+                        });
+    },
+
+    // Delete current record
+    doDelete: function() {
+        var params = {};
+        params[this.id_attr] = this.id_value;
+        this.form.submit({
+            clientValidation: false,
+            url: this.delete_url,
+            method: 'GET',
+            params: params,
+            success: function (form, action) {
+                this.refresh();
+            },
+            failure: function (form, action) {
+                var title = Userman.T('Delete failed');
+                Ext.Msg.alert(title, Userman.T(action.response.statusText));
+                this.create();
+            },
+            scope: this
+        });
     },
 
     // Rejects changes and refreshes lists.
@@ -339,7 +375,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
             success: function (form, action) {
                 this.data = new this.Data (action.result.data);
-                this.markChanged(false);
+                this.id_value = params[this.id_attr];
+                this.unselect();
             },
 
             failure: function (form, action) {
@@ -371,9 +408,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
     // Actually rejects the changes.
     doRevert: function () {
-        this.data.reject();
-        this.form.loadRecord(this.data);
-        this.markChanged(false);
+        if (this.id_value) {
+            this.data.reject();
+            this.form.loadRecord(this.data);
+            this.markChanged(false);
+        } else {
+            this.create();
+        }
     },
 
     // This function is called after each key press
@@ -407,22 +448,20 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         if (changed == this.changed)
             return;
         this.changed = changed;
-        var ids1 = [
-            this.name + "_list",
-            this.btnId("add"),
-            this.btnId("delete"),
-            this.btnId("refresh")
-            ];
-        var ids0 = [
-            this.btnId("save"),
-            this.btnId("revert"),
-        ];
+
+        var ids1 = [ this.name + '_list', this.btnId('refresh') ];
+        var ids0 = [ this.btnId('save'), this.btnId('revert') ];
         if (changed) {
             // swap two sets
             var tmp = ids1;
             ids1 = ids0;
             ids0 = tmp;
         }
+
+        var ids = (this.id_value && !changed ? ids1 : ids0);
+        ids.push(this.btnId('delete'));
+        ids.push(this.btnId('add'));
+
         ids1.forEach(function(id) { Ext.getCmp(id).enable(); });
         ids0.forEach(function(id) { Ext.getCmp(id).disable(); });
     },

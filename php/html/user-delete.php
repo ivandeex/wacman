@@ -1,7 +1,7 @@
 <?php
 // $Id$
 
-// Retrieve user object
+// Delete user object
 
 require '../lib/common.php';
 
@@ -13,30 +13,7 @@ if (empty($uid)) {
     exit;
 }
 
-$searches = array(
-    'uni' => "(&(objectClass=person)(uid=\${uid}))",
-    'ads' => "(&(objectClass=user)(cn=\${cn}))",
-    'cgp' => ""
-);
-
-$usr = create_obj('user');
-set_attr($usr, 'uid', $uid);
-
-foreach ($searches as $srv => $filter) {
-    if ($servers[$srv]['disable'])
-        continue;
-    $msg = obj_read($usr, $srv, $filter);
-    if (! $msg)
-        continue;
-    if ($srv == 'uni') {
-        echo json_error($msg);
-        srv_disconnect_all();
-        exit;
-    }
-    log_info('will create "%s" user for uid "%s"', $srv, $uid);
-}
-
-echo obj_json_encode($usr);
+echo json_error('oops');
 srv_disconnect_all();
 
 ?>

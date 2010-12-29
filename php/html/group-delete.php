@@ -1,7 +1,7 @@
 <?php
 // $Id$
 
-// Retrieve group object
+// Delete group object
 
 require '../lib/common.php';
 
@@ -11,10 +11,7 @@ if (empty($_GET['cn'])) {
     exit;
 }
 
-$grp = create_obj('group');
-set_attr($grp, 'cn', $_GET['cn']);
-$msg = obj_read($grp, 'uni', "(&(objectClass=posixGroup)(cn=\${cn}))");
-echo $msg ? json_error($msg) : obj_json_encode($grp);
+echo json_error('oops');
 srv_disconnect_all();
 
 ?>
