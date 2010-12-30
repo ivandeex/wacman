@@ -16,7 +16,7 @@ Userman.RIGHT_GAP = 20;
 Userman.COL_GAP = 2;
 Userman.LABEL_WIDTH = 150;
 Userman.TAB_PADDING = "10px";
-Userman.FORM_TIMEOUT = 15;
+Userman.AJAX_TIMEOUT = 15;
 Userman.VIEWPORT_PADDING = "5px";
 
 //
@@ -161,6 +161,21 @@ Userman.formatTelnum = function (telnum) {
     return telnum;
 }
 
+Userman.anyToString = function (val, delimiter) {
+    if (!val)
+        return "";
+    if (!(typeof val == "object" && val instanceof Array))
+        return "" + val;
+    if (val.length == 0)
+        return "";
+    if (!delimiter)
+        delimiter = "\n";
+    var str = "" + Userman.anyToString(val[0]);
+    for (var i = 1; i < arr.length; i++)
+        str += delimiter + Userman.anyToString(val[i]);
+    return 
+}
+
 /////////////////////////////////////////////////////////
 // AJAX indicator icon
 //
@@ -210,41 +225,90 @@ Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
 
 Userman.FormAction = Ext.extend(Ext.form.Action, {
 
-    constructor: function (obj, options) {
-        Ext.form.Action.call(this, obj.form, options);
-        this.obj = obj;
-    },
-
+    //
+    // Start the AJAX request
+    //
     run: function () {
+
+        // Method defaults to "GET"
         var o = this.options;
+        var method = (o.method || "get").toUpperCase();
+
+        // Prepare request object
         var request = {
-            method: o.method,
+            method: method,
             url: o.url,
             headers: o.headers,
-            timeout: Userman.FORM_TIMEOUT * 1000,
+            timeout: Userman.AJAX_TIMEOUT * 1000,
             success: function (response) { this.handler(response, true); },
             failure: function (response) { this.handler(response, false); },
             scope: this
         };
-        if (o.method == "GET")
+
+        // Move GET parameters to query string
+        if (method == "GET")
             request.url = Ext.urlAppend(o.url, Ext.urlEncode(o.params));
         else
             request.params = o.params;
+
+        // Fire the request
         Ext.Ajax.request(request);
+
+        // Create a progress dialog
+        // _waitMsg and _waitTitle are our non-Ext private properties
+        Ext.MessageBox.wait(o._waitMsg, o._waitTitle);
     },
 
     handler: function (response, conn_ok) {
-        var result = conn_ok ? Ext.decode(response.responseText) : {};
-        if (!(typeof result == "object"))
-            result = {};
-        var data = result.data || result.obj || null;
-        var success = result.success || false;
-        var o = this.options;
-        if (o._isLoad && !data)
-            success = false;
 
+        // Finish up and close the progress dialog
+        Ext.MessageBox.updateProgress(1);
+        Ext.MessageBox.hide();
+
+        // Parse JSON from server and catch any possible errors
+        var result = null;
+        if (conn_ok) {
+            try {
+                result = Ext.decode(response.responseText);
+            } catch (err) {
+                // Decoding failed.
+                // Trigger "Invalid response" error below
+                result = null;
+            }
+        } else {
+            // The HTTP status is the error message
+            result = { message: response.statusText };
+        }
+
+        //
+        // Successful server response expected when _isLoad==false:
+        // { success: true }
+        //
+        // Successful server response expected when _isLoad==true:
+        // { success: true, obj: {...} }
+        //
+        // Erroneous server response:
+        //  {
+        //      success: false,
+        //      errors: { field1: "error1", ... },
+        //      message: "message"
+        //  }
+        //
+
+        if (!(result && (typeof result == "object"))) {
+            // Trigger the "Invalid response" error below
+            result = {};
+        }
+
+        // The actual data in the "obj" response field
+        var data = result.obj || null;
+        var success = result.success || false;
+        if (this.options._isLoad && !data)  success = false;
+
+        // Let user use our results
         this._success = success;
         this._data = data;
+        this._error = "";
 
         if (success) {
             this.form.afterAction(this, true);
@@ -253,19 +317,21 @@ Userman.FormAction = Ext.extend(Ext.form.Action, {
 
         this.form.afterAction(this, false);
 
-        if (!response.conn_ok) {
-            Ext.Msg.alert(o.waitTitle,
-                        Userman.T("Connection failed: %s", response.statusText));
-            return;
-        }
-
-        if (response.errors) {
+        // Mark any form fields that are invalid
+        if (result.errors)
             this.form.markInvalid(result.errors);
-        }
 
-        var title = o.waitTitle + ": " + Userman.T("error");
-        var msg = result.message || result.errorMessage || "Server error";
-        Ext.Msg.alert(title, Userman.T(msg));
+        // Build the error message
+        var ermes = result.message
+                    || "Invalid response from server";
+        ermes = Userman.T(Userman.anyToString(ermes));
+        if (!conn_ok)
+            ermes = Userman.T("Connection failed: ") + ermes;
+        this._error = ermes;
+
+        // Bring the alert popup
+        var title = this.options._waitTitle + ": " + Userman.T("error");
+        Ext.Msg.alert(title, ermes);
     },
 
 });
@@ -430,6 +496,14 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     //
+    // Rejects changes and refreshes lists.
+    //
+    refresh: function () {
+        this.clear();
+        this.list_store.reload();
+    },
+
+    //
     // Ask user if he is sure and proceed to record deletion if yes
     //
     onDelete: function () {
@@ -449,26 +523,19 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     doDelete: function() {
         var params = {};
         params[this.id_attr] = this.id_value;
-        this.form.doAction(new Userman.FormAction(this, {
-            url: this.delete_url,
-            method: "GET",
-            params: params,
-            waitTitle: this.id_value,
-            waitMsg: Userman.T("Deleting..."),
-            _isLoad: false,
-            scope: this,
-            success: function (form, action) {
-                this.refresh();
-            }
-        }));
-    },
-
-    //
-    // Rejects changes and refreshes lists.
-    //
-    refresh: function () {
-        this.clear();
-        this.list_store.reload();
+        this.form.doAction(
+            new Userman.FormAction(this.form, {
+                url: this.delete_url,
+                params: params,
+                _waitTitle: this.id_value,
+                _waitMsg: Userman.T("Deleting..."),
+                _isLoad: false,
+                scope: this,
+                success: function (form, action) {
+                    this.refresh();
+                }
+            })
+        );
     },
 
     //
@@ -477,31 +544,56 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     load: function (sm, row, rec) {
         var params = {};
         params[this.id_attr] = this.id_value = rec.get(this.id_attr);
-        this.form.doAction(new Userman.FormAction(this, {
-            url: this.read_url,
-            method: "GET",
-            params: params,
-            waitTitle: this.id_value,
-            waitMsg: Userman.T("Loading..."),
-            _isLoad: true,
-            scope: this,
-            success: function (form, action) {
-                // intercept data from server and put into local record
-                this.data = new this.Data (action._data);
-                this.form.clearInvalid();
-                this.form.setValues(action._data);
-                this.refocus();
-                this.markChanged(false, true);
-            },
-        }));
+        this.form.doAction(
+            new Userman.FormAction(this.form, {
+                url: this.read_url,
+                params: params,
+                _waitTitle: this.id_value,
+                _waitMsg: Userman.T("Loading..."),
+                _isLoad: true,
+                scope: this,
+                success: this.onLoadSuccess
+            })
+        );
+    },
+
+    onLoadSuccess: function (form, action) {
+        // intercept data from server and put into local record
+        this.data = new this.Data (action._data);
+        this.form.clearInvalid();
+        this.form.setValues(action._data);
+        this.refocus();
+        this.markChanged(false, true);
     },
 
     //
     // Submit form to server
     //
     save: function () {
-        this.form.submit();
-        this.markChanged(false);
+        var params = {};
+        if (this.id_value) {
+            // Update an existing record
+            params._action = "update";
+            params._old_id = this.id_value;
+        } else {
+            // Send new record
+            params._action = "create";
+            params._old_id = "";
+        }
+        this.form.doAction(
+            new Userman.FormAction(this.form, {
+                url: this.write_url,
+                method: "post",
+                params: params,
+                _waitTitle: this.get(this.id_attr),
+                _waitMsg: Userman.T(this.id_value ? "Updating..." : "Creating..."),
+                _isLoad: false,
+                scope: this,
+                success: function (form, action) {
+                    this.markChanged(false);
+                }
+            })
+        );
     },
 
     //
@@ -695,7 +787,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             url: "next-id.php",
             method: "GET",
             params: { which: which },
-            timeout: Userman.FORM_TIMEOUT * 1000,
+            timeout: Userman.AJAX_TIMEOUT * 1000,
 
             success: function (resp, opts) {
                 at.requesting = false;
@@ -844,11 +936,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             id: this.name + "_form",
             // form title reflects the record id, initially nothing
             title: "...",
-            url: this.write_url,
             activeItem: 0,
             frame: false,
             layout: "fit",
-            timeout: Userman.FORM_TIMEOUT,
 
             reader: new Ext.data.JsonReader({
                 root: "obj",
