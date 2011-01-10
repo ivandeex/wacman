@@ -16,5 +16,8 @@ function json_error ($msg) {
     return '{success:false,message:' . json_encode($msg) . '}';
 }
 
+function json_ok () {
+    return '{success:true}';
+}
 
 ?>

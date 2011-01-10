@@ -163,14 +163,14 @@ function uldap_entries ($res) {
 
 
 function uldap_pop ($res) {
-    if (isset($res['data']['count']) && $res['data']['count'] > 0)
+    if (is_array($res) && isset($res['data']['count']) && $res['data']['count'] > 0)
         return $res['data'][0];
     return null;
 }
 
 
-function uldap_dn (&$ldap) {
-    return isset($ldap[0]['dn']) ? $ldap[0]['dn'] : null;
+function uldap_dn ($val) {
+    return (is_array($val) && isset($val['dn']) ? $val['dn'] : '');
 }
 
 
@@ -184,6 +184,19 @@ function uldap_json_encode ($res, $func = null, $remove_dn = false) {
     if (!is_null($func))
         usort($res, $func);
     return "{success:true,rows:" . json_encode($res) . "}\n";
+}
+
+
+function uldap_delete ($srv, $dn)
+{
+    $cfg =& get_server($srv, true);
+    srv_connect($srv);
+    $conn = $cfg['ldap'];
+    $ok = @ldap_delete($conn, $dn);
+    if ($ok)
+        return array('code' => 0, 'error' => '');
+    else
+        return array('code' => ldap_errno($conn), 'error' => ldap_error($conn));
 }
 
 

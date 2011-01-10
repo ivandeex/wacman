@@ -72,7 +72,7 @@ function configure ($files = null) {
                 $mode = $parts[1];
                 if (! $modes[$mode])
                     log_error('incorrect section "%s" in %s: %s', $mode, $file, $line);
-		continue;
+                continue;
             } else if (preg_match('/^\s*(\S+)\s*=\s*(.*?)\s*$/', $line, $parts)) {
                  $name = strip_quotes($parts[1]);
                  $val = $parts[2];
@@ -145,6 +145,14 @@ function get_credentials ($srv) {
             log_error('cannot find credentials for server "%s"', $srv);
     }
     return array('user' => $user, 'pass' => $pass);
+}
+
+function is_reserved ($id) {
+    foreach (split_list(get_config("reserved_names", "")) as $x) {
+        if ($id == $x)
+            return true;
+    }
+    return false;
 }
 
 ?>

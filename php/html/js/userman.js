@@ -161,6 +161,10 @@ Userman.formatTelnum = function (telnum) {
     return telnum;
 }
 
+//
+// Convert any value to string.
+// Use delimiters to join array members.
+//
 Userman.anyToString = function (val, delimiter) {
     if (!val)
         return "";
@@ -174,6 +178,26 @@ Userman.anyToString = function (val, delimiter) {
     for (var i = 1; i < arr.length; i++)
         str += delimiter + Userman.anyToString(val[i]);
     return 
+}
+
+//
+// Check whether particular identifier is reserved by the system
+//
+Userman.isReserved = function (id, msg) {
+    id = Userman.trim(id);
+    var names = Userman.getConfig("reserved_names").split(",");
+    for (var i in names) {
+        var name = Userman.trim(names[i]);
+        if (name != "" && id == name) {
+            if (msg) {
+                if (msg == "!")
+                    msg = "Cannot delete reserved object";
+                Ext.Msg.alert(id, Userman.T(msg));
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 /////////////////////////////////////////////////////////
@@ -215,8 +239,8 @@ Userman.Throbber = Ext.extend(Ext.Button, {
 
 Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
     getCheckedDisplay:function() {
-		return this.getCheckedValue(this.displayField);
-	}
+        return this.getCheckedValue(this.displayField);
+    }
 });
 
 /////////////////////////////////////////////////////////
@@ -300,8 +324,8 @@ Userman.FormAction = Ext.extend(Ext.form.Action, {
             result = {};
         }
 
-        // The actual data in the "obj" response field
-        var data = result.obj || null;
+        // The actual data in the "data" response field
+        var data = result.data || null;
         var success = result.success || false;
         if (this.options._isLoad && !data)  success = false;
 
@@ -324,7 +348,7 @@ Userman.FormAction = Ext.extend(Ext.form.Action, {
         // Build the error message
         var ermes = result.message
                     || "Invalid response from server";
-        ermes = Userman.T(Userman.anyToString(ermes));
+        ermes = Userman.T(Userman.anyToString(ermes, "\n"));
         if (!conn_ok)
             ermes = Userman.T("Connection failed: ") + ermes;
         this._error = ermes;
@@ -507,7 +531,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Ask user if he is sure and proceed to record deletion if yes
     //
     onDelete: function () {
-        if (! this.id_value)
+        if (! this.id_value || Userman.isReserved(this.id_value, "!"))
             return;
         var _this = this;
         Ext.Msg.confirm(this.id_value,
