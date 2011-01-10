@@ -34,6 +34,7 @@ ext_js = js/ext/adapter/ext/ext-base.js,js/ext/ext-all-debug.js
 ext_js_lang = js/ext/src/locale/ext-lang-%s.js
 add_button_css = 'gentle-frame'
 
+helper_script = ~/userman-helper
 create_homes  = 1
 remove_homes  = 1
 home_root     = /group

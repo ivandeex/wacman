@@ -25,7 +25,7 @@ function log_msg () {
         );
     $args = func_get_args();
     $level = array_shift($args);
-    if (($level == LOG_DEBUG || $level == LOG_NOTICE) && !get_config('debug'))
+    if (($level == LOG_DEBUG || $level == LOG_NOTICE) && !str2bool(get_config('debug')))
         return false;
     if (count($args) == 1 && is_array($args[0]))
         $args = $args[0];

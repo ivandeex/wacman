@@ -9,6 +9,7 @@ $config = array(
     'unix_user_classes' => 'top,person,organizationalPerson,inetOrgPerson,posixAccount,shadowAccount', # 'ntUser',
     'unix_group_classes'=> 'top,posixGroup',	
     'home_root'         => '/home',
+    'helper_script'     => '~/userman-helper',
     'ad_user_classes'   => 'top,user,person,organizationalPerson',	
     'ad_user_category'  => 'cn=Person,cn=Schema,cn=Configuration',
     'cgp_user_classes'  => 'top,person,organizationalPerson,inetOrgPerson,CommuniGateAccount',
@@ -153,6 +154,13 @@ function is_reserved ($id) {
             return true;
     }
     return false;
+}
+
+function run_helper ($action, $param) {
+    $script = get_config("helper_script");
+    if (substr($script, 0, 2) == '~/')
+        $script = CONFDIR . substr($script, 2);
+    die("FIXME: run_helper");
 }
 
 ?>

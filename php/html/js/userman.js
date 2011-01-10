@@ -175,9 +175,9 @@ Userman.anyToString = function (val, delimiter) {
     if (!delimiter)
         delimiter = "\n";
     var str = "" + Userman.anyToString(val[0]);
-    for (var i = 1; i < arr.length; i++)
+    for (var i = 1; i < val.length; i++)
         str += delimiter + Userman.anyToString(val[i]);
-    return 
+    return str;
 }
 
 //
@@ -348,7 +348,7 @@ Userman.FormAction = Ext.extend(Ext.form.Action, {
         // Build the error message
         var ermes = result.message
                     || "Invalid response from server";
-        ermes = Userman.T(Userman.anyToString(ermes, "\n"));
+        ermes = Userman.T(Userman.anyToString(ermes, "<br>"));
         if (!conn_ok)
             ermes = Userman.T("Connection failed: ") + ermes;
         this._error = ermes;

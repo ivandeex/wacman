@@ -142,7 +142,7 @@ function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
     } else {
         uldap_add($grp, 'memberUid', $a_new);
     }
-    $res = ldap_update('uni', $grp);
+    $res = @ldap_update('uni', $grp);
     if ($res['code']) {
         log_info('%s unix user "%s" in group %d error: %s',
                     $action, $uid, $gidn, $res['error']);
@@ -151,11 +151,6 @@ function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
         log_debug('success %s\'ing unix user "%s" in group %d: [%s] -> [%s]...',
                     $action, $uid, $gidn, $old, $new);
         $retval = 'OK';
-    }
-    $sel_grp = $group_obj;
-    if (!$sel_grp['changed'] && get_attr($sel_grp, 'gidNumber') == $gidn) {
-        // refresh gui for this group
-        group_load();
     }
     return $retval;
 }

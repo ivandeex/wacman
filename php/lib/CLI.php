@@ -463,7 +463,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function DeleteAccount($accountName) {
             if($accountName == '')
                 die('usage: $cli->DeleteAccount(string $accountName)'."\n");
-            $this->send('DLACNT '.$accountName);
+            $this->send('DeleteAccount '.$accountName);
             $this->_parseResponse();
         }
         
