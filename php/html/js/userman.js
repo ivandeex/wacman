@@ -860,10 +860,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         if (!popup) {
             // it's a simple text entry field
+            cfg.enableKeyEvents = true;
             at.field = new Ext.form.TextField(cfg);
-            at.field.on("valid", this.onModified, this);
-            //cfg.enableKeyEvents = true;
-            //at.field.on("keyup", this.onModified, this);
+            //at.field.on("valid", this.onModified, this);
+            at.field.on("keyup", this.onModified, this);
 
         } else if (popup == "yesno") {
             // the field can take only two values, yes or no
