@@ -558,10 +558,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     onLoadSuccess: function (form, action) {
-        // intercept data from server and put into local record
-        this.data = new this.Data (action._data);
         this.form.clearInvalid();
+        // note: we set values AFTER clearInvalid(),
+        // because the latter function will clear the original values
         this.form.setValues(action._data);
+        // intercept data from server and put into local record
+        this.data = new this.Data(action._data);
         this.refocus();
         this.markChanged(false, true);
     },
@@ -585,7 +587,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 url: this.write_url,
                 method: "post",
                 params: params,
-                _waitTitle: this.get(this.id_attr),
+                _waitTitle: this.vget(this.id_attr),
                 _waitMsg: Userman.T(this.id_value ? "Updating..." : "Creating..."),
                 _isLoad: false,
                 scope: this,
