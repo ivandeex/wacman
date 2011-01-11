@@ -121,38 +121,36 @@ function ldap_get_unix_group_ids ($srv, $val, $warn, $asstring = false) {
 
 
 function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
-    log_debug('will be %s\'ing unix user "%s" in group %d...',  $action, $uid, $gidn);    
-    $res = uldap_search('uni', "(&(objectClass=posixGroup)(gidNumber=$gidn))", array('memberUid'));
+    log_debug('will %s unix user "%s" in group %d...',  $action, $uid, $gidn);
+    $srv = 'uni';
+    $res = uldap_search($srv, "(&(objectClass=posixGroup)(gidNumber=$gidn))", array('memberUid'));
     $grp = uldap_pop($res);
     if ($res['code'] || empty($grp)) {
         log_info('cannot find unix group %d for modification', $gidn);
         return $res['error'];
     }
-    $exists = uldap_exists($grp, 'memberUid');
-    $old = $exists ? join_list(uldap_value($grp, 'memberUid')) : '';
-    $new = $action == 'add' ? append_list($old, $uid) : remove_list($old, $uid);
-    $a_new = split_list($new);
+
+    $old_uids = uldap_value($grp, 'memberUid', true);
+    $exists = !empty($old_uids);
+    $old = $exists ? join_list($old_uids) : '';
+    $new = join_list($action == 'add' ? append_list($old, $uid) : remove_list($old, $uid));
     if ($old == $new) {
         log_debug('unix group %d wont change with user "%s": (%s) = (%s)',
                     $gidn, $uid, $old, $new);
         return 'SAME';
     }
-    if ($exists) {
-        uldap_replace($grp, 'memberUid', $a_new);
-    } else {
-        uldap_add($grp, 'memberUid', $a_new);
-    }
-    $res = @ldap_update('uni', $grp);
+
+    $grp_dn = uldap_dn($grp);
+    $new_uids = array('memberUid' => split_list($new));
+    $res = $exists ? uldap_replace($srv, $grp_dn, $new_uids) : uldap_add($srv, $grp_dn, $new_uids);
     if ($res['code']) {
         log_info('%s unix user "%s" in group %d error: %s',
                     $action, $uid, $gidn, $res['error']);
-        $retval = $res['error'];
-    } else {
-        log_debug('success %s\'ing unix user "%s" in group %d: [%s] -> [%s]...',
-                    $action, $uid, $gidn, $old, $new);
-        $retval = 'OK';
+        return $res['error'];
     }
-    return $retval;
+    log_debug('successful %s unix user "%s" in group %d: [%s] -> [%s]...',
+                $action, $uid, $gidn, $old, $new);
+    return 'OK';
 }
 
 

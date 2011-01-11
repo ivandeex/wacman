@@ -63,10 +63,10 @@ function srv_connect ($srv) {
         return -1;
     }
 
-    if ($srv == 'ads') {
-        // active directory requires ldap protocol v3
-        @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
-    }
+    // Attempt to set LDAP protocol version 3.
+    // Active directory requires this version.
+    // Other servers might support it, let's try.
+    @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
 
     $okay = @ldap_bind($cfg['ldap'], $cfg['user'], $cfg['pass']);
     if (! $okay) {
@@ -126,7 +126,7 @@ function uldap_convert_array (&$src) {
 }
 
 
-function uldap_value ($data, $name, $asarray = false) {
+function uldap_value ($data, $name, $want_array = false) {
     $src = $data;
     if (is_array($src) && isset($src['count']) && $src['count'] == 1 && is_array($src[0]))
         $src = $src[0];
@@ -137,15 +137,22 @@ function uldap_value ($data, $name, $asarray = false) {
         $val = $src[$name];
     else
         $val = array();
-    unset($val['count']);
-    if (is_array($val) && !$asarray) {
-        if (count($val) == 1)
-            $val = $val[0];
-        else if (count($val) == 0)
-            $val = null;
+    if (is_array($val)) {
+        if (!$want_array)
+            $val = isset($val[0]) ? $val[0] : null;
+        else if (isset($val['count']))
+            unset($val['count']);
+    } else if ($want_array) {
+        $val = empty($val) ? array() : array($val);
     }
-    #echo _T("ugv(%s,%s):(%s)======>(%s)<br>\n", $name, $asarray?"T":"F", print_r($data,1), print_r($val,1));
+    #echo("ugv(".$name.",".bool2str($want_array)."):(".json_encode($data)."===>(".json_encode($val).")<br>\n");
     return $val;
+}
+
+
+function uldap_exists ($data, $name) {
+    $val = uldap_value($data, $name);
+    return !(is_null($val) || (is_array($val) && empty($val)));
 }
 
 
@@ -187,54 +194,80 @@ function uldap_json_encode ($res, $func = null, $remove_dn = false) {
 }
 
 
-function uldap_delete ($srv, $dn)
-{
+function _uldap_connection ($srv, &$res) {
     $cfg =& get_server($srv, true);
     srv_connect($srv);
-    $conn = $cfg['ldap'];
-    $ok = @ldap_delete($conn, $dn);
-    if ($ok)
-        return array('code' => 0, 'error' => '');
-    else
-        return array('code' => ldap_errno($conn), 'error' => ldap_error($conn));
+    if (! $cfg['connected']) {
+        $res['code'] = -1;
+        $res['error'] = _T("%s: not connected", $srv);
+        return null;
+    }
+    $res['code'] = 0;
+    $res['error'] = '';
+    return $cfg['ldap'];
 }
 
 
-function uldap_search ($srv, $filter, $attrs = null, $params = null)
-{
-    $cfg =& get_server($srv, true);
-    srv_connect($srv);
-    $res = array('data' => array('count' => 0));
-    if (! $cfg['connected']) {
-        $res['code'] = -1;
-        $res['error'] = "$srv: not connected";
-        return $res;
-    }
-    $conn = $cfg['ldap'];
-    if (is_null($attrs))
-        $attrs = array('*');
-    $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
-    if ($handle === FALSE) {
+function _uldap_result ($okay, $conn, &$res) {
+    if ($okay) {
+        $res['code'] = 0;
+        $res['error'] = '';
+    } else {
         $res['code'] = ldap_errno($conn);
         $res['error'] = ldap_error($conn);
+    }
+}
+
+
+function uldap_delete ($srv, $dn) {
+    $conn = _uldap_connection($srv, $res);
+    if ($conn)
+        _uldap_result(@ldap_delete($conn, $dn), $conn, $res);
+    return $res;
+}
+
+function uldap_add ($srv, $dn, $entry) {
+    $conn = _uldap_connection($srv, $res);
+    if ($conn)
+        _uldap_result(@ldap_mod_add($conn, $dn, $entry), $conn, $res);
+    return $res;
+}
+
+function uldap_replace ($srv, $dn, $entry) {
+    $conn = _uldap_connection($srv, $res);
+    if ($conn)
+        _uldap_result(@ldap_mod_replace($conn, $dn, $entry), $conn, $res);
+    return $res;
+}
+
+
+function uldap_search ($srv, $filter, $attrs = null, $params = null) {
+    $res = array('data' => array('count' => 0));
+    $conn = _uldap_connection($srv, $res);
+    if (is_null($conn))
+        return $res;
+    if (is_null($attrs))
+        $attrs = array('*');
+    $cfg = get_server($srv);
+    $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
+    if ($handle === FALSE) {
+        _uldap_result(false, $conn, $res);
         log_debug('LDAP(%s) search[%s] attrs[%s] search failed: %s',
                     $srv, $filter, join_list($attrs), $res['error']);
         return $res;
     }
-    $res['data'] = @ldap_get_entries($conn, $handle);
-    if ($res['data'] === FALSE) {
-        $res['code'] = ldap_errno($conn);
-        $res['error'] = ldap_error($conn);
-        $res['data'] = array('count' => 0);
+    $data = @ldap_get_entries($conn, $handle);
+    if ($data === FALSE) {
+        _uldap_result(false, $conn, $res);
         log_debug('LDAP(%s) search[%s] attrs[%s] entries failed: %s',
                     $srv, $filter, join_list($attrs), $res['error']);
         return $res;
     }
-    $res['code'] = 0;
-    $res['error'] = '';
+    _uldap_result(true, $conn, $res);
+    $res['data'] = $data;
     set_error();
     if ($cfg['debug'])
-        log_debug('LDAP(%s) search[%s]: %s', $srv, $filter, json_encode(uldap_convert_array($res['data'])));
+        log_debug('LDAP(%s) search[%s]: %s', $srv, $filter, json_encode(uldap_convert_array($data)));
     return $res;
 }
 
@@ -304,7 +337,7 @@ function ldap_write_dn (&$obj, &$at, $srv, $ldap, $name, $val) {
 
 
 function ldap_read_class (&$obj, &$at, $srv, $ldap, $name) {
-    return join_list(uldap_value($ldap, $name));
+    return join_list(uldap_value($ldap, $name, true));
 }
 
 
