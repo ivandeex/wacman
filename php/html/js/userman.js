@@ -817,7 +817,16 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
             success: function (resp, opts) {
                 at.requesting = false;
-                var id = Userman.trim(resp.responseText).replace(/[^0-9]/g, "");
+                var result = null;
+                try {
+                    result = Ext.decode(resp.responseText);
+                } catch (err) {
+                    result = null;
+                }
+                if (!(result && (typeof result == "object")))
+                    result = {};
+                var data = result.data || "";
+                var id = Userman.trim(data).replace(/[^0-9]/g, "");
                 if (format)
                     id = format(id);
                 // user might have already filled the value while the request
@@ -1280,7 +1289,7 @@ Userman.main = function () {
         var fields = list.fields || [ list.attr ];
         list.store = new Ext.data.JsonStore({
             url: list.url,
-            root: "rows",
+            root: "data",
             idProperty: list.attr,
             fields: fields,
             autoLoad: false

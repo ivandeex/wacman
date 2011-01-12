@@ -5,24 +5,16 @@
 
 require '../lib/common.php';
 
-send_json_headers();
-$id = nvl(isset($_GET['uid']) ? $_GET['uid'] : '');
-if (empty($id)) {
-    echo(json_error("uid: required parameter wrong or not specified"));
-    exit;
-}
-if (is_reserved($id)) {
-    echo(json_error("Cannot delete reserved object"));
-    exit;
-}
+send_headers();
+$id = req_param('uid');
+if (empty($id))  error_page("uid: required parameter wrong or not specified");
+if (is_reserved($id))  error_page("Cannot delete reserved object");
 
 // Find Unix, AD and CGP identifiers of the user
 $srv = 'uni';
 $res = uldap_search($srv, "(&(objectClass=person)(uid=$id))", array('dn', 'cn', 'mail', 'homeDirectory'));
-if ($res['code'] || $res['data']['count'] == 0) {
-    echo(json_error(_T('User not found')));
-    exit;
-}
+if ($res['code'] || $res['data']['count'] == 0)
+    error_page('User not found');
 $msg = array();
 $ue = uldap_pop($res);
 

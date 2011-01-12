@@ -17,39 +17,50 @@ define('CONFDIR',  realpath(LIBDIR.'../config').'/');
 define('CSSDIR',   'css/');
 define('JSDIR',    'js/');
 
-//
-// Print HTML-formatted error string.
-// Optional parameters $ldap_err_msg and $ldap_err_no make this function
-// lookup the error number and display an extra verbose message.
+/////////////////////////////////
+// HTTP helpers
 //
 
-function error_page ($msg, $ldap_err_msg = null, $ldap_err_no = -1, $fatal = true) {
-    @include_once HTDOCDIR.'header.php';
-    #if (function_exists('log_err'))  log_err('%s', $msg);  // FIXME
-    ?>
-      <center>
-        <h2><?php echo _('Error');?></h2>
-        <?php echo $msg; ?>
-        <br />
-    <?php
-        if( $ldap_err_msg ) {
-            echo sprintf(_('LDAP said: %s'), htmlspecialchars( $ldap_err_msg ));
-            echo '<br />';
-        }
-        if( $ldap_err_no != -1 ) {
-            $ldap_err_no = '0x' . str_pad(dechex( $ldap_err_no ), 2, 0, STR_PAD_LEFT);
-            if (function_exists('log_err'))
-                log_err('Error number: %s<br /><br />', $ldap_err_no);
-        }
-	?>
-        <br />
-        </td></tr></table>
-      </center>
-    <?php
-    if ($fatal) {
-        echo "</body>\n</html>";
-        die();
-    }
+//
+// Print HTML-formatted error string.
+//
+
+function req_param ($name) {
+    return nvl(isset($_POST[$name]) ? $_POST[$name]
+                : (isset($_GET[$name]) ? $_GET[$name] : ''));
+}
+
+function req_list () {
+    return array_unique(array_merge(array_keys($_POST), array_keys($_GET)));
+}
+
+function send_headers ($mime = "text/plain") {
+    static $headers_sent;
+    if ($headers_sent)
+        return;
+    $headers_sent = true;
+    if ($mime == 'text')  $mime = 'text/plain';
+    if ($mime == 'html')  $mime = 'text/html';
+    header("Expires: Sat, 26 Jul 1997 05:00:00 GMT");
+    header("Cache-Control: no-store, no-cache, must-revalidate");
+    header("Pragma: no-cache");
+    header("Content-Type: $mime; charset=UTF-8");
+}
+
+function json_error ($msg) {
+    return "{success:false,message:" . json_encode($msg) . "}\n";
+}
+
+function json_ok ($val = null) {
+    return "{success:true" . (is_null($val)? "" : ",data:" . json_encode($val)) . "}\n";
+}
+
+function error_page ($msg, $fatal = true) {
+    if (function_exists('_T'))  $msg = _T($msg);
+    if (function_exists('log_err'))  log_err($msg);
+    send_headers();
+    echo(json_error($msg));
+    if ($fatal)  die();
 }
 
 /////////////////////////////////

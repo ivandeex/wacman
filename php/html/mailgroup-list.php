@@ -5,19 +5,17 @@
 
 require '../lib/common.php';
 
-send_json_headers();
+send_headers();
 
 $res = cgp_cmd('cgp', 'ListGroups', get_config('mail_domain'));
-if ($res['code']) {
-    echo json_error($res['error']);
-} else {
-    $mgroups = array();
-    foreach ($res['data'] as $name)  $mgroups[] = $name;
-    asort($mgroups);
-    $res = array();
-    foreach ($mgroups as $name)  $arr[] = array('uid' => $name);
-    echo "{success:true,rows:" . json_encode($arr) . "}\n";
-}
+if ($res['code'])  error_page($res['error']);
+
+$mgroups = array();
+foreach ($res['data'] as $name)  $mgroups[] = $name;
+asort($mgroups);
+$res = array();
+foreach ($mgroups as $name)  $arr[] = array('uid' => $name);
+echo(json_ok($arr));
 
 srv_disconnect_all();
 ?>

@@ -190,7 +190,7 @@ function uldap_json_encode ($res, $func = null, $remove_dn = false) {
     }
     if (!is_null($func))
         usort($res, $func);
-    return "{success:true,rows:" . json_encode($res) . "}\n";
+    return json_ok($res);
 }
 
 

@@ -203,7 +203,7 @@ function set_attr (&$obj, $name, $val) {
 function obj_json_encode (&$obj) {
     $ret = array();
     foreach ($obj['attrs'] as $name => &$at)  $ret[$name] = $at['val'];
-    return "{success:true,data:" . json_encode($ret) . "}\n";            
+    return json_ok($ret);
 }
 
 

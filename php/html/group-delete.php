@@ -5,28 +5,18 @@
 
 require '../lib/common.php';
 
-send_json_headers();
-$id = nvl(isset($_GET['cn']) ? $_GET['cn'] : '');
-if (empty($id)) {
-    echo json_error("cn: required parameter missing");
-    exit;
-}
-if (is_reserved($id)) {
-    echo json_error("Cannot delete reserved object");
-    exit;
-}
+send_headers();
+$id = req_param('cn');
+if (empty($id))  error_page("cn: required parameter missing");
+if (is_reserved($id))  error_page("Cannot delete reserved object");
+
 $res = uldap_search('uni', "(&(objectClass=posixGroup)(cn=$id))", array('dn'));
-if ($res['code'] || $res['data']['count'] == 0) {
-    echo(json_error(_T('Group not found')));
-    exit;
-}
-$dn = uldap_dn(uldap_pop($res));
-$res = uldap_delete('uni', $dn);
-if ($res['code']) {
-    echo(json_error(_T('Error deleting group "%s": %s', $id, $res['error'])));
-    exit;
-}
-echo(json_ok());
+if ($res['code'] || $res['data']['count'] == 0)
+    error_page('Group not found');
+
+$res = uldap_delete('uni', uldap_dn(uldap_pop($res)));
+echo($res['code'] ?
+    json_error(_T('Error deleting group "%s": %s', $id, $res['error'])) : json_ok());
 srv_disconnect_all();
 
 ?>

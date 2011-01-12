@@ -5,13 +5,11 @@
 
 require '../lib/common.php';
 
-send_json_headers();
+send_headers();
 
-$which = isset($_GET['which']) ? $_GET['which'] : '';
-if (empty($which)) {
-    echo json_error("which: required parameter wrong or not specified");
-    exit;
-}
+$which = req_param('which');
+$retval = '0';
+if (empty($which))  error_page("which: required parameter wrong or not specified");
 
 switch ($which) {
     case 'unix_uidn':
@@ -22,7 +20,7 @@ switch ($which) {
             if ($uidn > $next_uidn)
                 $next_uidn = $uidn;
         }
-        echo($next_uidn > 0 ? $next_uidn + 1 : get_config('start_user_id'));
+        $retval = ($next_uidn > 0 ? $next_uidn + 1 : get_config('start_user_id'));
         break;
 
     case 'unix_gidn':
@@ -33,7 +31,7 @@ switch ($which) {
             if ($gidn > $next_gidn)
                 $next_gidn = $gidn;
         }
-        echo($next_gidn > 0 ? $next_gidn + 1 : get_config('start_group_id'));
+        $retval = ($next_gidn > 0 ? $next_gidn + 1 : get_config('start_group_id'));
         break;
 
     case 'cgp_telnum':
@@ -56,17 +54,17 @@ switch ($which) {
         list($min_telnum, $max_telnum) = array(get_config('min_telnum'), get_config('max_telnum'));
         for ($telnum = $min_telnum; $telnum <= $max_telnum; $telnum++) {
             if (! isset($telnums[$telnum])) {
-                echo $telnum;
+                $retval = $telnum;
                 break;
             }
         }
         break;
 
     default:
-        echo '0';
         log_error('unknown id type "%s"', $which);
         break;
 }
 
+echo(json_ok($retval));
 srv_disconnect_all();
 ?>

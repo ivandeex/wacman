@@ -5,16 +5,11 @@
 
 require '../lib/common.php';
 
-send_json_headers();
-$id = nvl(isset($_GET['uid']) ? $_GET['uid'] : '');
-if (empty($id)) {
-    echo json_error("uid: required parameter missing");
-    exit;
-}
-if (is_reserved($id)) {
-    echo json_error("Cannot delete reserved object");
-    exit;
-}
+send_headers();
+$id = req_param('uid');
+if (empty($id))  error_page("uid: required parameter missing");
+if (is_reserved($id))  error_page("Cannot delete reserved object");
+
 $res = cgp_cmd('cgp', 'DeleteGroup', $id.'@'.get_config('mail_domain'));
 echo($res['code'] ? json_error($res['error']) : json_ok());
 srv_disconnect_all();

@@ -9,7 +9,7 @@ function sort_users ($a, $b) {
     return strcmp($a['uid'], $b['uid']);
 }
 
-send_json_headers();
+send_headers();
 echo uldap_json_encode(
         uldap_search('uni', "(objectClass=person)", array('uid', 'cn')),
         'sort_users'

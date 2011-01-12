@@ -5,21 +5,14 @@
 
 require '../lib/common.php';
 
-send_json_headers();
-if (empty($_GET['uid'])) {
-    echo json_error("uid: required parameter wrong or not specified");
-    exit;
-}
+send_headers();
+$id = req_param('uid');
+if (empty($id))  error_page("uid: required parameter wrong or not specified");
 
-$id = $_GET['uid'];
 $mgrp = create_obj('mailgroup');
 
 $res = cgp_cmd('cgp', 'GetGroup', $id.'@'.get_config('mail_domain'));
-if ($res['code']) {
-    echo json_error($res['error']);
-    srv_disconnect_all();
-    exit;
-}
+if ($res['code'])  error_page($res['error']);
 
 $data = $res['data'];
 set_attr($mgrp, 'uid', $id);
@@ -29,7 +22,7 @@ unset($data['RealName']);
 unset($data['Members']);
 set_attr($mgrp, 'params', cgp_string('cgp', $data));
 
-echo obj_json_encode($mgrp);
+echo(obj_json_encode($mgrp));
 srv_disconnect_all();
 
 ?>

@@ -29,7 +29,6 @@ $includes = array(
     'language.php',
     'logging.php',
     'config.php',
-    'http.php',
     'ldap.php',
     'unix.php',
     'windows.php',

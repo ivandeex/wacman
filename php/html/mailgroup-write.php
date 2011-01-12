@@ -5,8 +5,8 @@
 
 require '../lib/common.php';
 
-send_json_headers();
-echo obj_json_error('mailgroup test error');
+send_headers();
+error_page('mailgroup test error');
 srv_disconnect_all();
 
 ?>

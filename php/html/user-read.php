@@ -5,13 +5,9 @@
 
 require '../lib/common.php';
 
-send_json_headers();
-
-$uid = isset($_GET['uid']) ? $_GET['uid'] : '';
-if (empty($uid)) {
-    echo json_error("uid: required parameter wrong or not specified");
-    exit;
-}
+send_headers();
+$uid = req_param('uid');
+if (empty($uid))  error_page("uid: required parameter wrong or not specified");
 
 $searches = array(
     'uni' => "(&(objectClass=person)(uid=\${uid}))",
@@ -36,7 +32,7 @@ foreach ($searches as $srv => $filter) {
     log_info('will create "%s" user for uid "%s"', $srv, $uid);
 }
 
-echo obj_json_encode($usr);
+echo(obj_json_encode($usr));
 srv_disconnect_all();
 
 ?>
