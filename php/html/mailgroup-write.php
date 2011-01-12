@@ -26,8 +26,8 @@ if (req_exists('params')) {
 }
 if (req_exists('cn'))
     $params['RealName'] = req_param('cn');
-//if (req_exists('groupMember'))
-//    $params['Members'] = split_list(req_param('groupMember'));
+if (req_exists('groupMember'))
+    $params['Members'] = split_list(req_param('groupMember'));
 
 // rename the group if needed
 if ($update && $id != $idold) {
@@ -39,5 +39,6 @@ if ($update && $id != $idold) {
 }
 
 $res = cgp_cmd($srv, ($update ? 'SetGroup' : 'CreateGroup'), $id.'@'.$domain, $params);
+if(is_null($reply))$reply=array();$reply['params'] = $params;
 echo($res['code']?json_error($res['error']):json_ok($reply));
 ?>

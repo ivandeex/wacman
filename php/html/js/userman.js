@@ -375,6 +375,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     read_url: undefined,    // for reading the record
     write_url: undefined,   // for creating/updating the record
     delete_url: undefined,  // for deleting the record
+    update_send_all: true,  // send only changed data in updates
 
     // UI elements
     obj_panel: null,        // main object panel
@@ -596,18 +597,21 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Submit form to server
     //
     save: function () {
+        // setup the parameter object
+        var params = this.data.data;
         if (this.id_value) {
             // Update an existing record
-            var params = this.data.getChanges();
+            if (!this.update_send_all)
+                params = this.data.getChanges();
             params._action = "update";
             params._idold = this.id_value;
         } else {
             // Send new record
-            var params = this.data.data;
             params._action = "create";
             params._idold = "";
         }
         params[this.id_attr] = params._id = this.vget(this.id_attr);
+
         this.form.doAction(
             new Userman.FormAction(this.form, {
                 url: this.write_url,
@@ -619,10 +623,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 scope: this,
                 success: function (form, action) {
                     this.markChanged(false);
-                    if ((action._data && action._data.refresh) || !this.id_value)
-                        this.refresh();
-                    else
-                        this.id_value = params._id;
+                    if (action._data && action._data.refresh)
+                        this.refresh();     // there was a rename action
+                    else if (!this.id_value)
+                        this.refresh();     // a new object was created
                 }
             })
         );
@@ -660,7 +664,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // This function is called after each key press
     // It will auto-fill some fields
     //
-    onModified: function (field, ev) {
+    onChange: function (field) {
         var val = Userman.trim(field.getValue());
         if (val == this.vget(field._attr.name))
             return;
@@ -901,8 +905,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             // it's a simple text entry field
             cfg.enableKeyEvents = true;
             at.field = new Ext.form.TextField(cfg);
-            //at.field.on("valid", this.onModified, this);
-            at.field.on("keyup", this.onModified, this);
+            //at.field.on("valid", this.onChange, this);
+            at.field.on("keyup", this.onChange, this);
 
         } else if (popup == "yesno") {
             // the field can take only two values, yes or no
@@ -950,6 +954,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             at.field = null;
         }
 
+        if (at.field)  at.field.on("change", this.onChange, this);
         return at.field;
     },
 
