@@ -28,7 +28,7 @@ if ($res['code'])
 $res = uldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$id))", array('gidNumber'));
 foreach (uldap_entries($res) as $ge) {
     $gidn = uldap_value($ge, 'gidNumber');
-    $retval = ldap_modify_unix_group($srv, $gidn, $id, 'remove');
+    $retval = modify_unix_group($srv, $gidn, $id, 'remove');
     if ($retval != "OK" && $retval != "SAME")
         $msg[] = _T('Error modifying group %s: %s', $gidn, $retval);
 }

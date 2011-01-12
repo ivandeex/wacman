@@ -3,15 +3,10 @@
 
 // Interface with CommuniGate server
 
-function get_telnum_pattern () {
-    return '/^\d{'.get_config('telnum_len',3).'}$/';
-}
 
-
-function get_email (&$obj) {
-    return nvl(get_attr($obj, 'mail'));
-}
-
+////////////////////////////////////////////////////
+//    User helpers
+//
 
 function cgp_read_user (&$obj, &$at, $srv, &$ldap, $name) {
     $mail = get_email($obj);
@@ -295,9 +290,64 @@ function cgp_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
 
 
 ////////////////////////////////////////////////////
-//    CLI interface
+//    Mailgroup helpers
 //
 
+function cgp_mailgroup_read_all (&$obj, &$at, $srv, &$ldap, $name) {
+    if (empty($obj['id']))
+        return '';
+
+    $mgrp_name = $obj['id'] . '@' . get_config('mail_domain');
+    $res = cgp_cmd($srv, 'GetGroup', $mgrp_name);
+    if ($res['code'])  error_page($res['error']);
+
+    $data = $res['data'];
+    set_attr($obj, 'uid', $obj['id']);
+    set_attr($obj, 'cn', nvl($data['RealName']));
+    set_attr($obj, 'groupMember', join_list($data['Members']));
+    unset($data['RealName']);
+    unset($data['Members']);
+    set_attr($obj, 'params', cgp_pack($srv, $data));
+
+    return $obj['id'];
+}
+
+
+function cgp_mailgroup_write_all (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $id = $obj['id'];
+    if (empty($id))
+        return false;
+    $idold = $obj['idold'];
+    $domain = get_config('mail_domain');
+
+    // pack settings
+    $params = get_attr($obj, 'params');
+    $params = empty($params) ? array() : cgp_unpack($srv, $params, $msg, true);
+    $params['RealName'] = get_attr($obj, 'cn');
+    $params['Members'] = split_list(get_attr($obj, 'groupMember'));
+
+    // rename the group if needed
+    if (!empty($idold) && $id != $idold) {
+        $res = cgp_cmd($srv, 'RenameGroup', $idold.'@'.$domain, $id.'@'.$domain);
+        if ($res['code'])
+            error_page(_T('Cannot rename mail group "%s" to "%s": %s',
+                        $idold, $id, $res['error']));
+        $obj['renamed'] = true;
+    }
+
+    $res = cgp_cmd($srv, (empty($idold) ? 'CreateGroup' : 'SetGroup'), $id.'@'.$domain, $params);
+    if ($res['code'])
+        error_page(_T('Cannot %s mail group "%s": %s',
+                    (empty($idold) ? "create" : "update"), $id, $res['error']));
+
+    // return "not changed" so that obj_write() does not call uldap_update()
+    return false;
+}
+
+
+////////////////////////////////////////////////////
+//    CLI interface
+//
 
 function cgp_connect ($srv) {
     $cfg =& get_server($srv);
@@ -384,14 +434,34 @@ function cgp_pack ($srv, $data) {
 }
 
 
-function cgp_unpack ($srv, $data, &$msg) {
+function cgp_unpack ($srv, $data, &$msg, $fatal) {
     $cli = _cgp_cli($srv);
     if (is_null($cli)) {
         $msg = _T('cgp_unpack(%s): invalid CGP state', $srv);
         log_error($msg);
-        return null;
+        $res = null;
+    } else {
+        $res = $cli->parseUserWords($data, $msg);
     }
-    return $cli->parseUserWords($data, $msg);
+    if ($fatal) {
+        if (! empty($msg))  error_page($msg);
+        if (! is_array($res))  error_page("Mail settings should be an array");
+    }
+    return $res;
+}
+
+
+////////////////////////////////////////////////////
+//    Utilities
+//
+
+function get_telnum_pattern () {
+    return '/^\d{'.get_config('telnum_len',3).'}$/';
+}
+
+
+function get_email (&$obj) {
+    return nvl(get_attr($obj, 'mail'));
 }
 
 

@@ -87,7 +87,7 @@ function ldap_read_unix_groups (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function ldap_get_unix_group_ids ($srv, $val, $warn, $asstring = false) {
+function _get_unix_group_ids ($srv, $val, $warn, $asstring = false) {
     $a_ids = split_list($val);
     #log_debug('list for "%s" is "%s"', $val, join_list($ids));
     if (empty($a_ids)) {
@@ -120,7 +120,7 @@ function ldap_get_unix_group_ids ($srv, $val, $warn, $asstring = false) {
 }
 
 
-function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
+function modify_unix_group ($srv, $gidn, $uid, $action) {
     log_debug('will %s unix user "%s" in group %d...',  $action, $uid, $gidn);
     $srv = 'uni';
     $res = uldap_search($srv, "(&(objectClass=posixGroup)(gidNumber=$gidn))", array('memberUid'));
@@ -156,18 +156,18 @@ function ldap_modify_unix_group ($srv, $gidn, $uid, $action) {
 
 function ldap_write_unix_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $uid = get_attr($obj, $name);
-    $old = ldap_get_unix_group_ids($srv, $at['old'], 'nowarn'); # FIXME!!!
-    $new = ldap_get_unix_group_ids($srv, $at['val'], 'warn');
+    $old = _get_unix_group_ids($srv, $at['old'], 'nowarn'); # FIXME!!!
+    $new = _get_unix_group_ids($srv, $at['val'], 'warn');
     log_debug('write_unix_groups(1): old=(%s) new=(%s)', $old, $new);
     $arr = compare_lists($old, $new);
     $old = $arr[0];
     $new = $arr[1];
     log_debug('write_unix_groups(2): del=(%s) add=(%s)', $old, $new);
     foreach (split_list($old) as $gidn) {
-        ldap_modify_unix_group($srv, $gidn, $uid, 'remove');
+        modify_unix_group($srv, $gidn, $uid, 'remove');
     }
     foreach (split_list($new) as $gidn) {
-        ldap_modify_unix_group($srv, $gidn, $uid, 'add');
+        modify_unix_group($srv, $gidn, $uid, 'add');
     }
     return ($old != '' || $new != '');
 }

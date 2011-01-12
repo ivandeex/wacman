@@ -333,29 +333,26 @@ $all_attrs = array(
     /////////////////////////////////////////////
 
     'mailgroup' => array(
-        'dn' => array(
-            'type' => 'mailgroup',
-            'ldap' => 'cgp',
-        ),
         'uid' => array(
+            // all other values are read/written by this handler
             'type' => 'mailgroup',
             'label' => 'Group name',
             'ldap' => 'cgp',
             'colwidth' => 140,
         ),
         'cn' => array(
-            'type' => 'mailgroup',
+            'type' => 'none',
             'label' => 'Description',
             'ldap' => 'cgp',
         ),
         'groupMember' => array(
-            'type' => 'mailgroup',
+            'type' => 'none',
             'label' => 'Members',
             'popup' => 'mailusers',
             'ldap' => 'cgp',
         ),
         'params' => array(
-            'type' => 'mailgroup',
+            'type' => 'none',
             'ldap' => 'cgp',
             'label' => 'Params',
         ),
@@ -424,7 +421,7 @@ $ldap_rw_subs = array(
     'mailgroups' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
     'domainIntercept' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),
     'userIntercept' => array( 'cgp_read_user_intercept', 'ldap_write_none', 'cgp_write_user_intercept' ),
-    'mailgroup' => array( 'ldap_read_none', 'ldap_write_none', 'ldap_write_none' ),
+    'mailgroup' => array( 'cgp_mailgroup_read_all', 'cgp_mailgroup_write_all', 'ldap_write_none' ),
     'real_uidn' => array( 'posix_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
     'real_gidn' => array( 'posix_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
     );

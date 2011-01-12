@@ -375,7 +375,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     read_url: undefined,    // for reading the record
     write_url: undefined,   // for creating/updating the record
     delete_url: undefined,  // for deleting the record
-    update_send_all: true,  // send only changed data in updates
+    update_send_all: false, // false = send only changed data in updates
 
     // UI elements
     obj_panel: null,        // main object panel

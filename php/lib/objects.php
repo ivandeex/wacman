@@ -166,11 +166,12 @@ function & create_obj ($objtype) {
 
     foreach ($all_attrs[$objtype] as $name => &$desc) {
         $obj['attrs'][$name] = array(
-            'name' => $name,
-            'type' => $desc['type'],
-            'desc' => &$desc,
-            'ldap' => array(),
-            'val' => ''
+            'name'  => $name,
+            'type'  => $desc['type'],
+            'desc'  => &$desc,
+            'ldap'  => array(),
+            'val'   => '',
+            'dirty' => false,
         );
     }
 
@@ -209,13 +210,16 @@ function obj_json_encode (&$obj) {
 
 $curr_read_obj = null;
 
-function subst_filter_arg ($matches) {
+function subst_filter_arg ($p) {
     global $curr_read_obj;
-    return get_attr($curr_read_obj, $matches[1]);
+    return ($p[1] == 'ID' ? $curr_read_obj['id'] : get_attr($curr_read_obj, $p[1]));
 }
 
 
-function obj_read (&$obj, $srv, $filter) {
+//
+// Fetch object values from CGP/LDAP server
+//
+function obj_read (&$obj, $srv, $filter, $obj_id = null) {
     global $servers;
 
     if ($servers[$srv]['disable']) {
@@ -223,6 +227,13 @@ function obj_read (&$obj, $srv, $filter) {
         return null;
     }
 
+    // CGP will use IDs for reading
+    $obj['idold'] = null;
+    $obj['id'] = $obj_id;
+    $obj['renamed'] = false;
+    $ldap =& $obj['ldap'][$srv];
+
+    // LDAP will use filter for reading
     if (empty($filter)) {
         $obj['ldap'][$srv] = array();
     } else {
@@ -241,22 +252,24 @@ function obj_read (&$obj, $srv, $filter) {
     }
 
     foreach ($obj['attrs'] as $name => &$at) {
-        if (isset($at['desc']['ldap'][$srv])) {
-            $val = call_user_func($at['desc']['ldap_read'],
-                                    $obj, $at, $srv,
-                                    $obj['ldap'][$srv],
-                                    $at['desc']['ldap'][$srv]);
-            $val = nvl($val);
-            if (! empty($val))
-                $at['val'] = $val;
-        }
+        if (! isset($at['desc']['ldap'][$srv])) // attribute exists for this server?
+            continue;
+        $func = $at['desc']['ldap_read'];
+        $sname = $at['desc']['ldap'][$srv];
+        $val = $func($obj, $at, $srv, $ldap, $sname);
+        $val = nvl($val);
+        if (! empty($val))
+            $at['val'] = $val;
     }
 
     return '';
 }
 
 
-function obj_write (&$obj, $srv) {
+//
+// Send object values to LDAP/CGP server
+//
+function obj_write (&$obj, $srv, $id, $idold) {
     global $servers;
 
     if ($servers[$srv]['disable'])
@@ -268,14 +281,26 @@ function obj_write (&$obj, $srv) {
 
     log_debug('start writing to "%s"...', $srv);
 
+    // CGP will use IDs for writing
+    $obj['idold'] = $idold;
+    $obj['id'] = $id;
+    $obj['renamed'] = false;    // can be set to true by subordinate writes
+
     foreach ($obj['attrs'] as $name => &$at) {
-        if (isset($at['desc']['ldap'][$srv])) {
-            if (call_user_func($at['desc']['ldap_write'],
-                                $obj, $at, $srv, $ldap,
-                                $at['desc']['ldap'][$srv],
-                                nvl($at['val']) ) )
-                $changed = true;
-        }
+        if (! isset($at['desc']['ldap'][$srv]))
+            continue;
+        // If we used call_user_func(), all parameters would be
+        // passed by value, and the "renamed" magic would not work.
+        // If we used call_user_func_array(), we would need to mark
+        // all passed by reference parameters by "&" at the call time.
+        // The form "$func($params...)" used here honor function
+        // prototypes as passing by reference from prototypes
+        // (at least in PHP 5.2.16).
+        $func = $at['desc']['ldap_write'];
+        $sname = $at['desc']['ldap'][$srv];
+        $aval = nvl($at['val']);
+        if ($func($obj, $at, $srv, $ldap, $sname, $aval))
+            $changed = true;
 	}
 
     if ($changed) {
@@ -285,18 +310,33 @@ function obj_write (&$obj, $srv) {
         if ($res['code'] && $res['code'] != 82)
             $msg = $res['error'];
     } else {
-        log_debug('no need to write to "%s"', $srv);		
+        log_debug('nothing to write to "%s"', $srv);		
     }
 
-    foreach ($obj['attrs'] as $name => $at) {
-        if (isset($at['desc']['ldap'][$srv])) {
-            if (call_user_func ($at['desc']['ldap_write_final'], $at, $srv, $ldap,
-                                $at['desc']['ldap'][$srv], nvl($at['val'])))
-                $changed = true;
-        }
+    foreach ($obj['attrs'] as $name => &$at) {
+        if (! isset($at['desc']['ldap'][$srv]))
+            continue;
+        $func = $at['desc']['ldap_write_final'];
+        $sname = $at['desc']['ldap'][$srv];
+        $aval = nvl($at['val']);
+        if ($func($obj, $at, $srv, $ldap, $sname, $aval))
+            $changed = true;
     }
 
     return $msg;
+}
+
+
+//
+// Update object values from web request
+//
+function obj_update (&$obj) {
+    foreach ($obj['attrs'] as $name => $at) {
+        if (req_exists($name)) {
+            $at['val'] = req_param($name);
+            $at['dirty'] = true;
+        }
+    }
 }
 
 
