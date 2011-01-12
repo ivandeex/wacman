@@ -23,6 +23,4 @@ unset($data['Members']);
 set_attr($mgrp, 'params', cgp_string('cgp', $data));
 
 echo(obj_json_encode($mgrp));
-srv_disconnect_all();
-
 ?>

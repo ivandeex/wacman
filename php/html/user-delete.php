@@ -63,6 +63,4 @@ if (!empty($home) && str2bool(get_config('remove_homes'))) {
 }
 
 echo(empty($msg) ? json_ok() : json_error($msg));
-srv_disconnect_all();
-
 ?>

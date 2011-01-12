@@ -60,7 +60,7 @@ function error_page ($msg, $fatal = true) {
     if (function_exists('log_err'))  log_err($msg);
     send_headers();
     echo(json_error($msg));
-    if ($fatal)  die();
+    if ($fatal)  exit();
 }
 
 /////////////////////////////////

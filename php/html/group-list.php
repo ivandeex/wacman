@@ -10,10 +10,9 @@ function sort_groups ($a, $b) {
 }
 
 send_headers();
-echo uldap_json_encode(
+echo(uldap_json_encode(
         uldap_search('uni', "(objectClass=posixGroup)", array('cn')),
         'sort_groups',
         true // remove_dn
-        );
-srv_disconnect_all();
+        ));
 ?>

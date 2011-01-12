@@ -13,6 +13,4 @@ $grp = create_obj('group');
 set_attr($grp, 'cn', $id);
 $msg = obj_read($grp, 'uni', "(&(objectClass=posixGroup)(cn=\${cn}))");
 echo($msg ? json_error($msg) : obj_json_encode($grp));
-
-srv_disconnect_all();
 ?>

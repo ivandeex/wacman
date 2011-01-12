@@ -10,9 +10,8 @@ function sort_users ($a, $b) {
 }
 
 send_headers();
-echo uldap_json_encode(
+echo(uldap_json_encode(
         uldap_search('uni', "(objectClass=person)", array('uid', 'cn')),
         'sort_users'
-        );
-srv_disconnect_all();
+        ));
 ?>

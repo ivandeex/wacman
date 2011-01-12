@@ -66,5 +66,4 @@ switch ($which) {
 }
 
 echo(json_ok($retval));
-srv_disconnect_all();
 ?>

@@ -45,6 +45,12 @@ function srv_connect ($srv) {
     if ($cfg['disable'] || $cfg['failed'])
         return -1;
 
+    static $disconnect_registered;
+    if (! $disconnect_registered) {
+        $disconnect_registered = true;
+        register_shutdown_function('srv_disconnect_all');
+    }
+
     if ($srv == 'cgp')
         return cgp_connect($srv);
 
@@ -89,6 +95,7 @@ function srv_disconnect_all () {
             continue;
         if (!(isset($cfg['connected']) && $cfg['connected']))
             continue;
+        #log_debug("disconnecting $srv");
         if ($srv == 'cgp') {
             cgp_disconnect($srv);
         } else {

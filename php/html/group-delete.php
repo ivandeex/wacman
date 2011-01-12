@@ -17,6 +17,4 @@ if ($res['code'] || $res['data']['count'] == 0)
 $res = uldap_delete('uni', uldap_dn(uldap_pop($res)));
 echo($res['code'] ?
     json_error(_T('Error deleting group "%s": %s', $id, $res['error'])) : json_ok());
-srv_disconnect_all();
-
 ?>

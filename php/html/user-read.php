@@ -24,15 +24,9 @@ foreach ($searches as $srv => $filter) {
     $msg = obj_read($usr, $srv, $filter);
     if (! $msg)
         continue;
-    if ($srv == 'uni') {
-        echo json_error($msg);
-        srv_disconnect_all();
-        exit;
-    }
+    if ($srv == 'uni')  error_page($msg);
     log_info('will create "%s" user for uid "%s"', $srv, $uid);
 }
 
 echo(obj_json_encode($usr));
-srv_disconnect_all();
-
 ?>
