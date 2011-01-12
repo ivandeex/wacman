@@ -618,10 +618,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 _isLoad: false,
                 scope: this,
                 success: function (form, action) {
-                    this.id_value = params._id;
                     this.markChanged(false);
-                    if (action._data && action._data.refresh)
+                    if ((action._data && action._data.refresh) || !this.id_value)
                         this.refresh();
+                    else
+                        this.id_value = params._id;
                 }
             })
         );
