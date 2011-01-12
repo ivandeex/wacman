@@ -340,22 +340,30 @@ function cgp_disconnect ($srv) {
 }
 
 
-// cgp_cmd($srv_name, $func_name, $func_args...)
-function cgp_cmd () {
-    $args = func_get_args();
-    $srv = array_shift($args);
-    $func = array_shift($args);
+function _cgp_cli ($srv) {
     $cfg =& get_server($srv, true);
     srv_connect($srv);
     if (!$cfg['connected'] || !isset($cfg['cli'])) {
         $msg = $cfg['disable'] ? 'CGP disabled' :
                 (isset($cfg['cli']) ? 'CGP not connected' : 'CGP is not CLI');
         set_error($msg);
-        return array('code' => -1, 'error' => $msg, 'data' => array());
+        return null;
     }
-    $cli = $cfg['cli'];
-    $ret = call_user_func_array(array($cli, $func), $args);
+    return $cfg['cli'];
+}
 
+
+// cgp_cmd($srv_name, $func_name, $func_args...)
+function cgp_cmd () {
+    $args = func_get_args();
+    $srv = array_shift($args);
+    $func = array_shift($args);
+
+    $cli = _cgp_cli($srv);
+    if (is_null($cli))
+        return array('code' => -1, 'error' => $msg, 'data' => array());
+
+    $ret = call_user_func_array(array($cli, $func), $args);
     if ($cli->isSuccess()) {
         set_error();
         return array('code' => 0, 'error' => 'OK', 'data' => $ret);
@@ -366,13 +374,24 @@ function cgp_cmd () {
 }
 
 
-function cgp_string ($srv, $data) {
-    $cfg =& get_server($srv, true);
-    if (!$cfg['connected'] || !isset($cfg['cli'])) {
-        log_error('cgp_string(%s): invalid CGP state', $srv);
+function cgp_pack ($srv, $data) {
+    $cli = _cgp_cli($srv);
+    if (is_null($cli)) {
+        log_error('cgp_pack(%s): invalid CGP state', $srv);
         return '';
     }
-    return $cfg['cli']->printWords($data);
+    return $cli->printWords($data);
+}
+
+
+function cgp_unpack ($srv, $data, &$msg) {
+    $cli = _cgp_cli($srv);
+    if (is_null($cli)) {
+        $msg = _T('cgp_unpack(%s): invalid CGP state', $srv);
+        log_error($msg);
+        return null;
+    }
+    return $cli->parseUserWords($data, $msg);
 }
 
 

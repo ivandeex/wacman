@@ -325,6 +325,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         var $errMsg                 = '';
         var $currentCGateCommand    = '';
         var $inlineResponse         = '';
+        var $userMsg                = null;
 
 
         // Connect to the server
@@ -411,9 +412,8 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         function GetResponseData() {
             return $this->parseWords($this->getWords());
         }
-        
-        
-        
+
+
         //////////////////////////////////////////////////
         // Account commands     
         
@@ -2351,7 +2351,10 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
                 if($aType == "assoc") {
                     $outp='{';
                     for(reset($data); $key = key($data); next($data)) {
-                        $outp .= $this->convertOutput($key,$this->translateStrings). '=' .$this->convertOutput($data["$key"],$this->translateStrings).';';
+                        $outp .= $this->convertOutput($key,$this->translateStrings)
+                            . '='
+                            . $this->convertOutput($data["$key"],$this->translateStrings)
+                            . ';';
                     }
                     $outp.='}';
                 } else {
@@ -2411,7 +2414,6 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             $line = $this->errMsg;
             $line = trim($line);
             return $line;
-            
         }
                 
         // sub send
@@ -2424,7 +2426,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         
         // sub skipSpaces
         function skipSpaces() {
-            while( $this->span < $this->len && preg_match("/\s/",substr($this->data,$this->span,1))) {
+            while ($this->span < $this->len && preg_match("/\s/",substr($this->data,$this->span,1))) {
                 ++$this->span;
             }
         }
@@ -2435,19 +2437,19 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             $isBlock = 0;
             $result = '';
             $this->skipSpaces();
-            if(substr($this->data,$this->span,1) == '"') {
+            if (substr($this->data,$this->span,1) == '"') {
                 $isQuoted = 1;
                 ++$this->span;
             } elseif (substr($this->data,$this->span,1) == '[') {
                 $isBlock = 1;
             }
-            while($this->span < $this->len) {
+            while ($this->span < $this->len) {
                 $ch = substr($this->data,$this->span,1);
                 if ($isQuoted) {
-                    if($ch == '\\') {
-                        if(preg_match("/^(?:\"|\\|\d\d\d)/",substr($this->data,$this->span+1,3))) {
+                    if ($ch == '\\') {
+                        if (preg_match("/^(?:\"|\\|\d\d\d)/",substr($this->data,$this->span+1,3))) {
                             $ch = substr($this->data,++$this->span,3);
-                            if(preg_match("/\d\d\d/",$ch)) {
+                            if (preg_match("/\d\d\d/",$ch)) {
                                 $this->span+=2;
                                 $ch=chr($ch);
                             } else {
@@ -2501,24 +2503,28 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         // sub readArray
         function readArray() {
             $result = array();
-            while($this->span < $this->len) {
+            while ($this->span < $this->len) {
                 $this->skipSpaces();
-                if(substr($this->data,$this->span,1) == ')') {
+                if (substr($this->data,$this->span,1) == ')') {
                     ++$this->span;
                     break;
                 } else {
                     $theValue = $this->readValue();
                     $this->skipSpaces();
                     array_push($result,$theValue);
-                    if(substr($this->data,$this->span,1) == ',') {
+                    if (substr($this->data,$this->span,1) == ',') {
                         // comma break
                         ++$this->span;
                     } elseif (substr($this->data,$this->span,1) == ')') {
+                        // fall thru
                     } else {
-                        die("CGPro output format error: '".substr($this->data,$this->span,1)."' (ASCII ".ord(substr($this->data,$this->span,1)).") encountered. ')' or ',' expected.\n");
+                        $this->parseError("CGPro output format error: '".substr($this->data,$this->span,1)
+                                        ."' (ASCII ".ord(substr($this->data,$this->span,1))
+                                        .") encountered. ')' or ',' expected.\n");
+                        break;
                     }
                 }
-            }           
+            }
             return($result);
         }
         
@@ -2533,19 +2539,25 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
                 } else {
                     $theKey = $this->readKey();
                     $this->skipSpaces();
-                    if (substr($this->data,$this->span,1) != '=')
-                        die("CGPro output format error at '=':".substr($this->data,$this->span,10)."\n");
+                    if (substr($this->data,$this->span,1) != '=') {
+                        $this->parseError("CGPro output format error at '=':"
+                                        .substr($this->data,$this->span,10)."\n");
+                        break;
+                    }
                     ++$this->span;
                     $result["$theKey"] = $this->readValue();
                     $this->skipSpaces();
-                    if (substr($this->data,$this->span,1) != ';')
-                        die("CGPro output format error while reading value:".substr($this->data,$this->span,10)."\n");
+                    if (substr($this->data,$this->span,1) != ';') {
+                        $this->parseError("CGPro output format error while reading value:"
+                                        .substr($this->data,$this->span,10)."\n");
+                        break;
+                    }
                     ++$this->span;
                 }
             }
             return($result);
         }
-        
+
         // sub parseWords
         function parseWords($data) {
             $this->data = $data;
@@ -2553,7 +2565,23 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
             $this->len = strlen($data);
             return $this->readValue();
         }
-        
+
+        // parse user-supplied words
+        function parseUserWords($data, &$msg) {
+            $this->userMsg = "";
+            $result = $this->parseWords($data);
+            $msg = $this->userMsg;
+            $this->userMsg = null;
+            return $result;
+        }
+
+        function parseError($msg) {
+            if (is_null($this->userMsg))
+                die($msg);
+            else
+                $this->userMsg = $msg;
+        }
+
         // logging
         function _logDebug($line) {
             if ($this->debug == 2 && function_exists("log_debug"))

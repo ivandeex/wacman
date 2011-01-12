@@ -25,6 +25,10 @@ define('JSDIR',    'js/');
 // Print HTML-formatted error string.
 //
 
+function req_exists ($name) {
+    return (isset($_POST[$name]) || isset($_GET[$name]));
+}
+
 function req_param ($name) {
     return nvl(isset($_POST[$name]) ? $_POST[$name]
                 : (isset($_GET[$name]) ? $_GET[$name] : ''));

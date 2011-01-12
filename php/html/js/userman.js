@@ -596,16 +596,18 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Submit form to server
     //
     save: function () {
-        var params = {};
         if (this.id_value) {
             // Update an existing record
+            var params = this.data.getChanges();
             params._action = "update";
-            params._old_id = this.id_value;
+            params._idold = this.id_value;
         } else {
             // Send new record
+            var params = this.data.data;
             params._action = "create";
-            params._old_id = "";
+            params._idold = "";
         }
+        params[this.id_attr] = params._id = this.vget(this.id_attr);
         this.form.doAction(
             new Userman.FormAction(this.form, {
                 url: this.write_url,
@@ -616,7 +618,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 _isLoad: false,
                 scope: this,
                 success: function (form, action) {
+                    this.id_value = params._id;
                     this.markChanged(false);
+                    if (action._data && action._data.refresh)
+                        this.refresh();
                 }
             })
         );
