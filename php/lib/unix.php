@@ -142,7 +142,10 @@ function modify_unix_group ($srv, $gidn, $uid, $action) {
 
     $grp_dn = uldap_dn($grp);
     $new_uids = array('memberUid' => split_list($new));
-    $res = $exists ? uldap_replace($srv, $grp_dn, $new_uids) : uldap_add($srv, $grp_dn, $new_uids);
+    if ($exists)
+        $res = uldap_entry_replace($srv, $grp_dn, $new_uids);
+    else
+        $res = uldap_entry_add($srv, $grp_dn, $new_uids);
     if ($res['code']) {
         log_info('%s unix user "%s" in group %d error: %s',
                     $action, $uid, $gidn, $res['error']);
@@ -238,18 +241,6 @@ function ldap_write_unix_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
     }
 
     return 1;
-}
-
-
-function ldap_write_unix_members_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $sel_usr = $user_obj;
-    if ($sel_usr['refresh_request']) {
-        // refresh gui for this user
-        log_debug('re-selecting user');
-        $sel_usr['refresh_request'] = 0;
-        user_load();
-    }
-    return 0;
 }
 
 

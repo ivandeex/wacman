@@ -392,7 +392,7 @@ function cgp_disconnect ($srv) {
 
 function _cgp_cli ($srv) {
     $cfg =& get_server($srv, true);
-    srv_connect($srv);
+    uldap_connect($srv);
     if (!$cfg['connected'] || !isset($cfg['cli'])) {
         $msg = $cfg['disable'] ? 'CGP disabled' :
                 (isset($cfg['cli']) ? 'CGP not connected' : 'CGP is not CLI');

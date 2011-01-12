@@ -22,5 +22,4 @@ $msg = obj_write($mgrp, 'cgp', $id, $idold);
 if ($msg)  error_page($msg);
 
 echo(json_ok(array('refresh' => $mgrp['renamed'])));
-//$p=array('refresh'=>$mgrp['renamed']);foreach(req_list() as $n) $p[$n]=req_param($n);echo(json_ok($p));
 ?>

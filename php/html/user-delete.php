@@ -20,7 +20,7 @@ $ue = uldap_pop($res);
 
 // Delete the Unix user
 $dn = uldap_dn($ue);
-$res = uldap_delete($srv, $dn);
+$res = uldap_entry_delete($srv, $dn);
 if ($res['code'])
     $msg[] = _T('Error deleting Unix user "%s" (%s): %s', $id, $dn, $res['error']);
 
@@ -42,7 +42,7 @@ if (!empty($cn) && !$servers['ads']['disable']) {
     } else {
         $we = uldap_pop($res);
         $wdn = uldap_dn($we);
-        $res = uldap_delete('ads', $wdn);
+        $res = uldap_entry_delete('ads', $wdn);
         if ($res['code'])
             $msg[] = _T('Error deleting Windows user "%s" (%s): %s', $id, $wdn, $res['error']);
     }

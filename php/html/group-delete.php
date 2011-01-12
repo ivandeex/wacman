@@ -14,7 +14,7 @@ $res = uldap_search('uni', "(&(objectClass=posixGroup)(cn=$id))", array('dn'));
 if ($res['code'] || $res['data']['count'] == 0)
     error_page('Group not found');
 
-$res = uldap_delete('uni', uldap_dn(uldap_pop($res)));
+$res = uldap_entry_delete('uni', uldap_dn(uldap_pop($res)));
 echo($res['code'] ?
     json_error(_T('Error deleting group "%s": %s', $id, $res['error'])) : json_ok());
 ?>

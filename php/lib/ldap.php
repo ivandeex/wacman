@@ -31,7 +31,7 @@ function & get_server ($srv, $allow_disabled = false) {
 // Protocol basics
 //
 
-function srv_connect ($srv) {
+function uldap_connect ($srv) {
     global $servers;
     $cfg =& $servers[$srv];
 
@@ -48,7 +48,7 @@ function srv_connect ($srv) {
     static $disconnect_registered;
     if (! $disconnect_registered) {
         $disconnect_registered = true;
-        register_shutdown_function('srv_disconnect_all');
+        register_shutdown_function('_uldap_disconnect_all');
     }
 
     if ($srv == 'cgp')
@@ -72,7 +72,13 @@ function srv_connect ($srv) {
     // Attempt to set LDAP protocol version 3.
     // Active directory requires this version.
     // Other servers might support it, let's try.
-    @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
+    // For renaming to work we need LDAP v3 everywhere.
+    $okay = @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
+    if (! $okay) {
+        log_error('cannot set protocol version 3 for server (%s): %s',
+                    $srv, ldap_error($cfg['ldap']));
+        return -1;
+    }
 
     $okay = @ldap_bind($cfg['ldap'], $cfg['user'], $cfg['pass']);
     if (! $okay) {
@@ -88,7 +94,7 @@ function srv_connect ($srv) {
 }
 
 
-function srv_disconnect_all () {
+function _uldap_disconnect_all () {
     global $servers;
     foreach ($servers as $srv => &$cfg) {
         if (isset($cfg['disable']) && $cfg['disable'])
@@ -203,7 +209,7 @@ function uldap_json_encode ($res, $func = null, $remove_dn = false) {
 
 function _uldap_connection ($srv, &$res) {
     $cfg =& get_server($srv, true);
-    srv_connect($srv);
+    uldap_connect($srv);
     if (! $cfg['connected']) {
         $res['code'] = -1;
         $res['error'] = _T("%s: not connected", $srv);
@@ -226,21 +232,42 @@ function _uldap_result ($okay, $conn, &$res) {
 }
 
 
-function uldap_delete ($srv, $dn) {
+//
+// Hack! Hack! Hack!
+// We suppose that DN of the group has form: ATTRNAME=ID,...
+// For different naming schemes this won't work
+//
+function make_new_rdn ($objtype, $id, $dn_old, $id_old) {
+    return (preg_replace('/=.*$/', '', $dn_old) . '=' . $id);
+}
+
+
+//
+// The following routines work directly with server
+//
+
+function uldap_entry_rename ($srv, $dn_old, $rdn_new) {
+    $conn = _uldap_connection($srv, $res);
+    if ($conn)
+        _uldap_result(@ldap_rename($conn, $dn_old, $rdn_new, null, true), $conn, $res);
+    return $res;
+}
+
+function uldap_entry_delete ($srv, $dn) {
     $conn = _uldap_connection($srv, $res);
     if ($conn)
         _uldap_result(@ldap_delete($conn, $dn), $conn, $res);
     return $res;
 }
 
-function uldap_add ($srv, $dn, $entry) {
+function uldap_entry_add ($srv, $dn, $entry) {
     $conn = _uldap_connection($srv, $res);
     if ($conn)
         _uldap_result(@ldap_mod_add($conn, $dn, $entry), $conn, $res);
     return $res;
 }
 
-function uldap_replace ($srv, $dn, $entry) {
+function uldap_entry_replace ($srv, $dn, $entry) {
     $conn = _uldap_connection($srv, $res);
     if ($conn)
         _uldap_result(@ldap_mod_replace($conn, $dn, $entry), $conn, $res);
@@ -348,19 +375,19 @@ function ldap_read_class (&$obj, &$at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_class (&$obj, &$at, $srv, $ldap, $name, $val) {
-    $changed = 0;
+function ldap_write_class (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $changed = false;
     $ca = array();
-    foreach (uldap_value($ldap, $name) as $c)
+    foreach (uldap_value($ldap, $name, true) as $c)
         $ca[strtolower($c)] = 1;
     foreach (split_list($val) as $c) {
         if (isset($ca[strtolower($c)]))
             continue;
         uldap_add($ldap, $name, $c);
-        $changed = 1;
+        $changed = true;
     }
-    log_debug('ldap_write_class(%s): attr="%s" class="%s" changed=%d',
-                $srv, $at['name'], $val, $changed);
+    log_debug('ldap_write_class(%s): attr="%s" class="%s" dn="%s" changed=%d',
+                $srv, $at['name'], $val, get_attr($obj, 'dn'), $changed);
     return $changed;
 }
 
@@ -377,7 +404,7 @@ function ldap_read_pass (&$obj, &$at, $srv, $ldap, $name) {
 }
 
 
-function ldap_write_pass (&$obj, &$at, $srv, $ldap, $name, $val) {
+function ldap_write_pass (&$obj, &$at, $srv, &$ldap, $name, $val) {
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return 0;
     if ($srv == 'ads') {
@@ -390,7 +417,7 @@ function ldap_write_pass (&$obj, &$at, $srv, $ldap, $name, $val) {
 }
 
 
-function ldap_write_pass_final (&$obj, &$at, $srv, $ldap, $name, $val) {
+function ldap_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return 0;
     if ($srv == 'uni')

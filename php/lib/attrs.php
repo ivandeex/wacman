@@ -310,7 +310,7 @@ $all_attrs = array(
         'cn' => array(
             'label' => 'Group name',
             'ldap' => 'uni',
-            'colwidth' => 130,
+            'colwidth' => 130,  // mark for inclusion in the list panel
         ),
         'gidNumber' => array(
             'label' => 'Group number',
@@ -338,7 +338,7 @@ $all_attrs = array(
             'type' => 'mailgroup',
             'label' => 'Group name',
             'ldap' => 'cgp',
-            'colwidth' => 140,
+            'colwidth' => 140,  // mark for inclusion in the list panel
         ),
         'cn' => array(
             'type' => 'none',
@@ -413,7 +413,7 @@ $ldap_rw_subs = array(
     'pass'    => array( 'ldap_read_pass', 'ldap_write_pass', 'ldap_write_pass_final' ),
     'gid'     => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', 'ldap_write_none' ),
     'groups'  => array( 'ldap_read_unix_groups', 'ldap_write_none', 'ldap_write_unix_groups_final' ),
-    'users'   => array( 'ldap_read_unix_members', 'ldap_write_unix_members', 'ldap_write_unix_members_final' ),
+    'users'   => array( 'ldap_read_unix_members', 'ldap_write_unix_members', 'ldap_write_none' ),
     'ntprig'  => array( 'ad_read_pri_group', 'ad_write_pri_group', 'ldap_write_none' ),
     'ntsecg'  => array( 'ad_read_sec_groups', 'ldap_write_none', 'ad_write_sec_groups_final' ),
     'mailuser'=> array( 'cgp_read_user', 'cgp_write_user', 'ldap_write_none' ),
