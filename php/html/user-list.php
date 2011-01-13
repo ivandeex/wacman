@@ -5,13 +5,7 @@
 
 require '../lib/common.php';
 
-function sort_users ($a, $b) {
-    return strcmp($a['uid'], $b['uid']);
-}
-
 send_headers();
-echo(uldap_json_encode(
-        uldap_search('uni', "(objectClass=person)", array('uid', 'cn')),
-        'sort_users'
-        ));
+$res = obj_list('user', 'uni');
+echo($res['code'] ? json_error($res['error']) : json_ok($res['data']));
 ?>

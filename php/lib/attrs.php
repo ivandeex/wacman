@@ -22,15 +22,18 @@ $all_attrs = array(
 
     'user' => array(
 
-        // Read/write methods
+        // Read/write methods, per server, per-operation
+        // array means LDAP-driven action and contains parts of LDAP request
+        // if value is not an array, the string contains relevant function
         '_accessors' => array(
             'uni' => array(
                         'read' => array('objectClass' => 'person', 'uid' => '$_ID'),
-                        'write' => 'LDAP'
+                        'write' => array(),
+                        'list' => array('objectClass' => 'person')
                         ),
             'ads' => array(
                         'read' => array('objectClass' => 'user', 'cn' => '$cn'),
-                        'write' => 'LDAP'
+                        'write' => array()
                         ),
             'cgp' => array(
                         'read' => 'cgp_user_reader',
@@ -319,7 +322,8 @@ $all_attrs = array(
         '_accessors' => array(
             'uni' => array(
                         'read' => array('objectClass' => 'posixGroup', 'cn' => '$_ID'),
-                        'write' => 'LDAP'
+                        'write' => array(),
+                        'list' => array('objectClass' => 'posixGroup')
                         )
         ),
 
@@ -363,7 +367,8 @@ $all_attrs = array(
         '_accessors' => array(
             'cgp' => array(
                     'read' => 'cgp_mailgroup_reader',
-                    'write' => 'cgp_mailgroup_writer'
+                    'write' => 'cgp_mailgroup_writer',
+                    'list' => 'cgp_mailgroup_list'
                     )
         ),
 

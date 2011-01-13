@@ -178,7 +178,7 @@ function uldap_search ($srv, $filter, $attrs) {
     $cfg = get_server($srv);
     $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
     if ($handle === false) {
-        _udap_result(false, $conn, $res);
+        _ldap_result(false, $conn, $res);
         log_debug('uldap_search(%s,filter:[%s],attrs:[%s]) search failed: %s',
                     $srv, $filter, join_list($attrs), $res['error']);
         return $res;
@@ -266,14 +266,6 @@ function uldap_replace (&$data, $name, $val) {
         $data[$name] = (array)$val;
     else
         $data[$name] = is_array($val) ? join_list($val) : $val;
-}
-
-
-function uldap_json_encode ($res, $func) {
-    if ($res['code'])
-        return json_error($res['error']);
-    if (isset($func))  usort($res['data'], $func);
-    return json_ok($res['data']);
 }
 
 

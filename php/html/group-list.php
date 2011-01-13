@@ -5,13 +5,7 @@
 
 require '../lib/common.php';
 
-function sort_groups ($a, $b) {
-    return strcmp($a['cn'], $b['cn']);
-}
-
 send_headers();
-echo(uldap_json_encode(
-        uldap_search('uni', "(objectClass=posixGroup)", array('cn')),
-        'sort_groups'
-        ));
+$res = obj_list('group', 'uni');
+echo($res['code'] ? json_error($res['error']) : json_ok($res['data']));
 ?>

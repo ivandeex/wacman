@@ -160,8 +160,10 @@ function setup_all_attrs () {
 function & create_obj ($objtype) {
     global $all_attrs;
     global $servers;
+
     if (! isset($all_attrs[$objtype]))
         log_error('unknown object type "%s"', $objtype);
+
     $obj = array(
         'type' => $objtype,
         'changed' => 0,
@@ -217,16 +219,7 @@ function obj_read (&$obj, $srv, $id) {
 
     if (is_array($reader)) {
         // Read the object using LDAP
-        $filter = "(";
-        if (count($reader) > 1)  $filter .= "&";
-        foreach ($reader as $name => $val) {
-            if ($val === '$_ID')
-                $val = $id;
-            else if (is_string($val) && $val[0] == '$')
-                $val = get_attr($obj, substr($val, 1));
-            $filter .= "({$name}={$val})";
-        }
-        $filter .= ")";
+        $filter = _array_to_filter($reader, $obj);
         $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
     }
     else {
@@ -301,10 +294,11 @@ function obj_write (&$obj, $srv, $id, $idold) {
         // not changed and not creating
         log_debug('nothing to write to "%s"', $srv);		
     } else {
-        if ($writer !== 'LDAP') {
-            $res = $writer($obj, $srv, $id, $idold, $ldap);
-        } else {
+        // as usual, array means LDAP and string means a function
+        if (is_array($writer)) {
             $res = uldap_update($srv, $ldap);
+        } else {
+            $res = $writer($obj, $srv, $id, $idold, $ldap);
         }
         log_debug('writing to "%s" returns "%s"', $srv, $res['error']);
         // Note: code 82 = `no values to update'
@@ -322,6 +316,69 @@ function obj_write (&$obj, $srv, $id, $idold) {
     }
 
     return $msg;
+}
+
+
+//
+// Return list of objects
+//
+function obj_list ($objtype, $srv) {
+    global $all_attrs;
+
+    // Get the listing function or LDAP search filter
+    $lister = @$all_attrs[$objtype]['_accessors'][$srv]['list'];
+    if (empty($lister))
+        error_page(_T('Lister not defined for "%s" on server "%s"', $obj_type, $srv));
+
+    // Get the list of attributes to get, the first one will be sort key
+    $attrs = array();
+    foreach ($all_attrs[$objtype] as $name => &$desc) {
+        if (isset($desc['colwidth']))  $attrs[] = $name;
+    }
+
+    // Fetch the list
+    if (is_array($lister)) {
+        $filter = _array_to_filter($lister);
+        $res = uldap_search($srv, $filter, $attrs);
+    } else {
+        $filter = $lister . "()";
+        $res = $lister($srv);
+    }
+
+    // Sort the list by the first attribute found
+    if (!$res['code']) {
+        global $_list_sort_key;
+        $_list_sort_key = $attrs[0];
+        usort($res['data'], '_obj_list_sort');
+    }
+
+    return $res;
+}
+
+$_list_sort_key = '';
+function _obj_list_sort ($a, $b) {
+    global $_list_sort_key;
+    return strcmp ($a[$_list_sort_key], $b[$_list_sort_key]);
+}
+
+
+//
+// Helper function that creates filter strings from arrays
+//
+function _array_to_filter($array, $obj = null) {
+    $filter = "";
+
+    foreach ($array as $name => $val) {
+        if ($val === '$_ID')
+            $val = $obj['id'];
+        else if (is_string($val) && $val[0] == '$')
+            $val = get_attr($obj, substr($val, 1));
+        $filter .= "(" . $name . "=" . $val . ")";
+    }
+
+    if (count($array) > 1)
+        $filter = "(&"  . $filter . ")";
+    return $filter;
 }
 
 

@@ -306,6 +306,17 @@ function cgp_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
 //
 
 
+function cgp_mailgroup_list ($srv) {
+    $res = cgp_cmd($srv, 'ListGroups', get_config('mail_domain'));
+    if ($res['code'])  return $res;
+    $data = array();
+    foreach ($res['data'] as $name)
+        $data[] = array('uid' => $name);
+    $res['data'] = $data;
+    return $res;
+}
+
+
 function cgp_mailgroup_reader (&$obj, $srv, $id) {
     $res = cgp_cmd($srv, 'GetGroup', $id . '@' . get_config('mail_domain'));
     // wrap successful result into array to mimic LDAP
