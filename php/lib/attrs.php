@@ -269,14 +269,14 @@ $all_attrs = array(
             'ldap' => 'cgp',
         ),
         'domainIntercept' => array(
-            'type' => 'domainIntercept',
+            'type' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),
             'label' => 'Domain Intercept',
             'checkbox' => true,
             'disable' => true,
             'ldap' => 'cgp',
         ),
         'userIntercept' => array(
-            'type' => 'userIntercept',
+            'type' => array( 'cgp_read_user_intercept', 'ldap_write_none', 'cgp_write_user_intercept' ),
             'label' => 'User Intercept',
             'checkbox' => true,
             'ldap' => 'cgp',
@@ -300,13 +300,13 @@ $all_attrs = array(
         'label' => array( 'ldap' => 'uni,ads', ),
         'real_uidn' => array(
             'ldap' => array( 'uni' => 'uidNumber' ),
-            'type' => 'real_uidn',
+            'type' => array( 'posix_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
             'label' => 'Real user id',
             'readonly' => true,
         ),
         'real_gidn' => array(
             'ldap' => array( 'uni' => 'gidNumber' ),
-            'type' => 'real_gidn',
+            'type' => array( 'posix_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
             'label' => 'Real group id',
             'readonly' => true,
         ),
@@ -447,24 +447,13 @@ $data_accessors = array(
     'number'  => array( 'ldap_read_string', 'ldap_write_string', 'ldap_write_none' ),
     'dn'      => array( 'ldap_read_dn', 'ldap_write_dn', 'ldap_write_none' ),
     'class'   => array( 'ldap_read_class', 'ldap_write_class', 'ldap_write_none' ),
-    'pass'    => array( 'ldap_read_pass', 'ldap_write_pass', 'ldap_write_pass_final' ),
-    'domainIntercept' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),
-    'userIntercept' => array( 'cgp_read_user_intercept', 'ldap_write_none', 'cgp_write_user_intercept' ),
-    'real_uidn' => array( 'posix_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
-    'real_gidn' => array( 'posix_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
+    'pass'    => array( 'ldap_read_pass', 'ldap_write_pass', 'ldap_write_pass_final' )
     );
 
 
-$data_converters = array(
-    'none'      => array('conv_none', 'conv_none'),
-    'bkslash'   => array('bkslash_front', 'bkslash_back'),
-    'binary'    => array('binary_front', 'binary_back'),
-    'monotime'  => array('monotime_front', 'monotime_back'),
-    'decihex'	=> array('decihex_front', 'decihex_back'),
-    'adtime'	=> array('adjtime_front', 'adjtime_back')
-    );
-
-
+//
+// Some attributes are disabled depending on configuration
+//
 function attribute_enabled ($objtype, $name) {
     if ($objtype == 'user') {
         if ($name == 'password2' && get_config('show_password'))
@@ -476,6 +465,5 @@ function attribute_enabled ($objtype, $name) {
     }
     return true;
 }
-
 
 ?>

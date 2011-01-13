@@ -14,11 +14,6 @@ $servers = array(
 // Connections
 //
 
-function get_server_names () {
-    global $servers;
-    return array_keys($servers);
-}
-
 
 function & get_server ($srv, $allow_disabled = false) {
     global $servers;
@@ -283,12 +278,14 @@ function make_new_rdn ($objtype, $id, $dn_old, $id_old) {
 // Modifying server entries directly
 //
 
+
 function uldap_entry_rename ($srv, $dn_old, $rdn_new) {
     $conn = _uldap_connection($srv, $res);
     if ($conn)
         _ldap_result(@ldap_rename($conn, $dn_old, $rdn_new, null, true), $conn, $res);
     return $res;
 }
+
 
 function uldap_entry_delete ($srv, $dn) {
     $conn = _uldap_connection($srv, $res);
@@ -297,12 +294,14 @@ function uldap_entry_delete ($srv, $dn) {
     return $res;
 }
 
+
 function uldap_entry_add ($srv, $dn, $entry) {
     $conn = _uldap_connection($srv, $res);
     if ($conn)
         _ldap_result(@ldap_mod_add($conn, $dn, $entry), $conn, $res);
     return $res;
 }
+
 
 function uldap_entry_replace ($srv, $dn, $entry) {
     $conn = _uldap_connection($srv, $res);
@@ -313,7 +312,7 @@ function uldap_entry_replace ($srv, $dn, $entry) {
 
 
 //////////////////////////////////////////////////////////////
-// Readers / Writers
+// Basic readers / Writers
 //
 
 function ldap_read_none () {

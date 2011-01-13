@@ -35,6 +35,7 @@ $includes = array(
     'CLI.php',
     'cgpro.php',
     'attrs.php',
+    'encrypt.php',
     'objects.php'
     );
 

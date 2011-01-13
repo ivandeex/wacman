@@ -33,10 +33,12 @@ $config = array(
     'btm_button_class'  => ''
 );
 
+
 function get_config($name, $defval = null) {
     global $config;
     return (isset($config[$name]) ? $config[$name] : $defval);
 }
+
 
 function strip_quotes ($str) {
   if (    (substr($str, 0, 1) == '"' && substr($str, -1, 1) == '"')
@@ -46,10 +48,13 @@ function strip_quotes ($str) {
       return $str;
 }
 
+
 function configure ($files = null) {
     global $config;
-    if (empty($files))
-        $files = $config['config_files'];
+    global $servers;
+
+    if (empty($files))  $files = $config['config_files'];
+
     foreach ($files as $file) {
         if (substr($file, 0, 2) == '~/')
             $file = CONFDIR . substr($file, 2);
@@ -58,12 +63,13 @@ function configure ($files = null) {
             log_error("$file: cannot open config file");
             continue;
         }
+
         $mode = 'config';
         $modes = array('config' => 1);
+        foreach (array_keys($servers) as $srv)  $modes[$srv] = 1;
         $no = 0;
-        foreach (get_server_names() as $srv)
-            $modes{$srv} = 1;
         $line = '';
+
         while (($line = fgets($f)) !== FALSE) {
             $no++;
             if (preg_match('/^\s*$/', $line) || preg_match('/^\s*#/', $line))
@@ -93,15 +99,15 @@ function configure ($files = null) {
                 log_error('incorrect line in %s: %s', $file, $line);
             }
         }
+
         fclose($f);
     }
 
     // some defaults
-    if (empty($config['start_user_id']))
-        $config{start_user_id} = 1000;
-    if (empty($config['start_group_id']))
-        $config{start_group_id} = 1000;
+    if (empty($config['start_user_id']))  $config{start_user_id} = 1000;
+    if (empty($config['start_group_id']))  $config{start_group_id} = 1000;
 }
+
 
 function get_credentials ($srv) {
     $cfg = &get_server($srv);
@@ -148,6 +154,7 @@ function get_credentials ($srv) {
     return array('user' => $user, 'pass' => $pass);
 }
 
+
 function is_reserved ($id) {
     foreach (split_list(get_config("reserved_names", "")) as $x) {
         if ($id == $x)
@@ -155,6 +162,7 @@ function is_reserved ($id) {
     }
     return false;
 }
+
 
 function run_helper ($action, $param) {
     $script = get_config("helper_script");
