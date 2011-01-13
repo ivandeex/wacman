@@ -7,10 +7,10 @@
 function setup_all_attrs () {
 
     global $all_attrs;
-    global $servers;
-    global $ldap_rw_subs;
-    global $convtype2subs;
     global $gui_attrs;
+    global $data_accessors;
+    global $data_converters;
+    global $servers;
     global $config;
 
     foreach ($all_attrs as $objtype => &$descs) {
@@ -21,6 +21,10 @@ function setup_all_attrs () {
         }
 
         foreach ($descs as $name => &$desc) {
+
+            if ($name == '_accessors')
+                continue;   // it's an accessor descriptor
+            // others are attribute descriptors
 
             $desc['name'] = $name;
             $desc['visual'] = false;
@@ -51,11 +55,8 @@ function setup_all_attrs () {
                 $desc['conv'] = 'none';
 
             foreach (array(0,1) as $dir) {
-                $sub = null;
-                if (isset($convtype2subs[$desc['conv']]));
-                    $sub = $convtype2subs[$desc['conv']][$dir];
-                if (empty($sub))
-                    $sub = 'conv_none';
+                $sub = isset($data_converters[$desc['conv']]) ? $data_converters[$desc['conv']][$dir] : null;
+                if (empty($sub))  $sub = 'conv_none';
                 $desc[$dir ? 'disp2attr' : 'attr2disp'] = $sub;
             }
 
@@ -113,10 +114,15 @@ function setup_all_attrs () {
             if (empty($ldap) || ! attribute_enabled($objtype, $name))
                 $desc['disable'] = 1;
 
-            $subs = $ldap_rw_subs[ $desc['disable'] ? 'none' : $desc['type'] ];
-            if (! $subs)
-                log_error('type "%s" of "%s" attribute "%s" is not supported',
-                            $desc['type'], $objtype, $name);
+            if ($desc['disable'])
+                $subs = $data_accessors['none'];
+            else if (is_array($desc['type']))
+                $subs = $desc['type'];
+            else
+                $subs = $data_accessors[ $desc['type'] ];
+            if (!is_array($subs))
+                error_page(_T('type "%s" of "%s" attribute "%s" is not supported',
+                                $desc['type'], $objtype, $name));
             $desc['ldap_read'] = $subs[0];
             $desc['ldap_write'] = $subs[1];
             $desc['ldap_write_final'] = $subs[2];
@@ -162,9 +168,16 @@ function & create_obj ($objtype) {
         'attrs' => array(),
         'ldap' => array(),
         'attrlist' => array(),
+        '_accessors' => array(),
         );
 
     foreach ($all_attrs[$objtype] as $name => &$desc) {
+        if ($name == '_accessors') {
+            // accessor descriptor
+            $obj[$name] = $desc;
+            continue;
+        }
+        // others are attribute descriptors
         $obj['attrs'][$name] = array(
             'name'  => $name,
             'type'  => $desc['type'],
@@ -184,82 +197,61 @@ function & create_obj ($objtype) {
 }
 
 
-function get_attr (&$obj, $name, $param = array()) {
-    if (!isset($obj['attrs'][$name])) {
-        log_error('get_attr: attribute "%s" undefined in object "%s"', $name, $obj['type']);
-        return '';
-    }
-    return nvl($obj['attrs'][$name]['val']);
-}
-
-
-function set_attr (&$obj, $name, $val) {
-    if (!isset($obj['attrs'][$name]))
-        log_error('set_attr: attribute "%s" undefined in object "%s"', $name, $obj['type']);
-    else
-        $obj['attrs'][$name]['val'] = $val;
-}
-
-
-function obj_json_encode (&$obj) {
-    $ret = array();
-    foreach ($obj['attrs'] as $name => &$at)  $ret[$name] = $at['val'];
-    return json_ok($ret);
-}
-
-
-$curr_read_obj = null;
-
-function subst_filter_arg ($p) {
-    global $curr_read_obj;
-    return ($p[1] == 'ID' ? $curr_read_obj['id'] : get_attr($curr_read_obj, $p[1]));
-}
-
-
 //
 // Fetch object values from CGP/LDAP server
 //
-function obj_read (&$obj, $srv, $filter, $obj_id = null) {
+function obj_read (&$obj, $srv, $id) {
     global $servers;
 
-    if ($servers[$srv]['disable']) {
-        $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
-        return null;
+    $obj['idold'] = null;
+    $obj['id'] = $id;
+    $obj['renamed'] = false;
+    $obj['ldap'][$srv] = array();
+    $obj['msg'] = '';
+
+    if ($servers[$srv]['disable'])  return null;
+
+    $reader = @$obj['_accessors'][$srv]['read'];
+    if (empty($reader))
+        error_page(_T('Reader not defined for "%s" on server "%s"', $obj['type'], $srv));
+
+    if (is_array($reader)) {
+        // Read the object using LDAP
+        $filter = "(";
+        if (count($reader) > 1)  $filter .= "&";
+        foreach ($reader as $name => $val) {
+            if ($val === '$_ID')
+                $val = $id;
+            else if (is_string($val) && $val[0] == '$')
+                $val = get_attr($obj, substr($val, 1));
+            $filter .= "({$name}={$val})";
+        }
+        $filter .= ")";
+        $res = uldap_search($srv, $filter, $obj['attrlist'][$srv]);
+    }
+    else {
+        // Read the object using a custom function
+        $filter = $reader . "()";
+        $res = $reader($obj, $srv, $id);
     }
 
-    // CGP will use IDs for reading
-    $obj['idold'] = null;
-    $obj['id'] = $obj_id;
-    $obj['renamed'] = false;
+    $obj['ldap'][$srv] = uldap_pop($res);
+    if (empty($res['data'])) {
+        log_debug('obj_read(%s) [%s]: failed with "%s"',
+                    $srv, $filter, $res['error']);
+        $obj['msg'] = $res['error'] ? $res['error'] : 'not found';
+    }
+    if ($obj['msg'])  error_page($obj['msg']);
     $ldap =& $obj['ldap'][$srv];
 
-    // LDAP will use filter for reading
-    if (empty($filter)) {
-        $obj['ldap'][$srv] = array();
-    } else {
-        global $curr_read_obj;
-        $curr_read_obj = $obj;
-        $res_filter = preg_replace_callback('/\$\{(\w+)\}/', 'subst_filter_arg', $filter);
-        if ($filter != $res_filter)
-            log_debug('filter substitutions src:"%s" res:"%s"', $filter, $res_filter);
-        $res = uldap_search($srv, $res_filter, $obj['attrlist'][$srv]);
-        if ($res['code'] || $res['data']['count'] == 0) {
-            $obj['ldap'][$srv] = array(); # FIXME Net::LDAP::Entry->new;
-            log_debug('uldap_obj_read(%s) [%s]: failed with code %d error "%s"', $srv, $filter, $res['code'], $res['error']);
-            return $res['error'] ? $res['error'] : 'not found';
-        }
-        $obj['ldap'][$srv] = $res['data'];
-    }
-
-    foreach ($obj['attrs'] as $name => &$at) {
+    foreach ($obj['attrs'] as $attr_name => &$at) {
         if (! isset($at['desc']['ldap'][$srv])) // attribute exists for this server?
             continue;
-        $func = $at['desc']['ldap_read'];
-        $sname = $at['desc']['ldap'][$srv];
-        $val = $func($obj, $at, $srv, $ldap, $sname);
-        $val = nvl($val);
-        if (! empty($val))
-            $at['val'] = $val;
+        $read_func = $at['desc']['ldap_read'];
+        $ldap_name = $at['desc']['ldap'][$srv];
+        $val = nvl($read_func($obj, $at, $srv, $ldap, $ldap_name));
+        // FIXME: use NULL as a "don't change" mark
+        if (!empty($val))  $at['val'] = $val;
     }
 
     return '';
@@ -279,6 +271,10 @@ function obj_write (&$obj, $srv, $id, $idold) {
     $changed = false;
     $msg = null;
 
+    $writer = @$obj['_accessors'][$srv]['write'];
+    if (empty($writer))
+        error_page(_T('Writer not defined for "%s" on server "%s"', $obj['type'], $srv));
+
     log_debug('start writing to "%s"...', $srv);
 
     // CGP will use IDs for writing
@@ -286,40 +282,42 @@ function obj_write (&$obj, $srv, $id, $idold) {
     $obj['id'] = $id;
     $obj['renamed'] = false;    // can be set to true by subordinate writes
 
-    foreach ($obj['attrs'] as $name => &$at) {
+    foreach ($obj['attrs'] as $attr_name => &$at) {
         if (! isset($at['desc']['ldap'][$srv]))
             continue;
-        // If we used call_user_func(), all parameters would be
-        // passed by value, and the "renamed" magic would not work.
+        // If we used call_user_func(), all parameters would be passed by value,
+        // and the "renamed" magic would not work.
         // If we used call_user_func_array(), we would need to mark
-        // all passed by reference parameters by "&" at the call time.
-        // The form "$func($params...)" used here honor function
-        // prototypes as passing by reference from prototypes
-        // (at least in PHP 5.2.16).
-        $func = $at['desc']['ldap_write'];
-        $sname = $at['desc']['ldap'][$srv];
-        $aval = nvl($at['val']);
-        if ($func($obj, $at, $srv, $ldap, $sname, $aval))
+        // all passed by reference parameters by "&" in the call time array.
+        // The variable function used here honors pass by reference
+        // in function prototypes (at least in PHP 5.2.16).
+        $write_func = $at['desc']['ldap_write'];
+        $ldap_name = $at['desc']['ldap'][$srv];
+        if ($write_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val'])))
             $changed = true;
 	}
 
-    if ($changed) {
-        $res = uldap_update($srv, $ldap);
-        log_debug('writing to "%s" returns code %d', $srv, $res['code']);
+    if (!$changed && !empty($idold)) {
+        // not changed and not creating
+        log_debug('nothing to write to "%s"', $srv);		
+    } else {
+        if ($writer !== 'LDAP') {
+            $res = $writer($obj, $srv, $id, $idold, $ldap);
+        } else {
+            $res = uldap_update($srv, $ldap);
+        }
+        log_debug('writing to "%s" returns "%s"', $srv, $res['error']);
         // Note: code 82 = `no values to update'
         if ($res['code'] && $res['code'] != 82)
             $msg = $res['error'];
-    } else {
-        log_debug('nothing to write to "%s"', $srv);		
     }
 
-    foreach ($obj['attrs'] as $name => &$at) {
+    foreach ($obj['attrs'] as $attr_name => &$at) {
         if (! isset($at['desc']['ldap'][$srv]))
             continue;
-        $func = $at['desc']['ldap_write_final'];
-        $sname = $at['desc']['ldap'][$srv];
-        $aval = nvl($at['val']);
-        if ($func($obj, $at, $srv, $ldap, $sname, $aval))
+        $post_func = $at['desc']['ldap_write_final'];
+        $ldap_name = $at['desc']['ldap'][$srv];
+        if ($post_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val'])))
             $changed = true;
     }
 
@@ -327,16 +325,45 @@ function obj_write (&$obj, $srv, $id, $idold) {
 }
 
 
+////////////////////////////////////////////////////////
+//       Attribute helpers
+//
+
+
+function get_attr (&$obj, $name, $param = array()) {
+    if (!isset($obj['attrs'][$name])) {
+        log_error('get_attr: attribute "%s" undefined in object "%s"', $name, $obj['type']);
+        return '';
+    }
+    return nvl($obj['attrs'][$name]['val']);
+}
+
+
+function set_attr (&$obj, $name, $val) {
+    if (!isset($obj['attrs'][$name]))
+        log_error('set_attr: attribute "%s" undefined in object "%s"', $name, $obj['type']);
+    else
+        $obj['attrs'][$name]['val'] = $val;
+}
+
+
 //
 // Update object values from web request
 //
 function obj_update (&$obj) {
-    foreach ($obj['attrs'] as $name => $at) {
+    foreach ($obj['attrs'] as $name => &$at) {
         if (req_exists($name)) {
             $at['val'] = req_param($name);
             $at['dirty'] = true;
         }
     }
+}
+
+
+function obj_json_encode (&$obj) {
+    $ret = array();
+    foreach ($obj['attrs'] as $name => &$at)  $ret[$name] = $at['val'];
+    return json_ok($ret);
 }
 
 

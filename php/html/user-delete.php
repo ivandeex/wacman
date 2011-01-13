@@ -13,8 +13,7 @@ if (is_reserved($id))  error_page("Cannot delete reserved object");
 // Find Unix, AD and CGP identifiers of the user
 $srv = 'uni';
 $res = uldap_search($srv, "(&(objectClass=person)(uid=$id))", array('dn', 'cn', 'mail', 'homeDirectory'));
-if ($res['code'] || $res['data']['count'] == 0)
-    error_page('User not found');
+if (empty($res['data']))  error_page('User not found');
 $msg = array();
 $ue = uldap_pop($res);
 
@@ -37,7 +36,7 @@ foreach (uldap_entries($res) as $ge) {
 $cn = uldap_value($ue, 'cn');
 if (!empty($cn) && !$servers['ads']['disable']) {
     $res = uldap_search('ads', "(&(objectClass=user)(cn=$cn))", array('dn'));
-    if ($res['code'] || $res['data']['count'] == 0) {
+    if (empty($res['data'])) {
         $msg[] = _T('Windows user "%s" not found', $cn);
     } else {
         $we = uldap_pop($res);

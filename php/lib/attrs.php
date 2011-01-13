@@ -22,6 +22,22 @@ $all_attrs = array(
 
     'user' => array(
 
+        // Read/write methods
+        '_accessors' => array(
+            'uni' => array(
+                        'read' => array('objectClass' => 'person', 'uid' => '$_ID'),
+                        'write' => 'LDAP'
+                        ),
+            'ads' => array(
+                        'read' => array('objectClass' => 'user', 'cn' => '$cn'),
+                        'write' => 'LDAP'
+                        ),
+            'cgp' => array(
+                        'read' => 'cgp_user_reader',
+                        'write' => 'cgp_user_writer'
+                        )
+        ),
+
         // ======== Core... ========
 
         'dn' => array(
@@ -94,13 +110,13 @@ $all_attrs = array(
             'ldap' => 'uni,ads',
         ),
         'gidNumber' => array(
-            'type' => 'gid',
+            'type' => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', 'ldap_write_none' ),
             'label' => 'Group',
             'popup' => 'gid',
             'ldap' => 'uni,ads',
         ),
         'moreGroups' => array(
-            'type' => 'groups',
+            'type' => array( 'ldap_read_unix_groups', 'ldap_write_none', 'ldap_write_unix_groups_final' ),
             'label' => 'Other groups',
             'popup' => 'groups',
             'ldap' => array( 'uni' => 'uid' ),
@@ -160,11 +176,11 @@ $all_attrs = array(
             'ldap' => array( 'ntuser' => '', 'ads' => 'scriptPath' ),
         ),
         'PrimaryGroupID' => array(
-            'type' => 'ntprig',
+            'type' => array( 'ad_read_pri_group', 'ad_write_pri_group', 'ldap_write_none' ),
             'ldap' => 'ads',
         ),
         'SecondaryGroups' => array(
-            'type' => 'ntsecg',
+            'type' => array( 'ad_read_sec_groups', 'ldap_write_none', 'ad_write_sec_groups_final' ),
             'ldap' => 'ads',
         ),
         'sfuDomain' => array(
@@ -230,11 +246,11 @@ $all_attrs = array(
         // ======== CommuniGate Pro ========
 
         'mailuser' => array(
-            'type' => 'mailuser',       // read/write cgp account
+            'type' => array( 'cgp_read_user', 'cgp_write_user', 'ldap_write_none' ),
             'ldap' => 'cgp',
         ),
         'aliases' => array(
-            'type' => 'aliases',
+            'type' => array( 'cgp_read_aliases', 'ldap_write_none', 'cgp_write_aliases_final' ),
             'label' => 'Mail aliases',
             'ldap' => 'cgp',
         ),
@@ -244,7 +260,7 @@ $all_attrs = array(
             'ldap' => 'cgp',
         ),
         'mailgroups' => array(
-            'type' => 'mailgroups',
+            'type' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
             'label' => 'Mail groups',
             'popup' => 'mailgroups',
             'ldap' => 'cgp',
@@ -298,6 +314,15 @@ $all_attrs = array(
     /////////////////////////////////////////////
 
     'group' => array(
+
+        // Read/write methods
+        '_accessors' => array(
+            'uni' => array(
+                        'read' => array('objectClass' => 'posixGroup', 'cn' => '$_ID'),
+                        'write' => 'LDAP'
+                        )
+        ),
+
         'objectClass' => array(
             'type' => 'class',
             'ldap' => 'uni',
@@ -321,7 +346,7 @@ $all_attrs = array(
             'ldap' => 'uni',
         ),
         'memberUid' => array(
-            'type' => 'users',
+            'type' => array( 'ldap_read_unix_members', 'ldap_write_unix_members', 'ldap_write_none' ),
             'label' => 'Members',
             'popup' => 'users',
             'ldap' => 'uni',
@@ -333,28 +358,35 @@ $all_attrs = array(
     /////////////////////////////////////////////
 
     'mailgroup' => array(
+
+        // Read/write methods
+        '_accessors' => array(
+            'cgp' => array(
+                    'read' => 'cgp_mailgroup_reader',
+                    'write' => 'cgp_mailgroup_writer'
+                    )
+        ),
+
         'uid' => array(
-            // all other values are read/written by this handler
-            'type' => 'mailgroup',
+            'type' => array( 'cgp_read_mailgroup_uid', 'ldap_write_none', 'ldap_write_none' ),
             'label' => 'Group name',
             'ldap' => 'cgp',
             'colwidth' => 140,  // mark for inclusion in the list panel
         ),
         'cn' => array(
-            'type' => 'none',
             'label' => 'Description',
-            'ldap' => 'cgp',
+            'ldap' => array( 'cgp' => 'RealName' ),
         ),
         'groupMember' => array(
-            'type' => 'none',
+            'type' => array( 'cgp_read_mailgroup_members', 'cgp_write_mailgroup_members', 'ldap_write_none' ),
             'label' => 'Members',
             'popup' => 'mailusers',
             'ldap' => 'cgp',
         ),
         'params' => array(
-            'type' => 'none',
-            'ldap' => 'cgp',
+            'type' => array( 'cgp_read_mailgroup_params', 'cgp_write_mailgroup_params', 'ldap_write_none' ),
             'label' => 'Params',
+            'ldap' => 'cgp',
         ),
     ),
 
@@ -404,30 +436,21 @@ $gui_attrs = array(
 );
 
 
-$ldap_rw_subs = array(
+$data_accessors = array(
     'none'    => array( 'ldap_read_none', 'ldap_write_none', 'ldap_write_none' ),
     'string'  => array( 'ldap_read_string', 'ldap_write_string', 'ldap_write_none' ),
     'number'  => array( 'ldap_read_string', 'ldap_write_string', 'ldap_write_none' ),
     'dn'      => array( 'ldap_read_dn', 'ldap_write_dn', 'ldap_write_none' ),
     'class'   => array( 'ldap_read_class', 'ldap_write_class', 'ldap_write_none' ),
     'pass'    => array( 'ldap_read_pass', 'ldap_write_pass', 'ldap_write_pass_final' ),
-    'gid'     => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', 'ldap_write_none' ),
-    'groups'  => array( 'ldap_read_unix_groups', 'ldap_write_none', 'ldap_write_unix_groups_final' ),
-    'users'   => array( 'ldap_read_unix_members', 'ldap_write_unix_members', 'ldap_write_none' ),
-    'ntprig'  => array( 'ad_read_pri_group', 'ad_write_pri_group', 'ldap_write_none' ),
-    'ntsecg'  => array( 'ad_read_sec_groups', 'ldap_write_none', 'ad_write_sec_groups_final' ),
-    'mailuser'=> array( 'cgp_read_user', 'cgp_write_user', 'ldap_write_none' ),
-    'aliases' => array( 'cgp_read_aliases', 'ldap_write_none', 'cgp_write_aliases_final' ),
-    'mailgroups' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
     'domainIntercept' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),
     'userIntercept' => array( 'cgp_read_user_intercept', 'ldap_write_none', 'cgp_write_user_intercept' ),
-    'mailgroup' => array( 'cgp_mailgroup_read_all', 'cgp_mailgroup_write_all', 'ldap_write_none' ),
     'real_uidn' => array( 'posix_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
     'real_gidn' => array( 'posix_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
     );
 
 
-$convtype2subs = array(
+$data_converters = array(
     'none'      => array('conv_none', 'conv_none'),
     'bkslash'   => array('bkslash_front', 'bkslash_back'),
     'binary'    => array('binary_front', 'binary_back'),

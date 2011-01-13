@@ -6,11 +6,11 @@
 require '../lib/common.php';
 
 send_headers();
-$id = req_param('uid');
-if (empty($id))  error_page("uid: required parameter wrong or not specified");
+$id = req_param('id');
+if (empty($id))  error_page("id is missing");
 
 $mgrp = create_obj('mailgroup');
-$msg = obj_read($mgrp, 'cgp', null, $id);
+$msg = obj_read($mgrp, 'cgp', $id);
 if ($msg)  error_page($msg);
 echo(obj_json_encode($mgrp));
 ?>

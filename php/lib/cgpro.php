@@ -8,6 +8,18 @@
 //    User helpers
 //
 
+
+function cgp_user_reader (&$obj, $srv, $id) {
+    // Return an empty array of attributes wrapped in another array to mimic LDAP
+    return array('code' => 0, 'error' => '', 'data' => array(array()));
+}
+
+
+function cgp_user_writer (&$obj, $srv, $id, $idold, &$ldap) {
+    return array('code' => 0, 'error' => '');
+}
+
+
 function cgp_read_user (&$obj, &$at, $srv, &$ldap, $name) {
     $mail = get_email($obj);
     if (empty($mail))
@@ -293,55 +305,78 @@ function cgp_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
 //    Mailgroup helpers
 //
 
-function cgp_mailgroup_read_all (&$obj, &$at, $srv, &$ldap, $name) {
-    if (empty($obj['id']))
-        return '';
 
-    $mgrp_name = $obj['id'] . '@' . get_config('mail_domain');
-    $res = cgp_cmd($srv, 'GetGroup', $mgrp_name);
-    if ($res['code'])  error_page($res['error']);
+function cgp_mailgroup_reader (&$obj, $srv, $id) {
+    $res = cgp_cmd($srv, 'GetGroup', $id . '@' . get_config('mail_domain'));
+    // wrap successful result into array to mimic LDAP
+    if (!$res['code'])  $res['data'] = array($res['data']);
+    return $res;
+}
 
-    $data = $res['data'];
-    set_attr($obj, 'uid', $obj['id']);
-    set_attr($obj, 'cn', nvl($data['RealName']));
-    set_attr($obj, 'groupMember', join_list($data['Members']));
-    unset($data['RealName']);
-    unset($data['Members']);
-    set_attr($obj, 'params', cgp_pack($srv, $data));
 
+function cgp_read_mailgroup_uid (&$obj, &$at, $srv, &$ldap, $name) {
     return $obj['id'];
 }
 
 
-function cgp_mailgroup_write_all (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $id = $obj['id'];
-    if (empty($id))
+function cgp_read_mailgroup_members (&$obj, &$at, $srv, &$ldap, $name) {
+    return isset($ldap['Members']) ? join_list($ldap['Members']) : '';
+}
+
+
+function cgp_write_mailgroup_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    if ($val == cgp_read_mailgroup_members ($obj, $at, $srv, $ldap, $name))
         return false;
-    $idold = $obj['idold'];
-    $domain = get_config('mail_domain');
+    $ldap['Members'] = split_list($val);
+    return true;
+}
 
-    // pack settings
-    $params = get_attr($obj, 'params');
-    $params = empty($params) ? array() : cgp_unpack($srv, $params, $msg, true);
-    $params['RealName'] = get_attr($obj, 'cn');
-    $params['Members'] = split_list(get_attr($obj, 'groupMember'));
 
+function cgp_read_mailgroup_params (&$obj, &$at, $srv, &$ldap, $name) {
+    $data = $ldap; // make a local copy
+    unset($data['RealName']);
+    unset($data['Members']);
+    return empty($data) ? '' : cgp_pack($srv, $data);
+}
+
+
+function cgp_write_mailgroup_params (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $old = cgp_read_mailgroup_params($obj, $at, $srv, $ldap, $name);
+    if ($old == $val)
+        return false;
+    $res = cgp_unpack($srv, $val);
+    if ($res['code'])  error_page($res['error']);
+    $data = $res['data'];
+    foreach ($data as $n => $v) {
+        if ($n != 'RealName' && $n != 'Members')
+            $ldap[$n] = $v;
+    }
+    return true;
+}
+
+
+function cgp_mailgroup_writer (&$obj, $srv, $id, $idold, &$ldap) {
     // rename the group if needed
+    $domain = get_config('mail_domain');
     if (!empty($idold) && $id != $idold) {
         $res = cgp_cmd($srv, 'RenameGroup', $idold.'@'.$domain, $id.'@'.$domain);
-        if ($res['code'])
-            error_page(_T('Cannot rename mail group "%s" to "%s": %s',
-                        $idold, $id, $res['error']));
+        if ($res['code']) {
+            $res['error'] = _T('Cannot rename mail group "%s" to "%s": %s',
+                                $idold, $id, $res['error']);
+            return $res;
+        }
         $obj['renamed'] = true;
     }
 
-    $res = cgp_cmd($srv, (empty($idold) ? 'CreateGroup' : 'SetGroup'), $id.'@'.$domain, $params);
-    if ($res['code'])
-        error_page(_T('Cannot %s mail group "%s": %s',
-                    (empty($idold) ? "create" : "update"), $id, $res['error']));
+    $cmd = empty($idold) ? 'CreateGroup' : 'SetGroup';
+    $res = cgp_cmd($srv, $cmd, $id.'@'.$domain, $ldap);
+    if ($res['code']) {
+        $res['error'] = _T('Cannot %s mail group "%s": %s',
+                            (empty($idold) ? "create" : "update"), $id, $res['error']);
+        return $res;
+    }
 
-    // return "not changed" so that obj_write() does not call uldap_update()
-    return false;
+    return array('code' => 0, 'error' => '');
 }
 
 
@@ -434,18 +469,21 @@ function cgp_pack ($srv, $data) {
 }
 
 
-function cgp_unpack ($srv, $data, &$msg, $fatal) {
+function cgp_unpack ($srv, $string) {
     $cli = _cgp_cli($srv);
-    if (is_null($cli)) {
-        $msg = _T('cgp_unpack(%s): invalid CGP state', $srv);
-        log_error($msg);
-        $res = null;
-    } else {
-        $res = $cli->parseUserWords($data, $msg);
-    }
-    if ($fatal) {
-        if (! empty($msg))  error_page($msg);
-        if (! is_array($res))  error_page("Mail settings should be an array");
+    $res = array('data' => null, 'code' => -1, 'error' => '');
+    if (is_null($cli))
+        $res['error'] = "cgp_unpack: server disconnected";
+    else {
+        $data = $cli->parseUserWords($string, $msg);
+        if (! empty($msg))
+            $res['error'] = $msg;
+        else if (! is_array($data))
+            $res['error'] = "Mail settings should be an array";
+        else {
+            $res['code'] = 0;
+            $res['data'] = $data;
+        }
     }
     return $res;
 }

@@ -13,13 +13,11 @@ $mgrp = create_obj('mailgroup');
 $idold = req_param("_idold");
 if (!empty($idold)) {
     // it's an update of existing mail group
-    $msg = obj_read($mgrp, 'cgp', null, $idold);
+    $msg = obj_read($mgrp, 'cgp', $idold);
     if ($msg)  error_page($msg);
 }
 
 obj_update($mgrp);
 $msg = obj_write($mgrp, 'cgp', $id, $idold);
-if ($msg)  error_page($msg);
-
-echo(json_ok(array('refresh' => $mgrp['renamed'])));
+echo($msg ? json_error($msg) : json_ok(array('refresh' => $mgrp['renamed'])));
 ?>

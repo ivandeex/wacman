@@ -568,7 +568,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     //
     load: function (sm, row, rec) {
         var params = {};
-        params[this.id_attr] = this.id_value = rec.get(this.id_attr);
+        params.id = this.id_value = rec.get(this.id_attr);
         this.form.doAction(
             new Userman.FormAction(this.form, {
                 url: this.read_url,
