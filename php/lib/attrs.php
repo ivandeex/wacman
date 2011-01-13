@@ -66,6 +66,12 @@ $all_attrs = array(
 
         // ======== posixAccount... ========
 
+        'uid' => array(
+            'type' => 'number',
+            'label' => 'Identifier',
+            'ldap' => 'uni,ads,cgp',
+            'colwidth' => 120,
+        ),
         'givenName' => array(
             'label' => 'Name',
             'ldap' => 'uni,ads',
@@ -78,12 +84,6 @@ $all_attrs = array(
             'label' => 'Full name',
             'ldap' => 'uni,ads,cgp',
             'colwidth' => 160,
-        ),
-        'uid' => array(
-            'type' => 'number',
-            'label' => 'Identifier',
-            'ldap' => 'uni,ads,cgp',
-            'colwidth' => 120,
         ),
         'password' => array(
             'type' => 'pass',

@@ -445,8 +445,28 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         // setup hidden attributes
         for (var name in Userman.all_attrs[this.name]) {
+            // visual attributes were configured above
             if (!(name in this.attr))
                 this.initAttr(name);
+
+            //
+            // A non-zero column width means that the field
+            // should be included in the record list.
+            //
+            // We add values here so that order of columns
+            // follows order of physical attributes as opposed
+            // to the order of visual attributes in the form.
+            //
+            var desc = this.attr[name].desc;
+            if (desc.colwidth) {
+                this.list_width += desc.colwidth + Userman.COL_GAP;
+                this.list_cols.push({
+                    header: Userman.T(desc.label),
+                    dataIndex: desc.name,
+                    sortable: true,
+                    width: desc.colwidth,
+                });
+            }
         }
 
         with (this) {
@@ -869,18 +889,6 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     //
     setupField: function (at) {
         var desc = at.desc;
-
-        // non-zero column width means that the field
-        // should be included in the record list
-        if (desc.colwidth) {
-            this.list_width += desc.colwidth + Userman.COL_GAP;
-            this.list_cols.push({
-                header: Userman.T(desc.label),
-                dataIndex: at.name,
-                sortable: true,
-                width: desc.colwidth,
-            });
-        }
 
         // generic field configurator
         var cfg = {
