@@ -1,8 +1,9 @@
 <?php
 // $Id$
 
-// Attribute helpers
-
+////////////////////////////////////////////////////////
+//       Attribute initializer
+//
 
 function setup_all_attrs () {
 
@@ -28,31 +29,22 @@ function setup_all_attrs () {
 
             $desc['name'] = $name;
             $desc['visual'] = false;
-            if (empty($desc['type']))
-                $desc['type'] = 'string';
-            if (isset($desc['label']))
-			    $desc['label'] = _T($desc['label']);
-            if (! isset($desc['readonly']))
-                $desc['readonly'] = false;
-            if (! isset($desc['verify']))
-                $desc['verify'] = false;
-            if (! isset($desc['colwidth']))
-                $desc['colwidth'] = null;
 
-            if (! isset($desc['popup']))
-			    $desc['popup'] = null;
-            if (! isset($desc['checkbox']))
-			    $desc['checkbox'] = false;
-            if ($desc['checkbox'])
-                $desc['popup'] = 'yesno';
+            if (empty($desc['type']))  $desc['type'] = 'string';
+            if (isset($desc['label']))  $desc['label'] = _T($desc['label']);
+            if (! isset($desc['readonly']))  $desc['readonly'] = false;
+            if (! isset($desc['verify']))  $desc['verify'] = false;
+            if (! isset($desc['colwidth']))  $desc['colwidth'] = null;
+            if (! isset($desc['popup']))  $desc['popup'] = null;
+            if (! isset($desc['checkbox']))  $desc['checkbox'] = false;
+            if ($desc['checkbox'])  $desc['popup'] = 'yesno';
 			
             if (! isset($desc['defval'])) {
                 $cfg_def = "default_value_${objtype}_${name}";
                 $desc['defval'] = isset($config[$cfg_def]) ? $config[$cfg_def] : null;
             }
 
-            if (! isset($desc['conv']))
-                $desc['conv'] = 'none';
+            if (! isset($desc['conv']))  $desc['conv'] = 'none';
 
             foreach (array(0,1) as $dir) {
                 $sub = isset($data_converters[$desc['conv']]) ? $data_converters[$desc['conv']][$dir] : null;
@@ -63,11 +55,9 @@ function setup_all_attrs () {
             if (isset($desc['copyfrom']) && !isset($descs[$desc['copyfrom']]))
                 log_error('%s attribute "%s" is copy-from unknown "%s"',
                             $objtype, $name, $desc['copyfrom']);
-            if (! isset($desc['copyfrom']))
-                $desc['copyfrom'] = null;
+            if (! isset($desc['copyfrom']))  $desc['copyfrom'] = null;
 
-            if (! isset($desc['disable']))
-			    $desc['disable'] = false;
+            if (! isset($desc['disable']))  $desc['disable'] = false;
 
             $ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
             if (! is_array($ldap)) {
@@ -155,7 +145,6 @@ function setup_all_attrs () {
 ////////////////////////////////////////////////////////
 //       Objects
 //
-
 
 function & create_obj ($objtype) {
     global $all_attrs;
