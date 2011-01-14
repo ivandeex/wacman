@@ -69,7 +69,11 @@ $all_attrs = array(
         'uid' => array(
             'type' => 'number',
             'label' => 'Identifier',
-            'ldap' => 'uni,ads,cgp',
+            'ldap' => array(
+                'uni' => '',
+                'ads' => '',
+                'cgp' => '_cgp_id'
+            ),
             'colwidth' => 120,
         ),
         'givenName' => array(
@@ -78,11 +82,19 @@ $all_attrs = array(
         ),
         'sn' => array(
             'label' => 'Second name',
-            'ldap' => 'uni,ads,cgp',
+            'ldap' => array(
+                'uni' => '',
+                'ads' => '',
+                'cgp' => 'surname'
+            ),
         ),
         'cn' => array(
             'label' => 'Full name',
-            'ldap' => 'uni,ads,cgp',
+            'ldap' => array(
+                'uni' => '',
+                'ads' => '',
+                'cgp' => 'RealName'
+            ),
             'colwidth' => 160,
         ),
         'password' => array(
@@ -91,7 +103,7 @@ $all_attrs = array(
             'ldap' => array(
                 'uni' => 'userPassword',
                 'ads' => 'unicodePwd',
-                'cgp' => 'userPassword'
+                'cgp' => 'Password'
 			),
         ),
         'password2' => array(
@@ -100,13 +112,9 @@ $all_attrs = array(
             'ldap' => array(
                 'uni' => 'userPassword',
                 'ads' => 'unicodePwd',
-                'cgp' => 'userPassword'
+                'cgp' => 'Password'
             ),
             'verify' => true,
-        ),
-        'mail' => array(
-            'label' => 'Mail',
-            'ldap' => 'uni,ads,cgp',
         ),
         'uidNumber' => array(
             'label' => 'User#',
@@ -250,9 +258,13 @@ $all_attrs = array(
 
         // ======== CommuniGate Pro ========
 
-        'mailuser' => array(
-            'type' => array( 'cgp_read_user', 'cgp_write_user', null ),
-            'ldap' => 'cgp',
+        'mail' => array(
+            'label' => 'Mail',
+            'ldap' => array(
+                'uni' => '',
+                'ads' => '',
+                'cgp' => '_cgp_mail'
+            )
         ),
         'aliases' => array(
             'type' => array( 'cgp_read_aliases', null, 'cgp_write_aliases_final' ),
@@ -260,7 +272,7 @@ $all_attrs = array(
             'ldap' => 'cgp',
         ),
         'telnum' => array(
-            'type' => 'none',           // read/write is done by aliases
+            'type' => 'none',           // cgp_read_aliases/cgp_write_aliases handles this value
             'label' => 'Short number',
             'ldap' => 'cgp',
         ),
@@ -271,14 +283,14 @@ $all_attrs = array(
             'ldap' => 'cgp',
         ),
         'domainIntercept' => array(
-            'type' => array( 'cgp_read_domain_intercept', null, 'cgp_write_domain_intercept' ),
+            'type' => array( 'cgp_read_domain_intercept', null, 'cgp_write_domain_intercept_final' ),
             'label' => 'Domain Intercept',
             'checkbox' => true,
             'disable' => true,
             'ldap' => 'cgp',
         ),
         'userIntercept' => array(
-            'type' => array( 'cgp_read_user_intercept', null, 'cgp_write_user_intercept' ),
+            'type' => array( 'cgp_read_user_intercept', null, 'cgp_write_user_intercept_final' ),
             'label' => 'User Intercept',
             'checkbox' => true,
             'ldap' => 'cgp',
@@ -458,7 +470,7 @@ $data_accessors = array(
 //
 function attribute_enabled ($objtype, $name) {
     if ($objtype == 'user') {
-        if ($name == 'password2' && get_config('show_password'))
+        if ($name == 'password2' && str2bool(get_config('show_password')))
             return false;
         if ($name == 'real_uidn' || $name == 'real_gidn') {
             if (! get_config('prefer_nss_ids'))

@@ -31,6 +31,14 @@ function decode_ad_pass ($pass) {
 }
 
 
+function ad_write_pass (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    // 'replace' works only for administrator.
+    // unprivileged users need to use change(delete=old,add=new)
+    uldap_replace($ldap, $name, encode_ad_pass($val));
+    return true;
+}
+
+
 function ad_read_pri_group (&$obj, &$at, $srv, &$ldap, $name) {
 	return 0;
 /*

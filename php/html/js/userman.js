@@ -16,7 +16,7 @@ Userman.RIGHT_GAP = 20;
 Userman.COL_GAP = 2;
 Userman.LABEL_WIDTH = 150;
 Userman.TAB_PADDING = "10px";
-Userman.AJAX_TIMEOUT = 15;
+Userman.AJAX_TIMEOUT = 20;
 Userman.VIEWPORT_PADDING = "5px";
 
 //
@@ -1148,6 +1148,7 @@ Userman.User = Ext.extend(Userman.Object, {
     list: "users",
     title: " Users ",
     id_attr: "uid",
+    update_send_all: true,
 
     formTitle: function () {
         return this.vget("uid") + " (" + this.vget("cn") + ")";

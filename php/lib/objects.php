@@ -61,9 +61,16 @@ function setup_all_attrs () {
                 $desc[$dir ? 'disp2attr' : 'attr2disp'] = $sub;
             }
 
+            // disable attributes due to configuration
+            if (! isset($desc['disable']))  $desc['disable'] = false;
+            if (! attribute_enabled($objtype, $name))  $desc['disable'] = true;
+
             // parse and setup per-server mappings for the attribute
             $ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
             if (! is_array($ldap)) {
+                // if all server attributes have the same name
+                // as the main attribute, we can use a simple string
+                // with server names separated by commas
                 $arr = split_list($ldap);
                 $ldap = array();
                 foreach ($arr as $x)  $ldap[$x] = '';
@@ -83,31 +90,33 @@ function setup_all_attrs () {
                     }
                 }
 
-                if (! isset($servers[$srv])) {
-                    log_error('wrong server "%s" in objtype "%s" descriptor "%s"',
-                                print_r($srv, 1), $objtype, $name);
-                    continue;
-                }
+                // having gotten rid of virtual servers,
+                // now check if the server exists
+                if (! isset($servers[$srv]))
+                    error_page(_T('wrong server "%s" in objtype "%s" descriptor "%s"',
+                                print_r($srv, 1), $objtype, $name));
 
-                if (empty($ldap[$srv]))
-                    $ldap[$srv] = $name;
+                // user can omit parameter name for a particular server
+                // if it coninsides with main parameter name.
+                if (empty($ldap[$srv]))  $ldap[$srv] = $name;
 
                 $ldap_attr = $ldap[$srv];
 				$cfg =& $servers[$srv];
+                // check that attribute mappings to servers
+                // do not duplicate each other
                 if (isset($cfg['attrhash'][$objtype][$ldap_attr])) {
                     if (! empty($desc['is_duplicate']))
                         log_error('duplicate attribute "%s" as "%s" for server "%s"',
                                     $name, $ldap_attr, $srv);
-                } else if (empty($ldap['disable'])) {
-                    $cfg['attrhash'][$objtype][$ldap_attr] = 1;
+                    continue;
                 }
+                if (!isset($desc['disable']) || empty($desc['disable']))
+                    $cfg['attrhash'][$objtype][$ldap_attr] = 1;
             }
 
+            // server mapping is done
             $desc['ldap'] = $ldap;
-
-            // disable attributes without servers or due to configuration
-            if (! isset($desc['disable']))  $desc['disable'] = false;
-            if (! attribute_enabled($objtype, $name))  $desc['disable'] = true;
+            // disable attributes without servers
             if (empty($ldap))  $desc['disable'] = true;
 
             // setup readers and writers
@@ -245,7 +254,8 @@ function obj_read (&$obj, $srv, $id) {
         $ldap_name = $at['desc']['ldap'][$srv];
         $val = nvl($read_func($obj, $at, $srv, $ldap, $ldap_name));
         // FIXME: use NULL as a "don't change" mark
-        if (!empty($val))  $at['val'] = $val;
+        if (empty($at['val']) && !empty($val))
+            $at['val'] = $val;
     }
 
     return '';
@@ -270,9 +280,9 @@ function obj_write (&$obj, $srv, $id, $idold) {
     $obj['idold'] = $idold;
     $obj['id'] = $id;
     $obj['renamed'] = false;    // can be set to true by subordinate writes
+    $obj['msg'] = array();
     $ldap =& $obj['ldap'][$srv];
     $changed = false;
-    $msg = null;
 
     // Find new DN
     if (is_array($writer)) {
@@ -297,8 +307,8 @@ function obj_write (&$obj, $srv, $id, $idold) {
         // in function prototypes (at least in PHP 5.2.16).
         $write_func = $at['desc']['ldap_write'];
         $ldap_name = $at['desc']['ldap'][$srv];
-        if ($write_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val'])))
-            $changed = $obj['changed'] = true;
+        $retval = $write_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val']));
+        if ($retval)  $changed = $obj['changed'] = true;
 	}
 
     // Rename LDAP object if needed
@@ -306,21 +316,21 @@ function obj_write (&$obj, $srv, $id, $idold) {
         $rdn_new = dn_to_rdn($dn);
         $res = uldap_entry_rename($srv, $dn_old, $rdn_new);
         if ($res['code']) {
-            $msg = _T('Cannot rename %s "%s" to "%s": %s',
-                        $obj['type'], $obj['idold'], $obj['id'], $res['error']);
+            $obj['msg'][] = _T('Cannot rename %s "%s" to "%s": %s',
+                                $obj['type'], $obj['idold'], $obj['id'], $res['error']);
         } else {
             log_debug("rename %s DN=[%s] to RDN=[%s] OK", $obj['type'], $dn_old, $rdn_new);
             $obj['renamed'] = true;
         }
     }
 
-    if ($msg)  return $msg;
+    if ($obj['msg'])  return $obj['msg'];
 
     // Update object attributes
     if ($changed || empty($idold)) {
         // Either changed during update or creating a new record.
-        // As usual, array means LDAP and string means a function.
         if (is_array($writer)) {
+            // As usual, array means LDAP
             uldap_set_dn($ldap, null);
             // Empty $idold means a brand new record
             if (empty($idold))
@@ -328,18 +338,19 @@ function obj_write (&$obj, $srv, $id, $idold) {
             else
                 $res = uldap_entry_update($srv, $dn, $ldap);
         } else {
+            // As usual, string means a custom function
             $res = $writer($obj, $srv, $id, $idold, $ldap);
         }
         log_debug('writing to "%s" returns "%s"', $srv, $res['error']);
         // Note: code 82 = `no values to update'
         if ($res['code'] && $res['code'] != 82)
-            $msg = $res['error'];
+            $obj['msg'][] = $res['error'];
     } else {
         // Not changed and not creating.
         log_debug('nothing to write to "%s"', $srv);
     }
 
-    if ($msg)  return $msg;
+    if ($obj['msg'])  return $obj['msg'];
 
     // Perform post-update operations
     foreach ($obj['attrs'] as $attr_name => &$at) {
@@ -347,11 +358,11 @@ function obj_write (&$obj, $srv, $id, $idold) {
             continue;
         $post_func = $at['desc']['ldap_write_final'];
         $ldap_name = $at['desc']['ldap'][$srv];
-        if ($post_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val'])))
-            $changed = $obj['changed'] = true;
+        $retval = $post_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val']));
+        if ($retval)  $changed = $obj['changed'] = true;
     }
 
-    return $msg;
+    return $obj['msg'];
 }
 
 

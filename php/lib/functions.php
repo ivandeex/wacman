@@ -60,12 +60,15 @@ function json_ok ($val = null) {
 }
 
 
-function error_page ($msg, $fatal = true) {
-    if (function_exists('_T'))  $msg = _T($msg);
-    if (function_exists('log_err'))  log_err($msg);
+function error_page ($msg) {
+    if (!is_array($msg))  $msg = array($msg);
+    foreach ($msg as &$line) {
+        if (function_exists('_T'))  $line = _T($line);
+        if (function_exists('log_err'))  log_err($line);
+    }
     send_headers();
     echo(json_error($msg));
-    if ($fatal)  exit();
+    exit();
 }
 
 

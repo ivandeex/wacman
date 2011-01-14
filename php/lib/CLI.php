@@ -2196,7 +2196,7 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
         }
 
         function SetServerIntercept($settings) {
-            if ($empty($settings))
+            if (!is_array($settings))
                 die('usage CGP::CLI->SetServerIntercept(array $settings)'."\n");
             $this->send('SetServerIntercept '.$this->printWords($settings));
             return $this->_parseResponse();

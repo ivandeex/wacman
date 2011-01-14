@@ -25,17 +25,16 @@ function log_msg () {
         );
     $args = func_get_args();
     $level = array_shift($args);
-    if (($level == LOG_DEBUG || $level == LOG_NOTICE) && !str2bool(get_config('debug')))
-        return false;
-    if (count($args) == 1 && is_array($args[0]))
-        $args = $args[0];
+    if (count($args) == 1 && is_array($args[0]))  $args = $args[0];
     $format = array_shift($args);
     $message = _T($format, $args);
+    if (($level == LOG_DEBUG || $level == LOG_NOTICE) && !str2bool(get_config('debug')))
+        return $message;
     static $no = 100;
     syslog(LOG_INFO, ''.++$no.' ['.$level_str[$level].'] '.$message);
     if ($level == LOG_ERR)
         set_error($message);
-    return true;
+    return $message;
 }
 
 function log_err()    { $args = func_get_args(); return log_msg(LOG_ERR,     $args); }

@@ -187,6 +187,8 @@ function uldap_search ($srv, $filter, $attrs) {
     }
     _ldap_result(true, $conn, $res);
     $res['data'] = (array) _ldap_to_array($data, true);
+    if (empty($res['data']))
+        $res['error'] = "No data";
     set_error();
     if ($cfg['debug'])
         log_debug('uldap_search(%s,filter:[%s]) OK: %s', $srv, $filter, json_encode($res['data']));
@@ -422,39 +424,42 @@ function ldap_write_class (&$obj, &$at, $srv, &$ldap, $name, $val) {
 
 
 function ldap_read_pass (&$obj, &$at, $srv, &$ldap, $name) {
+    // this value is cached because LDAP structure might have removed it for security
+    if (isset($at['oldpass']))
+        return $at['oldpass'];
+
     global $servers;
-    $val = '';
-    if (! get_config('show_password') || $servers['cgp']['disable']) {
+    if (!str2bool(get_config('show_password')) || $servers[$srv]['disable']) {
         $val = OLD_PASS;
     } else if ($srv == 'cgp') {
-        $val = ldap_read_string($at, $srv, $ldap, $name);
+        $val = ldap_read_string($obj, $at, $srv, $ldap, $name);
+    } else {
+        $val = '';
     }
-    return( $at['oldpass'] = nvl($val) );
+
+    $at['oldpass'] = $val;
+    return $val;
 }
 
 
 function ldap_write_pass (&$obj, &$at, $srv, &$ldap, $name, $val) {
-return false; #FIXME
-    if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
+    $oldpass = nvl(ldap_read_pass($obj, $at, $srv, $ldap, $name));
+    // 'verify' is true if this field is a second password copy
+    if ($at['desc']['verify'] || $val == $oldpass)
         return false;
-    if ($srv == 'ads') {
-        // 'replace' works only for administrator.
-        // unprivileged users need to use change(delete=old,add=new)
-        uldap_replace($ldap, $name, encode_ad_pass($val));
-        return true;
-    }
+    if ($srv == 'ads')
+        return false;###FIXME ad_write_pass($at, $srv, $ldap, $name, $val);
     return false;
 }
 
 
 function ldap_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-return false; #FIXME
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return false;
     if ($srv == 'uni')
-        return unix_write_pass_final($at, $srv, $ldap, $name, $val);
+        return false;###FIXME unix_write_pass_final($obj, $at, $srv, $ldap, $name, $val);
     if ($srv == 'cgp')
-        return cgp_write_pass_final($at, $srv, $ldap, $name, $val);
+        return cgp_write_pass_final($obj, $at, $srv, $ldap, $name, $val);
     return false;
 }
 
