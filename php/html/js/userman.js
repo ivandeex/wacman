@@ -200,6 +200,35 @@ Userman.isReserved = function (id, msg) {
     return false;
 }
 
+/////////////////////////////////
+// List functions
+//
+
+Userman.splitList = function (str, as_string) {
+    str = Userman.trim(str);
+    if (!str.length)  return [];
+    var arr = str.split(",");
+    arr.sort();
+    return (as_string ? arr.join(",") : arr);
+}
+
+Userman.joinList = function (arr) {
+    if (!arr.length)  return "";
+    arr.sort();
+    return arr.join(",");
+}
+
+Userman.appendList = function (a, b, as_string) {
+    a = (a instanceof Array) ? a : Userman.splitList(a);
+    b = (b instanceof Array) ? b : Userman.splitList(b);
+    var i, h = {}, r = [];
+    for (i = 0; i < a.length; i++)  h[a[i]] = 1;
+    for (i = 0; i < b.length; i++)  h[b[i]] = 1;
+    for (i in h)  r.push(i);
+    r.sort();
+    return (as_string ? r.join(",") : r);
+}
+
 /////////////////////////////////////////////////////////
 // AJAX indicator icon
 //
@@ -1141,7 +1170,10 @@ Userman.User = Ext.extend(Userman.Object, {
             uid = sn == "" ? gn : gn.substr(0, 1) + sn;
         this.vset("uid", (uid = Userman.toId(uid)));
 
-        //#this.vset("objectClass", append_list(this.vget("objectClass"), Userman.getConfig("unix_user_classes"));
+        this.vset("objectClass",
+                    Userman.appendList(this.vget("objectClass"),
+                                        Userman.getConfig("unix_user_classes"),
+                                        true));
 
         this.setIf("dn", this.getSubst("unix_user_dn"));
         this.setIf("ntDn", this.getSubst("ad_user_dn"));

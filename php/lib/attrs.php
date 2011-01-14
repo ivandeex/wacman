@@ -57,11 +57,11 @@ $all_attrs = array(
         ),
         'objectClass' => array(
             'type' => 'class',
-            'ldap' => array( 'uni' => 'objectClass' ),
+            'ldap' => 'uni',
         ),
         'ntObjectClass' => array(
             'type' => 'class',
-            'ldap' => array( 'ads' => 'objectClass' ),
+            'ldap' => 'ads',
         ),
 
         // ======== posixAccount... ========

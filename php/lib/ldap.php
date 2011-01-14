@@ -411,8 +411,7 @@ function ldap_write_class (&$obj, &$at, $srv, &$ldap, $name, $val) {
     foreach (uldap_value($ldap, $name, true) as $c)
         $ca[strtolower($c)] = 1;
     foreach (split_list($val) as $c) {
-        if (isset($ca[strtolower($c)]))
-            continue;
+        if (isset($ca[strtolower($c)]))  continue;
         uldap_add($ldap, $name, $c);
         $changed = true;
     }
@@ -435,6 +434,7 @@ function ldap_read_pass (&$obj, &$at, $srv, &$ldap, $name) {
 
 
 function ldap_write_pass (&$obj, &$at, $srv, &$ldap, $name, $val) {
+return false; #FIXME
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return false;
     if ($srv == 'ads') {
@@ -448,6 +448,7 @@ function ldap_write_pass (&$obj, &$at, $srv, &$ldap, $name, $val) {
 
 
 function ldap_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
+return false; #FIXME
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return false;
     if ($srv == 'uni')

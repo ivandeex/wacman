@@ -1,7 +1,7 @@
 <?php
 // $Id$
 
-// Retrieve group object
+// Create or update a group object
 
 require '../lib/common.php';
 
@@ -17,10 +17,9 @@ if (!empty($idold)) {
     $msg = obj_read($grp, $srv, $idold, array('objectClass' => 'posixGroup', 'cn' => '$_ID'));
     if ($msg)  error_page($msg);
 }
-
 obj_update($grp);
+
 $msg = obj_write($grp, $srv, $id, $idold);
 if ($msg)  error_page($msg);
-
 echo(json_ok(array('refresh' => $grp['renamed'])));
 ?>

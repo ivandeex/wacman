@@ -213,7 +213,7 @@ function obj_read (&$obj, $srv, $id) {
 
     $reader = @$obj['_accessors'][$srv]['read'];
     if (is_null($reader))
-        error_page(_T('Reader not defined for "%s" on server "%s"', $obj['type'], $srv));
+        error_page(_T('reader not defined for "%s" on server "%s"', $obj['type'], $srv));
 
     if (is_array($reader)) {
         // Read the object using LDAP
@@ -227,12 +227,15 @@ function obj_read (&$obj, $srv, $id) {
     }
 
     $obj['ldap'][$srv] = uldap_pop($res);
+
     if (empty($res['data'])) {
         log_debug('obj_read(%s) [%s]: failed with "%s"',
                     $srv, $filter, $res['error']);
         $obj['msg'] = $res['error'] ? $res['error'] : 'not found';
     }
-    if ($obj['msg'])  error_page($obj['msg']);
+
+    if ($obj['msg'])  return $obj['msg'];
+
     $ldap =& $obj['ldap'][$srv];
 
     foreach ($obj['attrs'] as $attr_name => &$at) {

@@ -11,12 +11,9 @@ if (empty($id))  error_page("id is missing");
 
 $usr = create_obj('user');
 
-foreach (array('uni','ads','cgp') as $srv) {
-    if ($servers[$srv]['disable'])  continue;
+foreach (array_keys($servers) as $srv) {
     $msg = obj_read($usr, $srv, $id);
-    if (! $msg)  continue;
-    if ($srv == 'uni')  error_page($msg);
-    log_info('will create "%s" user for uid "%s"', $srv, $id);
+    if ($msg && $srv == 'uni')  error_page($msg);
 }
 
 echo(obj_json_encode($usr));

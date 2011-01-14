@@ -125,13 +125,12 @@ function nvl ($s) {
 // List functions
 //
 
-function split_list ($str, $asstring = false) {
+function split_list ($str, $as_string = false) {
     $str = nvl($str);
-    if (empty($str))
-        return array();
-    $arr = preg_split('!(?:\s*[,;: ]\s*)+!', nvl($str));
+    if (empty($str))  return array();
+    $arr = preg_split('!(?:\s*[,;: ]\s*)+!', $str);
     sort($arr);
-    return $asstring ? implode(',', $arr) : $arr;
+    return $as_string ? implode(',', $arr) : $arr;
 }
 
 
@@ -143,15 +142,14 @@ function join_list ($arr) {
 }
 
 
-function append_list ($a, $b, $asstring = false) {
+function append_list ($a, $b, $as_string = false) {
     if (! is_array($a))  $a = split_list($a);
     if (! is_array($b))  $b = split_list($b);
     $r = array();
     foreach ($a as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
     foreach ($b as $x)  { if (nvl($x) != '')  $r[$x] = 1; }
     $r = array_keys($r);
-    if ($asstring)
-        return join_list($r);
+    if ($as_string)  return join_list($r);
     sort($r);
     return $r;
 }

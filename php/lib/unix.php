@@ -25,25 +25,24 @@ function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
 
 
 function ldap_write_unix_gidn (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    if (!empty($val) && !is_int($val)) { // /^\d*$/
+    if (!empty($val) && !preg_match('/^\d+$/', $val)) { // /^\d*$/
         $cn = $val;
         $val = 0;
         $res = uldap_search($srv, "(&(objectClass=posixGroup)(cn=$cn))", array('gidNumber'));
         $grp = uldap_pop($res);
         if (!empty($grp)) {
             $gidn = uldap_value($grp, 'gidNumber');
-            if ($gidn)
-                $val = $gidn;
+            if ($gidn)  $val = $gidn;
         }
-        if (! $val)
-            log_info('ldap_write_gidn: group "%s" not found on %s', $cn);
+        if (!$val)  log_info('ldap_write_gidn: group "%s" not found on %s', $cn);
     }
     log_debug('ldap_write_gidn: set group to "%s"', $val);
-    return ldap_write_string ($at, $srv, $ldap, $name, $val);
+    return ldap_write_string($obj, $at, $srv, $ldap, $name, $val);
 }
 
 
 function unix_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
+return false; #FIXME
     global $servers;
     $conf =& $servers[$srv];
     $ldap =& $conf['ldap'];
@@ -67,9 +66,9 @@ function unix_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
         message_box('error', 'close',
                     _T('Cannot change password for "%s" on "%s": %s',
                         $dn, $srv, $res['error']));
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
 }
 
 
@@ -156,6 +155,7 @@ function modify_unix_group ($srv, $gidn, $uid, $action) {
 
 
 function ldap_write_unix_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
+return false; #FIXME
     $uid = get_attr($obj, $name);
     $old = _get_unix_group_ids($srv, $at['old'], 'nowarn'); # FIXME!!!
     $new = _get_unix_group_ids($srv, $at['val'], 'warn');
@@ -164,12 +164,10 @@ function ldap_write_unix_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $old = $arr[0];
     $new = $arr[1];
     log_debug('write_unix_groups(2): del=(%s) add=(%s)', $old, $new);
-    foreach (split_list($old) as $gidn) {
+    foreach (split_list($old) as $gidn)
         modify_unix_group($srv, $gidn, $uid, 'remove');
-    }
-    foreach (split_list($new) as $gidn) {
+    foreach (split_list($new) as $gidn)
         modify_unix_group($srv, $gidn, $uid, 'add');
-    }
     return ($old != '' || $new != '');
 }
 
