@@ -1,6 +1,7 @@
 <?php
 // $Id$
 
+
 ////////////////////////////////////////////////////////
 //       Attribute initializer
 //
@@ -30,6 +31,7 @@ function setup_all_attrs () {
             $desc['name'] = $name;
             $desc['visual'] = false;
 
+            // substitute in default values
             if (empty($desc['type']))  $desc['type'] = 'string';
             if (isset($desc['label']))  $desc['label'] = _T($desc['label']);
             if (! isset($desc['readonly']))  $desc['readonly'] = false;
@@ -38,27 +40,28 @@ function setup_all_attrs () {
             if (! isset($desc['popup']))  $desc['popup'] = null;
             if (! isset($desc['checkbox']))  $desc['checkbox'] = false;
             if ($desc['checkbox'])  $desc['popup'] = 'yesno';
-			
+
+            // attributes can have a default value
             if (! isset($desc['defval'])) {
                 $cfg_def = "default_value_${objtype}_${name}";
                 $desc['defval'] = isset($config[$cfg_def]) ? $config[$cfg_def] : null;
             }
 
-            if (! isset($desc['conv']))  $desc['conv'] = 'none';
+            // attributes can be automatically copied from other attributes
+            if (isset($desc['copyfrom']) && !isset($descs[$desc['copyfrom']]))
+                log_error('%s attribute "%s" is copy-from unknown "%s"',
+                            $objtype, $name, $desc['copyfrom']);
+            if (! isset($desc['copyfrom']))  $desc['copyfrom'] = null;
 
+            // setup data conversions
+            if (! isset($desc['conv']))  $desc['conv'] = 'none';
             foreach (array(0,1) as $dir) {
                 $sub = isset($data_converters[$desc['conv']]) ? $data_converters[$desc['conv']][$dir] : null;
                 if (empty($sub))  $sub = 'conv_none';
                 $desc[$dir ? 'disp2attr' : 'attr2disp'] = $sub;
             }
 
-            if (isset($desc['copyfrom']) && !isset($descs[$desc['copyfrom']]))
-                log_error('%s attribute "%s" is copy-from unknown "%s"',
-                            $objtype, $name, $desc['copyfrom']);
-            if (! isset($desc['copyfrom']))  $desc['copyfrom'] = null;
-
-            if (! isset($desc['disable']))  $desc['disable'] = false;
-
+            // parse and setup per-server mappings for the attribute
             $ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
             if (! is_array($ldap)) {
                 $arr = split_list($ldap);
@@ -68,9 +71,9 @@ function setup_all_attrs () {
 
             foreach (array_keys($ldap) as $srv) {
 
-				// 'ntuser' is a special set of unix attributes
-				// they can be either supported as 'uni' or unsupported
-				if ($srv == 'ntuser') {
+                // 'ntuser' is a special set of unix attributes
+                // they can be either supported as 'uni' or unsupported
+                if ($srv == 'ntuser') {
                     if (get_config('ntuser_support', false)) {
                         $ldap[$srv = 'uni'] = $ldap['ntuser'];
                         unset($ldap['ntuser']);
@@ -89,21 +92,25 @@ function setup_all_attrs () {
                 if (empty($ldap[$srv]))
                     $ldap[$srv] = $name;
 
-                $ldapattr = $ldap[$srv];
+                $ldap_attr = $ldap[$srv];
 				$cfg =& $servers[$srv];
-                if (isset($cfg['attrhash'][$objtype][$ldapattr])) {
+                if (isset($cfg['attrhash'][$objtype][$ldap_attr])) {
                     if (! empty($desc['is_duplicate']))
                         log_error('duplicate attribute "%s" as "%s" for server "%s"',
-                                    $name, $ldapattr, $srv);
+                                    $name, $ldap_attr, $srv);
                 } else if (empty($ldap['disable'])) {
-                    $cfg['attrhash'][$objtype][$ldapattr] = 1;
+                    $cfg['attrhash'][$objtype][$ldap_attr] = 1;
                 }
             }
 
             $desc['ldap'] = $ldap;
-            if (empty($ldap) || ! attribute_enabled($objtype, $name))
-                $desc['disable'] = 1;
 
+            // disable attributes without servers or due to configuration
+            if (! isset($desc['disable']))  $desc['disable'] = false;
+            if (! attribute_enabled($objtype, $name))  $desc['disable'] = true;
+            if (empty($ldap))  $desc['disable'] = true;
+
+            // setup readers and writers
             if ($desc['disable'])
                 $subs = $data_accessors['none'];
             else if (is_array($desc['type']))
@@ -113,9 +120,9 @@ function setup_all_attrs () {
             if (!is_array($subs))
                 error_page(_T('type "%s" of "%s" attribute "%s" is not supported',
                                 $desc['type'], $objtype, $name));
-            $desc['ldap_read'] = $subs[0];
-            $desc['ldap_write'] = $subs[1];
-            $desc['ldap_write_final'] = $subs[2];
+            $desc['ldap_read'] = $subs[0] ? $subs[0] : 'ldap_read_none';
+            $desc['ldap_write'] = $subs[1] ? $subs[1] : 'ldap_write_none';
+            $desc['ldap_write_final'] = $subs[2] ? $subs[2] : 'ldap_write_none';
         }
 
         foreach ($servers as $srv => &$cfg) {
@@ -139,6 +146,8 @@ function setup_all_attrs () {
             }
         }
     }
+
+    // all done.
 }
 
 
@@ -155,7 +164,8 @@ function & create_obj ($objtype) {
 
     $obj = array(
         'type' => $objtype,
-        'changed' => 0,
+        'changed' => false,
+        'renamed' => false,
         'attrs' => array(),
         'ldap' => array(),
         'attrlist' => array(),
@@ -196,7 +206,6 @@ function obj_read (&$obj, $srv, $id) {
 
     $obj['idold'] = null;
     $obj['id'] = $id;
-    $obj['renamed'] = false;
     $obj['ldap'][$srv] = array();
     $obj['msg'] = '';
 
@@ -286,7 +295,7 @@ function obj_write (&$obj, $srv, $id, $idold) {
         $write_func = $at['desc']['ldap_write'];
         $ldap_name = $at['desc']['ldap'][$srv];
         if ($write_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val'])))
-            $changed = true;
+            $changed = $obj['changed'] = true;
 	}
 
     // Rename LDAP object if needed
@@ -336,7 +345,7 @@ function obj_write (&$obj, $srv, $id, $idold) {
         $post_func = $at['desc']['ldap_write_final'];
         $ldap_name = $at['desc']['ldap'][$srv];
         if ($post_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val'])))
-            $changed = true;
+            $changed = $obj['changed'] = true;
     }
 
     return $msg;

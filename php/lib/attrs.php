@@ -195,6 +195,8 @@ $all_attrs = array(
         ),
 
         // ======== ntUser... ========
+        // 'ntuser' is a special set of unix attributes
+        // they can be either supported as 'uni' or unsupported
 
         'ntUserCreateNewAccount' => array(
             'defval' => 'false',
