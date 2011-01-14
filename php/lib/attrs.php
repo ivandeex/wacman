@@ -113,13 +113,13 @@ $all_attrs = array(
             'ldap' => 'uni,ads',
         ),
         'gidNumber' => array(
-            'type' => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', 'ldap_write_none' ),
+            'type' => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', null ),
             'label' => 'Group',
             'popup' => 'gid',
             'ldap' => 'uni,ads',
         ),
         'moreGroups' => array(
-            'type' => array( 'ldap_read_unix_groups', 'ldap_write_none', 'ldap_write_unix_groups_final' ),
+            'type' => array( 'ldap_read_unix_groups', null, 'ldap_write_unix_groups_final' ),
             'label' => 'Other groups',
             'popup' => 'groups',
             'ldap' => array( 'uni' => 'uid' ),
@@ -179,11 +179,11 @@ $all_attrs = array(
             'ldap' => array( 'ntuser' => '', 'ads' => 'scriptPath' ),
         ),
         'PrimaryGroupID' => array(
-            'type' => array( 'ad_read_pri_group', 'ad_write_pri_group', 'ldap_write_none' ),
+            'type' => array( 'ad_read_pri_group', 'ad_write_pri_group', null ),
             'ldap' => 'ads',
         ),
         'SecondaryGroups' => array(
-            'type' => array( 'ad_read_sec_groups', 'ldap_write_none', 'ad_write_sec_groups_final' ),
+            'type' => array( 'ad_read_sec_groups', null, 'ad_write_sec_groups_final' ),
             'ldap' => 'ads',
         ),
         'sfuDomain' => array(
@@ -251,34 +251,34 @@ $all_attrs = array(
         // ======== CommuniGate Pro ========
 
         'mailuser' => array(
-            'type' => array( 'cgp_read_user', 'cgp_write_user', 'ldap_write_none' ),
+            'type' => array( 'cgp_read_user', 'cgp_write_user', null ),
             'ldap' => 'cgp',
         ),
         'aliases' => array(
-            'type' => array( 'cgp_read_aliases', 'ldap_write_none', 'cgp_write_aliases_final' ),
+            'type' => array( 'cgp_read_aliases', null, 'cgp_write_aliases_final' ),
             'label' => 'Mail aliases',
             'ldap' => 'cgp',
         ),
         'telnum' => array(
-            'type' => 'none',           // read/write via aliases
+            'type' => 'none',           // read/write is done by aliases
             'label' => 'Short number',
             'ldap' => 'cgp',
         ),
         'mailgroups' => array(
-            'type' => array( 'cgp_read_mail_groups', 'ldap_write_none', 'cgp_write_mail_groups_final' ),
+            'type' => array( 'cgp_read_mail_groups', null, 'cgp_write_mail_groups_final' ),
             'label' => 'Mail groups',
             'popup' => 'mailgroups',
             'ldap' => 'cgp',
         ),
         'domainIntercept' => array(
-            'type' => array( 'cgp_read_domain_intercept', 'ldap_write_none', 'cgp_write_domain_intercept' ),
+            'type' => array( 'cgp_read_domain_intercept', null, 'cgp_write_domain_intercept' ),
             'label' => 'Domain Intercept',
             'checkbox' => true,
             'disable' => true,
             'ldap' => 'cgp',
         ),
         'userIntercept' => array(
-            'type' => array( 'cgp_read_user_intercept', 'ldap_write_none', 'cgp_write_user_intercept' ),
+            'type' => array( 'cgp_read_user_intercept', null, 'cgp_write_user_intercept' ),
             'label' => 'User Intercept',
             'checkbox' => true,
             'ldap' => 'cgp',
@@ -302,13 +302,13 @@ $all_attrs = array(
         'label' => array( 'ldap' => 'uni,ads', ),
         'real_uidn' => array(
             'ldap' => array( 'uni' => 'uidNumber' ),
-            'type' => array( 'posix_read_real_uidn', 'ldap_write_none', 'ldap_write_none' ),
+            'type' => array( 'posix_read_real_uidn', null, null ),
             'label' => 'Real user id',
             'readonly' => true,
         ),
         'real_gidn' => array(
             'ldap' => array( 'uni' => 'gidNumber' ),
-            'type' => array( 'posix_read_real_gidn', 'ldap_write_none', 'ldap_write_none' ),
+            'type' => array( 'posix_read_real_gidn', null, null ),
             'label' => 'Real group id',
             'readonly' => true,
         ),
@@ -352,7 +352,7 @@ $all_attrs = array(
             'ldap' => 'uni',
         ),
         'memberUid' => array(
-            'type' => array( 'ldap_read_unix_members', 'ldap_write_unix_members', 'ldap_write_none' ),
+            'type' => array( 'ldap_read_unix_members', 'ldap_write_unix_members', null ),
             'label' => 'Members',
             'popup' => 'users',
             'ldap' => 'uni',
@@ -375,7 +375,7 @@ $all_attrs = array(
         ),
 
         'uid' => array(
-            'type' => array( 'cgp_read_mailgroup_uid', 'ldap_write_none', 'ldap_write_none' ),
+            'type' => array( 'cgp_read_mailgroup_uid', null, null ),
             'label' => 'Group name',
             'ldap' => 'cgp',
             'colwidth' => 140,  // mark for inclusion in the list panel
@@ -385,13 +385,13 @@ $all_attrs = array(
             'ldap' => array( 'cgp' => 'RealName' ),
         ),
         'groupMember' => array(
-            'type' => array( 'cgp_read_mailgroup_members', 'cgp_write_mailgroup_members', 'ldap_write_none' ),
+            'type' => array( 'cgp_read_mailgroup_members', 'cgp_write_mailgroup_members', null ),
             'label' => 'Members',
             'popup' => 'mailusers',
             'ldap' => 'cgp',
         ),
         'params' => array(
-            'type' => array( 'cgp_read_mailgroup_params', 'cgp_write_mailgroup_params', 'ldap_write_none' ),
+            'type' => array( 'cgp_read_mailgroup_params', 'cgp_write_mailgroup_params', null ),
             'label' => 'Params',
             'ldap' => 'cgp',
         ),
@@ -444,11 +444,11 @@ $gui_attrs = array(
 
 
 $data_accessors = array(
-    'none'    => array( 'ldap_read_none', 'ldap_write_none', 'ldap_write_none' ),
-    'string'  => array( 'ldap_read_string', 'ldap_write_string', 'ldap_write_none' ),
-    'number'  => array( 'ldap_read_string', 'ldap_write_string', 'ldap_write_none' ),
-    'dn'      => array( 'ldap_read_dn', 'ldap_write_dn', 'ldap_write_none' ),
-    'class'   => array( 'ldap_read_class', 'ldap_write_class', 'ldap_write_none' ),
+    'none'    => array( null, null, null ),
+    'string'  => array( 'ldap_read_string', 'ldap_write_string', null ),
+    'number'  => array( 'ldap_read_string', 'ldap_write_string', null ),
+    'dn'      => array( 'ldap_read_dn', 'ldap_write_dn', null ),
+    'class'   => array( 'ldap_read_class', 'ldap_write_class', null ),
     'pass'    => array( 'ldap_read_pass', 'ldap_write_pass', 'ldap_write_pass_final' )
     );
 
