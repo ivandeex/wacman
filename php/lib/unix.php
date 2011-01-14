@@ -196,49 +196,36 @@ function ldap_read_unix_members (&$obj, &$at, $srv, &$ldap, $name) {
 
 
 function ldap_write_unix_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $h_uids = array();
-    $touched_uids = array();
+    $uid_hash = array();
+
     foreach (split_list($val) as $uidn) {
-        if (! is_int($uidn)) {
-            $h_uids[$uidn] = $touched_uids[$uidn] = 1;
+        if (! preg_match('/^\d+$/', $uidn)) {
+            $uid_hash[$uidn] = 1;
             continue;
         }
         $res = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
-        $ue = uldap_pop($res);
-        $uid = !empty($ue) ? nvl(uldap_value($ue, 'uid')) : '';
-        log_debug('search for uidn="%d" returns uid="%s" (code=%s)', $uidn, $uid, $res['code']);
+        $uid = nvl(uldap_value(uldap_pop($res), 'uid'));
         if ($uid != '') {
-            $h_uids[$uid] = $touched_uids[$uid] = 1;
+            log_debug('search for uidn="%d" returns uid="%s"', $uidn, $uid);
+            $uid_hash[$uid] = 1;
         } else {
-            log_info('did not find user uidn %s', $uidn);
+            log_info('cannot find user for id %s: %s', $uidn, $res['error']);
         }
     }
 
-	$a_uids = sort(array_keys($h_uids));
-    log_debug('ldap_write_unix_members: uids(%s) [%s] => [%s]',
-                $name, $val, join_list($a_uids));
-    if (empty($a_uids)) {
-        if (uldap_exists($ldap, $name)) {
-            foreach (uldap_value($ldap, $name) as $x)
-                $touched_uids[$x] = 1;
-			uldap_delete($ldap, $name);
-        }
+    $uid_arr = array_keys($uid_hash);
+    sort($uid_arr);
+
+    if (empty($uid_arr)) {
+        uldap_delete($ldap, $name);
     } else if (uldap_exists($ldap, $name)) {
-        foreach (uldap_value($ldap, $name) as $x)
-            $touched_uids{$x} = 1;
-        uldap_replace($ldap, $name, $a_uids);
+        uldap_replace($ldap, $name, $uid_arr);
     } else {
-        uldap_add($ldap, $name, $a_uids);
+        uldap_add($ldap, $name, $uid_arr);
     }
 
-    $sel_usr = $user_obj;
-    if (!$sel_usr['changed'] && $touched_uids[get_attr($sel_usr, 'uid')]) {
-        // will refresh gui for this user after commit to LDAP
-        $sel_usr['refresh_request'] = 1;
-        log_debug('will re-select current user');
-    }
-
-    return 1;
+    log_debug('ldap_write_unix_members: uids(%s) [%s] => [%s]', $name, $val, join_list($uid_arr));
+    return true;
 }
 
 

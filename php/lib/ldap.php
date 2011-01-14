@@ -209,8 +209,24 @@ function uldap_pop ($res) {
 }
 
 
-function uldap_dn ($data) {
+function uldap_dn (&$data) {
     return (isset($data['dn']) ? $data['dn'] : '');
+}
+
+
+function uldap_set_dn (&$data, $dn = null) {
+    $old_dn = uldap_dn($data);
+    if ($dn)
+        $ldap['dn'] = $dn;
+    elseif (isset($data['dn']))
+        unset($data['dn']);
+    return $old_dn;
+}
+
+
+function dn_to_rdn ($dn) {
+    // Remove comma which is not escaped by preceding backslash and the rest of string
+    return preg_replace('/(?<!\\\\),.*$/', '', $dn);
 }
 
 
@@ -244,10 +260,12 @@ function uldap_delete (&$data, $name) {
 
 function uldap_add (&$data, $name, $val) {
     _fix_ldap_name($data, $name);
-    if (isset($data[$name]))
-        $data[$name] = array_merge((array)$data[$name], $val);
-    else
+    if (isset($data[$name])) {
+        $data[$name] = array_merge((array)$data[$name], (array)$val);
+        sort($data[$name]);
+    } else {
         $data[$name] = $val;
+    }
 }
 
 
@@ -264,16 +282,6 @@ function uldap_replace (&$data, $name, $val) {
 }
 
 
-//
-// Hack! Hack! Hack!
-// We suppose that DN of the group has form: ATTRNAME=ID,...
-// For different naming schemes this won't work
-//
-function make_new_rdn ($objtype, $id, $dn_old, $id_old) {
-    return (preg_replace('/=.*$/', '', $dn_old) . '=' . $id);
-}
-
-
 ///////////////////////////////////////////////
 // Modifying server entries directly
 //
@@ -283,6 +291,22 @@ function uldap_entry_rename ($srv, $dn_old, $rdn_new) {
     $conn = _uldap_connection($srv, $res);
     if ($conn)
         _ldap_result(@ldap_rename($conn, $dn_old, $rdn_new, null, true), $conn, $res);
+    return $res;
+}
+
+
+function uldap_entry_create ($srv, $dn, $values) {
+    $conn = _uldap_connection($srv, $res);
+    if ($conn)
+        _ldap_result(@ldap_add($conn, $dn, $values), $conn, $res);
+    return $res;
+}
+
+
+function uldap_entry_update ($srv, $dn, $values) {
+    $conn = _uldap_connection($srv, $res);
+    if ($conn)
+        _ldap_result(@ldap_modify($conn, $dn, $values), $conn, $res);
     return $res;
 }
 
@@ -314,6 +338,7 @@ function uldap_entry_replace ($srv, $dn, $entry) {
 //////////////////////////////////////////////////////////////
 // Basic readers / Writers
 //
+
 
 function ldap_read_none () {
     return '';

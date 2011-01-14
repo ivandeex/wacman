@@ -462,7 +462,7 @@ function cgp_cmd () {
     $ret = call_user_func_array(array($cli, $func), $args);
     if ($cli->isSuccess()) {
         set_error();
-        return array('code' => 0, 'error' => 'OK', 'data' => $ret);
+        return array('code' => 0, 'error' => '', 'data' => $ret);
     }
 
     log_error("CLI error in $func: " . $cli->getErrMessage());

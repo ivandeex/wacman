@@ -203,7 +203,7 @@ function obj_read (&$obj, $srv, $id) {
     if ($servers[$srv]['disable'])  return null;
 
     $reader = @$obj['_accessors'][$srv]['read'];
-    if (empty($reader))
+    if (is_null($reader))
         error_page(_T('Reader not defined for "%s" on server "%s"', $obj['type'], $srv));
 
     if (is_array($reader)) {
@@ -246,31 +246,41 @@ function obj_read (&$obj, $srv, $id) {
 function obj_write (&$obj, $srv, $id, $idold) {
     global $servers;
 
-    if ($servers[$srv]['disable'])
-        return null;
-
-    $ldap =& $obj['ldap'][$srv];
-    $changed = false;
-    $msg = null;
+    if ($servers[$srv]['disable'])  return null;
 
     $writer = @$obj['_accessors'][$srv]['write'];
-    if (empty($writer))
+    if (is_null($writer))
         error_page(_T('Writer not defined for "%s" on server "%s"', $obj['type'], $srv));
 
     log_debug('start writing to "%s"...', $srv);
 
-    // CGP will use IDs for writing
+    // Prepare writing parameters
     $obj['idold'] = $idold;
     $obj['id'] = $id;
     $obj['renamed'] = false;    // can be set to true by subordinate writes
+    $ldap =& $obj['ldap'][$srv];
+    $changed = false;
+    $msg = null;
 
+    // Find new DN
+    if (is_array($writer)) {
+        $dn_old = uldap_dn($ldap);
+        $dn = get_attr($obj, 'dn');
+        if (empty($dn) || (!empty($idold) && empty($dn_old)))
+            return _T("DN is missing");
+    }
+
+    // Convert object attributes into low-level values
     foreach ($obj['attrs'] as $attr_name => &$at) {
         if (! isset($at['desc']['ldap'][$srv]))
             continue;
+
         // If we used call_user_func(), all parameters would be passed by value,
         // and the "renamed" magic would not work.
+        //
         // If we used call_user_func_array(), we would need to mark
         // all passed by reference parameters by "&" in the call time array.
+        //
         // The variable function used here honors pass by reference
         // in function prototypes (at least in PHP 5.2.16).
         $write_func = $at['desc']['ldap_write'];
@@ -279,13 +289,32 @@ function obj_write (&$obj, $srv, $id, $idold) {
             $changed = true;
 	}
 
-    if (!$changed && !empty($idold)) {
-        // not changed and not creating
-        log_debug('nothing to write to "%s"', $srv);		
-    } else {
-        // as usual, array means LDAP and string means a function
+    // Rename LDAP object if needed
+    if (is_array($writer) && !empty($idold) && $id != $idold) {
+        $rdn_new = dn_to_rdn($dn);
+        $res = uldap_entry_rename($srv, $dn_old, $rdn_new);
+        if ($res['code']) {
+            $msg = _T('Cannot rename %s "%s" to "%s": %s',
+                        $obj['type'], $obj['idold'], $obj['id'], $res['error']);
+        } else {
+            log_debug("rename %s DN=[%s] to RDN=[%s] OK", $obj['type'], $dn_old, $rdn_new);
+            $obj['renamed'] = true;
+        }
+    }
+
+    if ($msg)  return $msg;
+
+    // Update object attributes
+    if ($changed || empty($idold)) {
+        // Either changed during update or creating a new record.
+        // As usual, array means LDAP and string means a function.
         if (is_array($writer)) {
-            $res = uldap_update($srv, $ldap);
+            uldap_set_dn($ldap, null);
+            // Empty $idold means a brand new record
+            if (empty($idold))
+                $res = uldap_entry_create($srv, $dn, $ldap);
+            else
+                $res = uldap_entry_update($srv, $dn, $ldap);
         } else {
             $res = $writer($obj, $srv, $id, $idold, $ldap);
         }
@@ -293,8 +322,14 @@ function obj_write (&$obj, $srv, $id, $idold) {
         // Note: code 82 = `no values to update'
         if ($res['code'] && $res['code'] != 82)
             $msg = $res['error'];
+    } else {
+        // Not changed and not creating.
+        log_debug('nothing to write to "%s"', $srv);
     }
 
+    if ($msg)  return $msg;
+
+    // Perform post-update operations
     foreach ($obj['attrs'] as $attr_name => &$at) {
         if (! isset($at['desc']['ldap'][$srv]))
             continue;
@@ -316,7 +351,7 @@ function obj_list ($objtype, $srv) {
 
     // Get the listing function or LDAP search filter
     $lister = @$all_attrs[$objtype]['_accessors'][$srv]['list'];
-    if (empty($lister))
+    if (is_null($lister))
         error_page(_T('Lister not defined for "%s" on server "%s"', $obj_type, $srv));
 
     // Get the list of attributes to get, the first one will be sort key
