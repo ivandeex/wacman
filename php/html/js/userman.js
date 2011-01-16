@@ -399,6 +399,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     name: undefined,    // object name
     list: undefined,    // index in Userman.std_lists
     title: undefined,   // title for the list panel
+    affect_lists: [],   // other lists affected by this object list changes
 
     // AJAX URLs for interaction with PHP
     read_url: undefined,    // for reading the record
@@ -570,11 +571,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     },
 
     //
-    // Rejects changes and refreshes lists.
+    // Rejects changes if any and refreshes lists.
     //
     refresh: function () {
         this.clear();
         this.list_store.reload();
+        for (var i = 0; i < this.affect_lists.length; i++)
+            Userman.std_lists[this.affect_lists[i]].store.reload();
     },
 
     //
@@ -606,6 +609,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 _isLoad: false,
                 scope: this,
                 success: function (form, action) {
+                    this.refresh();
+                },
+                failure: function (form, action) {
+                    // refresh even if error happens
                     this.refresh();
                 }
             })
@@ -1149,6 +1156,9 @@ Userman.User = Ext.extend(Userman.Object, {
     title: " Users ",
     id_attr: "uid",
     update_send_all: true,
+
+    // user list changes also affects the list of mail users
+    affect_lists: ["mailusers"],
 
     formTitle: function () {
         return this.vget("uid") + " (" + this.vget("cn") + ")";

@@ -278,7 +278,7 @@ $all_attrs = array(
             'ldap' => 'cgp',
         ),
         'mailgroups' => array(
-            'type' => array( 'cgp_read_mail_groups', null, 'cgp_write_mail_groups_final' ),
+            'type' => array( 'cgp_read_user_mail_groups', null, 'cgp_write_user_mail_groups_final' ),
             'label' => 'Mail groups',
             'popup' => 'mailgroups',
             'ldap' => 'cgp',
