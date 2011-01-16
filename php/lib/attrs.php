@@ -37,7 +37,8 @@ $all_attrs = array(
                         ),
             'cgp' => array(
                         'read' => 'cgp_user_reader',
-                        'write' => 'cgp_user_writer'
+                        'write' => 'cgp_user_writer',
+                        'clean' => 'cgp_user_cleaner'
                         )
         ),
 

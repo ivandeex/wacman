@@ -201,6 +201,10 @@ function & create_obj ($objtype) {
     foreach (array_keys($servers) as $srv) {
         $obj['attrlist'][$srv] =& $servers[$srv]['attrlist'][$objtype];
         $obj['ldap'][$srv] = array();
+
+        $cleaner = @$obj['_accessors'][$srv]['clean'];
+        if ($cleaner)
+            $cleaner($obj, $srv, $obj['ldap'][$srv]);
     }
 
     return $obj;

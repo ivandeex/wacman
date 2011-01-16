@@ -9,6 +9,18 @@
 //
 
 
+function cgp_user_cleaner (&$obj, $srv, &$ldap) {
+    $ldap['_cgp_id'] = '';
+    $ldap['_cgp_mail'] = '';
+    $ldap['_cgp_others'] = array();
+    $ldap['_cgp_mail_aliases'] = array();
+    $ldap['_cgp_domain_rules'] = array();
+    $ldap['_cgp_domain_rule_idx'] = -1;
+    $ldap['_cgp_server_intercept'] = array();
+    $ldap['_cgp_mail_groups'] = array();
+}
+
+
 function cgp_user_reader (&$obj, $srv, $id) {
 
     $mail = cgp_verify_mail($id);
