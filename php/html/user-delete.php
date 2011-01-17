@@ -30,7 +30,7 @@ foreach (uldap_entries($res) as $ge) {
     $gidn = uldap_value($ge, 'gidNumber');
     modify_unix_group($dummy_usr, $srv, $gidn, $id, false);
 }
-foreach ($obj['msg'] as $line)  $msg[] = $line;
+foreach ($dummy_usr['msg'] as $line)  $msg[] = $line;
 
 // Delete AD account
 $cn = uldap_value($ue, 'cn');

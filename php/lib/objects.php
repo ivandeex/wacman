@@ -182,6 +182,7 @@ function & create_obj ($objtype) {
         'data' => array(),
         'attrlist' => array(),
         '_accessors' => array(),
+        'msg' => array(),
         );
 
     foreach ($all_attrs[$objtype] as $name => &$desc) {
@@ -222,7 +223,7 @@ function obj_read (&$obj, $srv, $id) {
 
     $obj['idold'] = null;
     $obj['id'] = $id;
-    $obj['msg'] = '';
+    $obj['msg'] = array();
 
     if ($servers[$srv]['disable'])  return null;
 
@@ -244,7 +245,7 @@ function obj_read (&$obj, $srv, $id) {
     if (empty($res['data'])) {
         log_debug('obj_read(%s) [%s]: failed with "%s"',
                     $srv, $filter, $res['error']);
-        $obj['msg'] = $res['error'] ? $res['error'] : 'not found';
+        $obj['msg'][] = $res['error'] ? $res['error'] : 'not found';
     }
 
     if ($obj['msg'])  return $obj['msg'];
