@@ -122,16 +122,16 @@ $all_attrs = array(
             'srv' => 'uni,ads',
         ),
         'gidNumber' => array(
-            'type' => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', null ),
+            'type' => array( 'unix_read_gidn', 'unix_write_gidn', null ),
             'label' => 'Group',
             'popup' => 'gid',
             'srv' => 'uni,ads',
         ),
         'moreGroups' => array(
-            'type' => array( 'ldap_read_unix_groups', null, 'ldap_write_unix_groups_final' ),
+            'type' => array( 'unix_read_user_groups', null, 'unix_write_user_groups_final' ),
             'label' => 'Other groups',
             'popup' => 'groups',
-            'srv' => array( 'uni' => 'uid' ),
+            'srv' => 'uni',
         ),
         'homeDirectory' => array(
             'label' => 'Home directory',
@@ -365,7 +365,7 @@ $all_attrs = array(
             'srv' => 'uni',
         ),
         'memberUid' => array(
-            'type' => array( 'ldap_read_unix_members', 'ldap_write_unix_members', null ),
+            'type' => array( 'unix_read_group_members', 'unix_write_group_members', null ),
             'label' => 'Members',
             'popup' => 'users',
             'srv' => 'uni',

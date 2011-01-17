@@ -172,21 +172,27 @@ function remove_list ($a, $b, $asstring = false) {
 }
 
 
-function compare_lists ($a, $b, $asstring = false) {
+function compare_lists ($a, $b) {
     if (! is_array($a))  $a = split_list($a);
     if (! is_array($b))  $b = split_list($b);
-    $h_a = array();
-    foreach ($a as $x)  { $h_a[$x] = 1; }
-    $h_b = array();
-    foreach ($b as $x)  { $h_b[$x] = 1; }
-    $onlya = array();
-    $onlyb = array();
+    $only_a = array();
+    $only_b = array();
     $common = array();
-    foreach ($a as $x)  { $b[$x] ? ($common[$x] = 1) : ($onlya[$x] = 1); }
-    foreach ($b as $x)  { $a[$x] ? ($common[$x] = 1) : ($onlyb[$x] = 1); }
-    return array(join_list(array_keys(onlya)),
-                join_list(array_keys(onlyb)),
-                join_list(array_keys(common)));
+    foreach ($a as $x)  {
+        if (array_search($x, $b))
+            $common[$x] = 1;
+        else
+            $only_a[$x] = 1;
+    }
+    foreach ($b as $x)  {
+        if (array_search($x, $a))
+            $common[$x] = 1;
+        else
+            $only_b[$x] = 1;
+    }
+    return array(join_list(array_keys($only_a)),
+                join_list(array_keys($only_b)),
+                join_list(array_keys($common)));
 }
 
 

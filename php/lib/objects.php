@@ -345,7 +345,6 @@ function obj_write (&$obj, $srv, $id, $idold) {
                 $res = uldap_entry_create($srv, $dn, $data);
             else
                 $res = uldap_entry_update($srv, $dn, $data);
-###log_info("srv=$srv action=".(empty($idold)?"create":"update")." dn=($dn) data=".json_encode($data)." res=".json_encode($res));
         } else {
             // As usual, string means a custom function
             $res = $writer($obj, $srv, $id, $idold, $data);
