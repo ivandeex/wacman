@@ -35,7 +35,6 @@ function setup_all_attrs () {
             if (empty($desc['type']))  $desc['type'] = 'string';
             if (isset($desc['label']))  $desc['label'] = _T($desc['label']);
             if (! isset($desc['readonly']))  $desc['readonly'] = false;
-            if (! isset($desc['verify']))  $desc['verify'] = false;
             if (! isset($desc['colwidth']))  $desc['colwidth'] = null;
             if (! isset($desc['popup']))  $desc['popup'] = null;
             if (! isset($desc['checkbox']))  $desc['checkbox'] = false;
@@ -297,7 +296,7 @@ function obj_write (&$obj, $srv, $id, $idold) {
 
     // Convert object attributes into low-level values
     foreach ($obj['attrs'] as $attr_name => &$at) {
-        if (! isset($at['desc']['srv'][$srv]))
+        if (! isset($at['desc']['srv'][$srv]) || $at['desc']['readonly'])
             continue;
 
         // If we used call_user_func(), all parameters would be passed by value,
@@ -362,7 +361,7 @@ function obj_write (&$obj, $srv, $id, $idold) {
 
     // Perform post-update operations
     foreach ($obj['attrs'] as $attr_name => &$at) {
-        if (! isset($at['desc']['srv'][$srv]))
+        if (! isset($at['desc']['srv'][$srv]) || $at['desc']['readonly'])
             continue;
         $post_func = $at['desc']['ldap_write_final'];
         $ldap_attr = $at['desc']['srv'][$srv];

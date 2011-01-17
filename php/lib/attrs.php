@@ -42,31 +42,17 @@ $all_attrs = array(
                         )
         ),
 
-        // ======== Core... ========
+        // ======== posixAccount... ========
 
         'dn' => array(
             'type' => 'dn',
             'srv' => 'uni',
             'label' => 'UNIX DN',
-            'readonly' => true,
-        ),
-        'ntDn' => array(
-            'type' => 'dn',
-            'srv' => 'ads',
-            'label' => 'Windows DN',
-            'readonly' => true,
         ),
         'objectClass' => array(
             'type' => 'class',
             'srv' => 'uni',
         ),
-        'ntObjectClass' => array(
-            'type' => 'class',
-            'srv' => 'ads'
-        ),
-
-        // ======== posixAccount... ========
-
         'uid' => array(
             'type' => 'number',
             'label' => 'Identifier',
@@ -110,12 +96,12 @@ $all_attrs = array(
         'password2' => array(
             'type' => 'pass',
             'label' => 'Again password',
+            'readonly' => true,
             'srv' => array(
                 'uni' => 'userPassword',
                 'ads' => 'unicodePwd',
                 'cgp' => 'Password'
             ),
-            'verify' => true,
         ),
         'uidNumber' => array(
             'label' => 'User#',
@@ -144,6 +130,14 @@ $all_attrs = array(
 
         // ======== Active Directory... ========
 
+        'ntDn' => array(
+            'type' => 'dn',
+            'srv' => array('ads' => 'dn'),
+        ),
+        'ntObjectClass' => array(
+            'type' => 'class',
+            'srv' => array('ads' => 'objectClass')
+        ),
         'accountExpires' => array(
             'defval' => NO_EXPIRE,
             'srv' => 'ads',
@@ -164,7 +158,6 @@ $all_attrs = array(
         ),
         'userAccountControl' => array(
             'conv' => 'decihex',
-            'label' => 'Account control',
             'srv' => 'ads',
         ),
         'userPrincipalName' => array(

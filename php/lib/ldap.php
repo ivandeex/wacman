@@ -195,8 +195,8 @@ function uldap_search ($srv, $filter, $attrs) {
         $res['error'] = "No data";
     set_error();
     if ($debug)
-        log_info('uldap_search(%s,filter:[%s]) OK: %s',
-                $srv, $filter, json_encode($res['data']));
+        log_info('uldap_search(%s,filter:[%s],attrs:[%s]) OK: %s',
+                $srv, $filter, json_encode($attrs), json_encode($res['data']));
     return $res;
 }
 
@@ -409,23 +409,24 @@ function ldap_write_class (&$obj, &$at, $srv, &$data, $name, $val) {
     $name = 'objectClass';
     $changed = false;
     $ca = array();
+    $added = array();
     foreach (uldap_value($data, $name, true) as $c)
         $ca[strtolower($c)] = 1;
     foreach (split_list($val) as $c) {
         if (isset($ca[strtolower($c)]))  continue;
         uldap_add($data, $name, $c);
+        $added[] = $c;
         $changed = true;
     }
-    log_debug('ldap_write_class(%s): attr="%s" class="%s" dn="%s" changed=%d',
-                $srv, $at['name'], $val, get_attr($obj, 'dn'), $changed);
+    log_debug('ldap_write_class(%s): attr="%s" class="%s" changed=%d (%s)',
+                $srv, $at['name'], $val, $changed, join_list($added));
     return $changed;
 }
 
 
 function ldap_read_pass (&$obj, &$at, $srv, &$data, $name) {
     // this value is cached because LDAP structure might have removed it for security
-    if (isset($at['oldpass']))
-        return $at['oldpass'];
+    if (isset($at['old']))  return $at['old'];
 
     global $servers;
     if (!str2bool(get_config('show_password')) || $servers[$srv]['disable']) {
@@ -436,15 +437,14 @@ function ldap_read_pass (&$obj, &$at, $srv, &$data, $name) {
         $val = '';
     }
 
-    $at['oldpass'] = $val;
+    $at['old'] = $val;
     return $val;
 }
 
 
 function ldap_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
-    $oldpass = nvl(ldap_read_pass($obj, $at, $srv, $data, $name));
-    // 'verify' is true if this field is a second password copy
-    if ($at['desc']['verify'] || $val == $oldpass)
+    $old = nvl(ldap_read_pass($obj, $at, $srv, $data, $name));
+    if ($val == $old)
         return false;
     if ($srv == 'ads')
         return false;###FIXME ad_write_pass($at, $srv, $data, $name, $val);
@@ -453,7 +453,8 @@ function ldap_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
 
 
 function ldap_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
-    if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
+    $old = nvl(ldap_read_pass($obj, $at, $srv, $data, $name));
+    if ($val == $old)
         return false;
     if ($srv == 'uni')
         return false;###FIXME unix_write_pass_final($obj, $at, $srv, $data, $name, $val);
