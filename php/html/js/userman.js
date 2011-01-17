@@ -657,6 +657,10 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.form.setValues(action._data);
         // intercept data from server and put into local record
         this.data = new this.Data(action._data);
+        // reload attributes with new values
+        for (var name in this.attr)
+            this.vset(name, this.data.get(name));
+        // update GUI
         this.refocus();
         this.markChanged(false, true);
     },
