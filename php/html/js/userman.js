@@ -1202,8 +1202,8 @@ Userman.User = Ext.extend(Userman.Object, {
                                         Userman.getConfig("unix_user_classes"),
                                         true));
 
-        this.setIf("dn", this.getSubst("unix_user_dn"));
-        this.setIf("ntDn", this.getSubst("ad_user_dn"));
+        this.vset("dn", this.getSubst("unix_user_dn"));
+        this.vset("ntDn", this.getSubst("ad_user_dn"));
 
         // assign next available UID number
         if (this.isAuto("uidNumber")) {

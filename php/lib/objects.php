@@ -280,12 +280,11 @@ function obj_write (&$obj, $srv, $id, $idold) {
     if (is_null($writer))
         error_page(_T('Writer not defined for "%s" on server "%s"', $obj['type'], $srv));
 
-    log_debug('start writing to "%s"...', $srv);
+    log_debug('obj_write(%s,%s,%s) begin', $srv, $id, $idold);
 
     // Prepare writing parameters
     $obj['idold'] = $idold;
     $obj['id'] = $id;
-    $obj['renamed'] = false;    // can be set to true by subordinate writes
     $obj['msg'] = array();
     $data =& $obj['data'][$srv];
     $changed = false;

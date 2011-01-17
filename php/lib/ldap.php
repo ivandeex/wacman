@@ -319,7 +319,7 @@ function uldap_entry_create ($srv, $dn, $data) {
 function uldap_entry_update ($srv, $dn, $data) {
     list($conn, $debug) = _uldap_connection($srv, $res);
     if ($conn)
-        _ldap_result(@ldap_modify($conn, $dn, $values), $conn, $res);
+        _ldap_result(@ldap_modify($conn, $dn, $data), $conn, $res);
     if ($debug)
         log_info('uldap_entry_update(%s) [%s] => [%s]: %s',
                     $srv, $dn, json_encode($data), json_encode($res));
@@ -391,12 +391,10 @@ function ldap_read_dn (&$obj, &$at, $srv, &$data, $name) {
 
 
 function ldap_write_dn (&$obj, &$at, $srv, &$data, $name, $val) {
-    $prev = nvl(uldap_dn($data));
-    $val = nvl($val);
-    log_debug('ldap_write_dn(%s): attr="%s" dn="%s", prev="%s"',
+    $prev = uldap_dn($data);
+    log_debug('ldap_write_dn(%s): attr="%s" val="%s", prev="%s"',
                 $srv, $at['name'], $val, $prev);
-    if ($val == $prev || $val == '')
-        return false;
+    if ($val == $prev || $val == '')  return false;
     uldap_set_dn($data, $val);
     return true;
 }
