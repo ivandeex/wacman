@@ -179,13 +179,13 @@ function compare_lists ($a, $b) {
     $only_b = array();
     $common = array();
     foreach ($a as $x)  {
-        if (array_search($x, $b))
+        if (array_search($x, $b) !== false)
             $common[$x] = 1;
         else
             $only_a[$x] = 1;
     }
     foreach ($b as $x)  {
-        if (array_search($x, $a))
+        if (array_search($x, $a) !== false)
             $common[$x] = 1;
         else
             $only_b[$x] = 1;
