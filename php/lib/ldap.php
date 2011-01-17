@@ -84,7 +84,9 @@ function uldap_connect ($srv) {
 
     $cfg['connected'] = true;
     $cfg['failed'] = false;
-    log_debug('connected to server "%s"', $srv);
+
+    if ($cfg['debug'])
+        log_debug('connected to server "%s"', $srv);
     return 0;
 }
 
@@ -95,11 +97,11 @@ function _uldap_connection ($srv, &$res) {
     if (! $cfg['connected']) {
         $res['code'] = -1;
         $res['error'] = _T("%s: not connected", $srv);
-        return null;
+        return array(null, false);
     }
     $res['code'] = 0;
     $res['error'] = '';
-    return $cfg['conn'];
+    return array($cfg['conn'], $cfg['debug']);
 }
 
 
@@ -167,21 +169,23 @@ function _ldap_to_array (&$src, $in_root = false) {
 
 function uldap_search ($srv, $filter, $attrs) {
     $res = array('data' => array());
-    $conn = _uldap_connection($srv, $res);
+    list($conn, $debug) = _uldap_connection($srv, $res);
     if (!$conn)  return $res;
     if (!$attrs)  $attrs = array('*');
     $cfg = get_server($srv);
     $handle = @ldap_search($conn, $cfg['base'], $filter, $attrs);
     if ($handle === false) {
         _ldap_result(false, $conn, $res);
-        log_debug('uldap_search(%s,filter:[%s],attrs:[%s]) search failed: %s',
+        if ($debug)
+            log_info('uldap_search(%s,filter:[%s],attrs:[%s]) search failed: %s',
                     $srv, $filter, join_list($attrs), $res['error']);
         return $res;
     }
     $data = @ldap_get_entries($conn, $handle);
     if ($data === false) {
         _ldap_result(false, $conn, $res);
-        log_debug('uldap_search(%s,filter:[%s],attrs:[%s]) entries failed: %s',
+        if ($debug)
+            log_info('uldap_search(%s,filter:[%s],attrs:[%s]) entries failed: %s',
                     $srv, $filter, join_list($attrs), $res['error']);
         return $res;
     }
@@ -190,8 +194,9 @@ function uldap_search ($srv, $filter, $attrs) {
     if (empty($res['data']))
         $res['error'] = "No data";
     set_error();
-    if ($cfg['debug'])
-        log_debug('uldap_search(%s,filter:[%s]) OK: %s', $srv, $filter, json_encode($res['data']));
+    if ($debug)
+        log_info('uldap_search(%s,filter:[%s]) OK: %s',
+                $srv, $filter, json_encode($res['data']));
     return $res;
 }
 
@@ -290,49 +295,44 @@ function uldap_replace (&$data, $name, $val) {
 
 
 function uldap_entry_rename ($srv, $dn_old, $rdn_new) {
-    $conn = _uldap_connection($srv, $res);
+    list($conn, $debug) = _uldap_connection($srv, $res);
     if ($conn)
         _ldap_result(@ldap_rename($conn, $dn_old, $rdn_new, null, true), $conn, $res);
+    if ($debug)
+        log_info('uldap_entry_rename(%s) [%s] => [%s]: %s',
+                    $srv, $dn_old, $rdn_new, json_encode($res));
     return $res;
 }
 
 
-function uldap_entry_create ($srv, $dn, $values) {
-    $conn = _uldap_connection($srv, $res);
+function uldap_entry_create ($srv, $dn, $data) {
+    list($conn, $debug) = _uldap_connection($srv, $res);
     if ($conn)
-        _ldap_result(@ldap_add($conn, $dn, $values), $conn, $res);
+        _ldap_result(@ldap_add($conn, $dn, $data), $conn, $res);
+    if ($debug)
+        log_info('uldap_entry_create(%s) [%s] => [%s]: %s',
+                    $srv, $dn, json_encode($data), json_encode($res));
     return $res;
 }
 
 
-function uldap_entry_update ($srv, $dn, $values) {
-    $conn = _uldap_connection($srv, $res);
+function uldap_entry_update ($srv, $dn, $data) {
+    list($conn, $debug) = _uldap_connection($srv, $res);
     if ($conn)
         _ldap_result(@ldap_modify($conn, $dn, $values), $conn, $res);
+    if ($debug)
+        log_info('uldap_entry_update(%s) [%s] => [%s]: %s',
+                    $srv, $dn, json_encode($data), json_encode($res));
     return $res;
 }
 
 
 function uldap_entry_delete ($srv, $dn) {
-    $conn = _uldap_connection($srv, $res);
+    list($conn, $debug) = _uldap_connection($srv, $res);
     if ($conn)
         _ldap_result(@ldap_delete($conn, $dn), $conn, $res);
-    return $res;
-}
-
-
-function uldap_entry_add ($srv, $dn, $entry) {
-    $conn = _uldap_connection($srv, $res);
-    if ($conn)
-        _ldap_result(@ldap_mod_add($conn, $dn, $entry), $conn, $res);
-    return $res;
-}
-
-
-function uldap_entry_replace ($srv, $dn, $entry) {
-    $conn = _uldap_connection($srv, $res);
-    if ($conn)
-        _ldap_result(@ldap_mod_replace($conn, $dn, $entry), $conn, $res);
+    if ($debug)
+        log_info('uldap_entry_delete(%s) [%s]: %s', $srv, $dn, json_encode($res));
     return $res;
 }
 
