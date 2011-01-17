@@ -90,7 +90,7 @@ function cgp_user_reader (&$obj, $srv, $id) {
     foreach ($mgroups as $mgroup) {
         $res = cgp_cmd($srv, 'GetGroup', $mgroup.'@'.$domain);
         if ($res['code']) {
-            log_error('error reading mail group "%s" for "%s": %s', $mgroup, $mail, $res['error']);
+            $obj['msg'][] = log_error('error reading mail group "%s" for "%s": %s', $mgroup, $mail, $res['error']);
             continue;
         }
         $desc = $res['data'];

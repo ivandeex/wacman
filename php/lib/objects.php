@@ -164,6 +164,10 @@ function setup_all_attrs () {
 //       Objects
 //
 
+
+//
+// Object constructor
+//
 function & create_obj ($objtype) {
     global $all_attrs;
     global $servers;
@@ -219,7 +223,6 @@ function obj_read (&$obj, $srv, $id) {
 
     $obj['idold'] = null;
     $obj['id'] = $id;
-    $obj['data'][$srv] = array();
     $obj['msg'] = '';
 
     if ($servers[$srv]['disable'])  return null;
@@ -239,8 +242,6 @@ function obj_read (&$obj, $srv, $id) {
         $res = $reader($obj, $srv, $id);
     }
 
-    $obj['data'][$srv] = uldap_pop($res);
-
     if (empty($res['data'])) {
         log_debug('obj_read(%s) [%s]: failed with "%s"',
                     $srv, $filter, $res['error']);
@@ -249,6 +250,7 @@ function obj_read (&$obj, $srv, $id) {
 
     if ($obj['msg'])  return $obj['msg'];
 
+    $obj['data'][$srv] = uldap_pop($res);
     $data =& $obj['data'][$srv];
 
     foreach ($obj['attrs'] as $attr_name => &$at) {
