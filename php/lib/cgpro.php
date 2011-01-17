@@ -536,7 +536,7 @@ function cgp_cmd () {
 
     $cli = _cgp_cli($srv);
     if (is_null($cli))
-        return array('code' => -1, 'error' => $msg, 'data' => array());
+        return array('code' => -1, 'error' => _T('%s: not connected', $srv), 'data' => array());
 
     $ret = call_user_func_array(array($cli, $func), $args);
     if ($cli->isSuccess()) {

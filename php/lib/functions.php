@@ -51,7 +51,7 @@ function send_headers ($mime = "text/plain") {
 
 
 function json_error ($msg) {
-    return "{success:false,message:" . json_encode($msg) . "}\n";
+    return "{success:false,data:[],message:" . json_encode($msg) . "}\n";
 }
 
 
