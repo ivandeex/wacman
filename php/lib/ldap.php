@@ -219,7 +219,7 @@ function uldap_dn (&$data) {
 function uldap_set_dn (&$data, $dn = null) {
     $old_dn = uldap_dn($data);
     if ($dn)
-        $ldap['dn'] = $dn;
+        $data['dn'] = $dn;
     elseif (isset($data['dn']))
         unset($data['dn']);
     return $old_dn;
@@ -408,6 +408,7 @@ function ldap_read_class (&$obj, &$at, $srv, &$ldap, $name) {
 
 
 function ldap_write_class (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $name = 'objectClass';
     $changed = false;
     $ca = array();
     foreach (uldap_value($ldap, $name, true) as $c)

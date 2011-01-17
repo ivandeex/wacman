@@ -62,7 +62,7 @@ $all_attrs = array(
         ),
         'ntObjectClass' => array(
             'type' => 'class',
-            'ldap' => 'ads',
+            'ldap' => 'ads'
         ),
 
         // ======== posixAccount... ========

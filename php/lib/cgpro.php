@@ -10,6 +10,7 @@
 
 
 function cgp_user_cleaner (&$obj, $srv, &$ldap) {
+    $ldap['_cgp_exist'] = false;
     $ldap['_cgp_id'] = '';
     $ldap['_cgp_mail'] = '';
     $ldap['_cgp_others'] = array();
@@ -47,6 +48,7 @@ function cgp_user_reader (&$obj, $srv, $id) {
     }
 
     // Mark our private non-CGP fields with "_cgp_"
+    $ldap['_cgp_exist'] = true;
     $ldap['_cgp_id'] = get_attr($obj, 'uid');
     $ldap['_cgp_mail'] = $mail;
     $ldap['_cgp_others'] = $others;
@@ -104,6 +106,13 @@ function cgp_user_writer (&$obj, $srv, $id, $idold, &$ldap) {
     $mail = cgp_verify_mail($id);
     if (empty($mail))
         return array('code' => -1, 'error' => _T('wrong target mail "%s"', $id));
+
+    // detect if mail user did not exist
+    if (!$ldap['_cgp_exist'] && !empty($idold)) {
+        log_info('mail user "%s" (%s) does not exist and will be created',
+                    $ldap['_cgp_mail'], $idold);
+        $idold = '';
+    }
 
     // rename user if needed
     if (!empty($idold) && $id != $idold) {

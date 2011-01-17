@@ -7,10 +7,11 @@
 //
 
 function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
+    $srv = 'uni';
     $val = nvl(uldap_value($ldap, $at['name']));
 	if (! preg_match('/^\d+$/', $val))
 	    return $val;
-    $res = uldap_search('uni', "(&(objectClass=posixGroup)(gidNumber=$val))", array('cn'));
+    $res = uldap_search($srv, "(&(objectClass=posixGroup)(gidNumber=$val))", array('cn'));
     if (empty($res['data'])) {
         log_debug('ldap_read_unix_gidn(): cannot find group id=%s (error: %s)',
                     $val, $res['error']);
@@ -25,6 +26,7 @@ function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
 
 
 function ldap_write_unix_gidn (&$obj, &$at, $srv, &$ldap, $name, $val) {
+    $srv = 'uni';
     if (!empty($val) && !preg_match('/^\d+$/', $val)) { // /^\d*$/
         $cn = $val;
         $val = 0;
@@ -34,9 +36,9 @@ function ldap_write_unix_gidn (&$obj, &$at, $srv, &$ldap, $name, $val) {
             $gidn = uldap_value($grp, 'gidNumber');
             if ($gidn)  $val = $gidn;
         }
-        if (!$val)  log_info('ldap_write_gidn: group "%s" not found on %s', $cn);
+        if (!$val)  log_info('ldap_write_gidn: group "%s" not found on %s', $cn, $srv);
     }
-    log_debug('ldap_write_gidn: set group to "%s"', $val);
+    log_debug('ldap_write_unix_gidn: set group to "%s"', $val);
     return ldap_write_string($obj, $at, $srv, $ldap, $name, $val);
 }
 

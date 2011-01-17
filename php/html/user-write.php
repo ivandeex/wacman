@@ -39,8 +39,6 @@ foreach (array_keys($servers) as $srv) {
             list($cur_oid, $old_oid) = array(get_attr($usr, 'mail'), $mail_old);
             break;
     }
-    if ($srv == 'ads')
-        continue;
     $msg = obj_write($usr, $srv, $cur_oid, $old_oid);
     if ($msg)  error_page($msg);
 }

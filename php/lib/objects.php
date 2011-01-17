@@ -288,12 +288,10 @@ function obj_write (&$obj, $srv, $id, $idold) {
     $ldap =& $obj['ldap'][$srv];
     $changed = false;
 
-    // Find new DN
-    if (is_array($writer)) {
-        $dn_old = uldap_dn($ldap);
-        $dn = get_attr($obj, 'dn');
-        if (empty($dn) || (!empty($idold) && empty($dn_old)))
-            return _T("DN is missing");
+    $dn_old = uldap_dn($ldap);
+    if (is_array($writer) && !empty($idold) && empty($dn_old)) {
+        log_info('old DN is missing when writing to server "%s". will create.', $srv);
+        $idold = null;
     }
 
     // Convert object attributes into low-level values
@@ -314,6 +312,10 @@ function obj_write (&$obj, $srv, $id, $idold) {
         $retval = $write_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val']));
         if ($retval)  $changed = $obj['changed'] = true;
 	}
+
+    $dn = uldap_dn($ldap);
+    if (is_array($writer) && empty($dn))
+        return log_error('new DN is missing when writing to server "%s"', $srv);
 
     // Rename LDAP object if needed
     if (is_array($writer) && !empty($idold) && $id != $idold) {
@@ -341,13 +343,15 @@ function obj_write (&$obj, $srv, $id, $idold) {
                 $res = uldap_entry_create($srv, $dn, $ldap);
             else
                 $res = uldap_entry_update($srv, $dn, $ldap);
+###log_info("srv=$srv action=".(empty($idold)?"create":"update")." dn=($dn) ldap=".json_encode($ldap)." res=".json_encode($res));
         } else {
             // As usual, string means a custom function
             $res = $writer($obj, $srv, $id, $idold, $ldap);
         }
         log_debug('writing to "%s" returns "%s"', $srv, $res['error']);
-        // Note: code 82 = `no values to update'
-        if ($res['code'] && $res['code'] != 82)
+        // Note: code 82 == "no values to update"
+        // code 53 == "Unwilling to perform" (FIXME!!!)
+        if ($res['code'] && !($res['code'] == 82 || ($srv == 'ads' && $res['code'] == 53)))
             $obj['msg'][] = $res['error'];
     } else {
         // Not changed and not creating.

@@ -200,6 +200,18 @@ Userman.isReserved = function (id, msg) {
     return false;
 }
 
+//
+// Convert path to LDAP DN
+//
+Userman.path2dn = function (path, prefix, delimiter) {
+    if (!prefix)  prefix = "dc";
+    if (!delimiter)  delimiter = ".";
+    var arr = path.split(delimiter);
+    for (var i = 0; i < arr.length; i++)
+        arr[i] = prefix + "=" + arr[i];
+	return arr.join(",");
+}
+
 /////////////////////////////////
 // List functions
 //
@@ -1207,10 +1219,14 @@ Userman.User = Ext.extend(Userman.Object, {
 
         // ############# Active Directory ############
 
-        //#this.vset("ntObjectClass", append_list(this.vget("ntObjectClass"), Userman.getConfig("ad_user_classes")));
+        this.vset("ntObjectClass",
+                    Userman.appendList(this.vget("ntObjectClass"),
+                                        Userman.getConfig("ad_user_classes"),
+                                        true));
 
-        //#this.setIf("objectCategory", Userman.getConfig("ad_user_category")
-        //#             + "," + path2dn(Userman.getConfig("ad_domain")));
+        this.setIf("objectCategory",
+                    Userman.getConfig("ad_user_category") + ","
+                    + Userman.path2dn(Userman.getConfig("ad_domain")));
 
         this.setIf("userPrincipalName", uid + "@" + Userman.getConfig("ad_domain"));
 
