@@ -6,9 +6,9 @@
 // Unix OpenLDAP
 //
 
-function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
+function ldap_read_unix_gidn (&$obj, &$at, $srv, &$data, $name) {
     $srv = 'uni';
-    $val = nvl(uldap_value($ldap, $at['name']));
+    $val = nvl(uldap_value($data, $at['name']));
 	if (! preg_match('/^\d+$/', $val))
 	    return $val;
     $res = uldap_search($srv, "(&(objectClass=posixGroup)(gidNumber=$val))", array('cn'));
@@ -25,7 +25,7 @@ function ldap_read_unix_gidn (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function ldap_write_unix_gidn (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ldap_write_unix_gidn (&$obj, &$at, $srv, &$data, $name, $val) {
     $srv = 'uni';
     if (!empty($val) && !preg_match('/^\d+$/', $val)) { // /^\d*$/
         $cn = $val;
@@ -39,28 +39,26 @@ function ldap_write_unix_gidn (&$obj, &$at, $srv, &$ldap, $name, $val) {
         if (!$val)  log_info('ldap_write_gidn: group "%s" not found on %s', $cn, $srv);
     }
     log_debug('ldap_write_unix_gidn: set group to "%s"', $val);
-    return ldap_write_string($obj, $at, $srv, $ldap, $name, $val);
+    return ldap_write_string($obj, $at, $srv, $data, $name, $val);
 }
 
 
-function unix_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-return false; #FIXME
+function unix_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
     global $servers;
     $conf =& $servers[$srv];
-    $ldap =& $conf['ldap'];
     if (! isset($conf['extop'])) {
-        $conf['extop'] = false; # FIXME $ldap->root_dse->supported_extension('1.3.6.1.4.1.4203.1.11.1');
+        $conf['extop'] = false; # FIXME $data->root_dse->supported_extension('1.3.6.1.4.1.4203.1.11.1');
     }
     $extop = $conf['extop'];
     $dn = get_attr($obj, 'dn');
     if ($extop) {
         // set_password() without 'oldpasswd' works only for administrator
         // ordinary users need to supply 'oldpasswd'
-        #$res = $ldap->set_password(user => $dn, newpasswd => $val);
+        #$res = $conf['conn']->set_password(user => $dn, newpasswd => $val);
     } else {
         // 'replace' works only for administrator.
         // unprivileged users need to use change(delete=old,add=new)
-        $res = uldap_modify($ldap, $dn, $name, $val);
+        $res = uldap_modify($data, $dn, $name, $val);
     }
     log_debug('change password on "%s": dn="%s" extop=%d attr=%s code=%d',
                 $srv, $dn, $extop, $name, $res['code']);
@@ -74,8 +72,8 @@ return false; #FIXME
 }
 
 
-function ldap_read_unix_groups (&$obj, &$at, $srv, &$ldap, $name) {
-    $uid = nvl(uldap_value($ldap, $name));
+function ldap_read_unix_groups (&$obj, &$at, $srv, &$data, $name) {
+    $uid = nvl(uldap_value($data, $name));
     if (!isset($uid) || !$uid)
         $uid = get_attr($obj, $name);
     $res = uldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$uid))", array('cn'));
@@ -156,7 +154,7 @@ function modify_unix_group ($srv, $gidn, $uid, $action) {
 }
 
 
-function ldap_write_unix_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ldap_write_unix_groups_final (&$obj, &$at, $srv, &$data, $name, $val) {
 return false; #FIXME
     $uid = get_attr($obj, $name);
     $old = _get_unix_group_ids($srv, $at['old'], 'nowarn'); # FIXME!!!
@@ -174,9 +172,9 @@ return false; #FIXME
 }
 
 
-function ldap_read_unix_members (&$obj, &$at, $srv, &$ldap, $name) {
+function ldap_read_unix_members (&$obj, &$at, $srv, &$data, $name) {
     // RHDS returns uid numbers, OpenLDAP returns usernames. We handle both cases.
-    $uidns = uldap_value($ldap, $name, true);
+    $uidns = uldap_value($data, $name, true);
     log_debug('ldap_read_unix_members: "%s" is (%s)', $name, join_list($uidns));
     $uids = array();
     foreach ($uidns as $uidn) {
@@ -195,7 +193,7 @@ function ldap_read_unix_members (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function ldap_write_unix_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ldap_write_unix_members (&$obj, &$at, $srv, &$data, $name, $val) {
     $uid_hash = array();
 
     foreach (split_list($val) as $uidn) {
@@ -217,11 +215,11 @@ function ldap_write_unix_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
     sort($uid_arr);
 
     if (empty($uid_arr)) {
-        uldap_delete($ldap, $name);
-    } else if (uldap_exists($ldap, $name)) {
-        uldap_replace($ldap, $name, $uid_arr);
+        uldap_delete($data, $name);
+    } else if (uldap_exists($data, $name)) {
+        uldap_replace($data, $name, $uid_arr);
     } else {
-        uldap_add($ldap, $name, $uid_arr);
+        uldap_add($data, $name, $uid_arr);
     }
 
     log_debug('ldap_write_unix_members: uids(%s) [%s] => [%s]', $name, $val, join_list($uid_arr));
@@ -233,15 +231,15 @@ function ldap_write_unix_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
 // POSIX passwd
 //
 
-function posix_read_real_uidn (&$obj, &$at, $srv, &$ldap, $name) {
-    $username = nvl(uldap_value($ldap, 'uid'));
+function posix_read_real_uidn (&$obj, &$at, $srv, &$data, $name) {
+    $username = nvl(uldap_value($data, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['uid'];
 }
 
 
-function posix_read_real_gidn (&$obj, &$at, $srv, &$ldap, $name) {
-    $username = nvl(uldap_value($ldap, 'uid'));
+function posix_read_real_gidn (&$obj, &$at, $srv, &$data, $name) {
+    $username = nvl(uldap_value($data, 'uid'));
     $pwent = posix_getpwnam($username);
     return $pwent === FALSE ? '' : $pwent['gid'];
 }

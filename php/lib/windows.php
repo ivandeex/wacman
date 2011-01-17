@@ -31,15 +31,15 @@ function decode_ad_pass ($pass) {
 }
 
 
-function ad_write_pass (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ad_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
     // 'replace' works only for administrator.
     // unprivileged users need to use change(delete=old,add=new)
-    uldap_replace($ldap, $name, encode_ad_pass($val));
+    uldap_replace($data, $name, encode_ad_pass($val));
     return true;
 }
 
 
-function ad_read_pri_group (&$obj, &$at, $srv, &$ldap, $name) {
+function ad_read_pri_group (&$obj, &$at, $srv, &$data, $name) {
 	return 0;
 /*
     my $pgname = $config{ad_primary_group};
@@ -57,13 +57,13 @@ function ad_read_pri_group (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function ad_write_pri_group (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ad_write_pri_group (&$obj, &$at, $srv, &$data, $name, $val) {
 	// writing not supported: AD refuses to set PrimaryGroupID
 	return 0;
 }
 
 
-function ad_read_sec_groups (&$obj, &$at, $srv, &$ldap, $name) {
+function ad_read_sec_groups (&$obj, &$at, $srv, &$data, $name) {
 	return '';
 /*
     my $filter = join( '', map("(cn=$_)", split_list $config{ad_user_groups}) );
@@ -77,7 +77,7 @@ function ad_read_sec_groups (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function ad_write_sec_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ad_write_sec_groups_final (&$obj, &$at, $srv, &$data, $name, $val) {
 	return 0;
 /*
     my $dn = get_attr($at->{obj}, 'ntDn');

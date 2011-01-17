@@ -9,16 +9,16 @@
 //
 
 
-function cgp_user_cleaner (&$obj, $srv, &$ldap) {
-    $ldap['_cgp_exist'] = false;
-    $ldap['_cgp_id'] = '';
-    $ldap['_cgp_mail'] = '';
-    $ldap['_cgp_others'] = array();
-    $ldap['_cgp_mail_aliases'] = array();
-    $ldap['_cgp_domain_rules'] = array();
-    $ldap['_cgp_domain_rule_idx'] = -1;
-    $ldap['_cgp_server_intercept'] = array();
-    $ldap['_cgp_mail_groups'] = array();
+function cgp_user_cleaner (&$obj, $srv, &$data) {
+    $data['_cgp_exist'] = false;
+    $data['_cgp_id'] = '';
+    $data['_cgp_mail'] = '';
+    $data['_cgp_others'] = array();
+    $data['_cgp_mail_aliases'] = array();
+    $data['_cgp_domain_rules'] = array();
+    $data['_cgp_domain_rule_idx'] = -1;
+    $data['_cgp_server_intercept'] = array();
+    $data['_cgp_mail_groups'] = array();
 }
 
 
@@ -34,24 +34,24 @@ function cgp_user_reader (&$obj, $srv, $id) {
         log_error('cannot read mail account of "%s": %s', $mail, $res['error']);
         return $res;
     }
-    $ldap = $res['data'];
+    $data = $res['data'];
 
     // Remove values not belonging to us
     $cfg =& get_server($srv);
     $our_attrs = $cfg['attrlist'][$obj['type']];
     $others = array();
-    foreach ($ldap as $key => $val) {
+    foreach ($data as $key => $val) {
         if (array_search($key, $our_attrs) === false) {
-            $others[$key] = $ldap[$key];
-            unset($ldap[$key]);
+            $others[$key] = $data[$key];
+            unset($data[$key]);
         }
     }
 
     // Mark our private non-CGP fields with "_cgp_"
-    $ldap['_cgp_exist'] = true;
-    $ldap['_cgp_id'] = get_attr($obj, 'uid');
-    $ldap['_cgp_mail'] = $mail;
-    $ldap['_cgp_others'] = $others;
+    $data['_cgp_exist'] = true;
+    $data['_cgp_id'] = get_attr($obj, 'uid');
+    $data['_cgp_mail'] = $mail;
+    $data['_cgp_others'] = $others;
 
     // Read account aliases
     $res = cgp_cmd($srv, 'GetAccountAliases', $mail);
@@ -59,7 +59,7 @@ function cgp_user_reader (&$obj, $srv, $id) {
         log_error('cannot read mail aliases of "%s": %s', $mail, $res['error']);
         return $res;
     }
-    $ldap['_cgp_mail_aliases'] = $res['data'];
+    $data['_cgp_mail_aliases'] = $res['data'];
 
     // Read domain mail rules
     $res = cgp_cmd($srv, 'GetDomainMailRules', get_config('mail_domain'));
@@ -67,8 +67,8 @@ function cgp_user_reader (&$obj, $srv, $id) {
         log_error('cannot read mail domain rules of "%s": %s', $mail, $res['error']);
         return $res;
     }
-    $ldap['_cgp_domain_rules'] = $res['data'];
-    $ldap['_cgp_domain_rule_idx'] = -1;
+    $data['_cgp_domain_rules'] = $res['data'];
+    $data['_cgp_domain_rule_idx'] = -1;
 
     // Read server intercept
     $domain = get_config('mail_domain');
@@ -77,10 +77,10 @@ function cgp_user_reader (&$obj, $srv, $id) {
         log_error('cannot read mail server intercept of "%s": %s', $mail, $res['error']);
         return $res;
     }
-    $ldap['_cgp_server_intercept'] = $res['data'];
+    $data['_cgp_server_intercept'] = $res['data'];
 
     // Read mail groups
-    $ldap['_cgp_mail_groups'] = array();
+    $data['_cgp_mail_groups'] = array();
     $res = cgp_cmd($srv, 'ListGroups', $domain);
     if ($res['code']) {
         log_error('cannot list mail groups of "%s": %s', $mail, $res['error']);
@@ -95,22 +95,22 @@ function cgp_user_reader (&$obj, $srv, $id) {
         }
         $desc = $res['data'];
         if (empty($desc['Members']))  $desc['Members'] = array();
-        $ldap['_cgp_mail_groups'][$mgroup] = $desc;
+        $data['_cgp_mail_groups'][$mgroup] = $desc;
     }
 
-    return array('code' => 0, 'error' => '', 'data' => array($ldap));
+    return array('code' => 0, 'error' => '', 'data' => array($data));
 }
 
 
-function cgp_user_writer (&$obj, $srv, $id, $idold, &$ldap) {
+function cgp_user_writer (&$obj, $srv, $id, $idold, &$data) {
     $mail = cgp_verify_mail($id);
     if (empty($mail))
         return array('code' => -1, 'error' => _T('wrong target mail "%s"', $id));
 
     // detect if mail user did not exist
-    if (!$ldap['_cgp_exist'] && !empty($idold)) {
+    if (!$data['_cgp_exist'] && !empty($idold)) {
         log_info('mail user "%s" (%s) does not exist and will be created',
-                    $ldap['_cgp_mail'], $idold);
+                    $data['_cgp_mail'], $idold);
         $idold = '';
     }
 
@@ -132,7 +132,7 @@ function cgp_user_writer (&$obj, $srv, $id, $idold, &$ldap) {
     $params = array();
     $cfg =& get_server($srv);
     $our_attrs = $cfg['attrlist'][$obj['type']];
-    foreach ($ldap as $key => $val) {
+    foreach ($data as $key => $val) {
         // skip private pseudo-attributes
         if (preg_match('/^_cgp_/', $key))  continue;
         // skip non-relevant attributes
@@ -159,9 +159,9 @@ function cgp_user_writer (&$obj, $srv, $id, $idold, &$ldap) {
 }
 
 
-function cgp_read_domain_intercept (&$obj, &$at, $srv, &$ldap, $name) {
+function cgp_read_domain_intercept (&$obj, &$at, $srv, &$data, $name) {
     $rule_idx = -1;
-    foreach ($ldap['_cgp_domain_rules'] as $idx => &$rule) {
+    foreach ($data['_cgp_domain_rules'] as $idx => &$rule) {
         if (is_array($rule) || count($rule) >= 4) {
             list($prio, $name, $cond, $steps) = $rule;
             if (strpos($name, '#Redirect') !== false && is_array($steps)) {
@@ -178,20 +178,20 @@ function cgp_read_domain_intercept (&$obj, &$at, $srv, &$ldap, $name) {
         }
     }
 
-    $ldap['_cgp_domain_rule_idx'] = $rule_idx;
+    $data['_cgp_domain_rule_idx'] = $rule_idx;
     $val = bool2str($rule_idx >= 0);
     log_debug('cgp_read_domain_intercept: %s (idx=%s)', $val, $rule_idx);
     return $val;
 }
 
 
-function cgp_write_domain_intercept_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $old = ($ldap['_cgp_domain_rule_idx'] >= 0);
+function cgp_write_domain_intercept_final (&$obj, &$at, $srv, &$data, $name, $val) {
+    $old = ($data['_cgp_domain_rule_idx'] >= 0);
     $val = str2bool($val);
     if ($val === $old)  return false;
 
-    $rules &= $ldap['_cgp_domain_rules'];
-    $rule_idx &= $ldap['_cgp_domain_rule_idx'];
+    $rules &= $data['_cgp_domain_rules'];
+    $rule_idx &= $data['_cgp_domain_rule_idx'];
     if ($val) {
         $rules[] = array(
                 0,
@@ -216,10 +216,10 @@ function cgp_write_domain_intercept_final (&$obj, &$at, $srv, &$ldap, $name, $va
 }
 
 
-function cgp_read_user_intercept (&$obj, &$at, $srv, &$ldap, $name) {
+function cgp_read_user_intercept (&$obj, &$at, $srv, &$data, $name) {
     // Return true if at least one intercept option is turned on
-    $mail = $ldap['_cgp_mail'];
-    $intercept = $ldap['_cgp_server_intercept'];
+    $mail = $data['_cgp_mail'];
+    $intercept = $data['_cgp_server_intercept'];
     if (!isset($intercept[$mail]))
         return bool2str(false);
     foreach ($intercept[$mail] as $opt) {
@@ -230,15 +230,15 @@ function cgp_read_user_intercept (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function cgp_write_user_intercept_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $old = cgp_read_domain_intercept ($obj, $at, $srv, $ldap, $name);
+function cgp_write_user_intercept_final (&$obj, &$at, $srv, &$data, $name, $val) {
+    $old = cgp_read_domain_intercept ($obj, $at, $srv, $data, $name);
     if (is_null($old))  return false;
     $old = str2bool($old);
     $val = str2bool($val);
     if ($val === $old)  return false;
 
-    $mail = $ldap['_cgp_mail'];
-    $intercept =& $ldap['_cgp_server_intercept'];
+    $mail = $data['_cgp_mail'];
+    $intercept =& $data['_cgp_server_intercept'];
 
     if ($val) {
         // add to the intercept structures
@@ -263,11 +263,11 @@ function cgp_write_user_intercept_final (&$obj, &$at, $srv, &$ldap, $name, $val)
 }
 
 
-function cgp_read_aliases (&$obj, &$at, $srv, &$ldap, $name) {
+function cgp_read_aliases (&$obj, &$at, $srv, &$data, $name) {
     $aliases = array();
     $telnum = '';
     $telnum_pat = get_telnum_pattern();
-    foreach ($ldap['_cgp_mail_aliases'] as $alias) {
+    foreach ($data['_cgp_mail_aliases'] as $alias) {
         if (preg_match($telnum_pat, $alias))
             $telnum = $alias;
         else
@@ -281,12 +281,12 @@ function cgp_read_aliases (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function cgp_write_aliases_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $mail = $ldap['_cgp_mail'];
+function cgp_write_aliases_final (&$obj, &$at, $srv, &$data, $name, $val) {
+    $mail = $data['_cgp_mail'];
     $aliases = split_list($val);
     $aliases[] = get_attr($obj, 'telnum');
     $aliases = array_unique($aliases);
-    if (join_list($aliases) == join_list($ldap['_cgp_mail_aliases']))
+    if (join_list($aliases) == join_list($data['_cgp_mail_aliases']))
         return false;
 
     $res = cgp_cmd($srv, 'SetAccountAliases', $mail, $aliases);
@@ -299,12 +299,12 @@ function cgp_write_aliases_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
 }
 
 
-function cgp_read_user_mail_groups (&$obj, &$at, $srv, &$ldap, $name) {
-    $mail = $ldap['_cgp_mail'];
+function cgp_read_user_mail_groups (&$obj, &$at, $srv, &$data, $name) {
+    $mail = $data['_cgp_mail'];
     $domain = get_config('mail_domain');
     $mgroups = array();
     $uid = preg_replace('/\@.*$/', '', $mail);
-    foreach ($ldap['_cgp_mail_groups'] as $mgroup => $desc) {
+    foreach ($data['_cgp_mail_groups'] as $mgroup => $desc) {
         if (array_search($uid, $desc['Members']) !== false)
             $mgroups[] = $mgroup;
     }
@@ -312,9 +312,9 @@ function cgp_read_user_mail_groups (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function cgp_write_user_mail_groups_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $mail = $ldap['_cgp_mail'];
-    $old = cgp_read_user_mail_groups($obj, $at, $srv, $ldap, $name);
+function cgp_write_user_mail_groups_final (&$obj, &$at, $srv, &$data, $name, $val) {
+    $mail = $data['_cgp_mail'];
+    $old = cgp_read_user_mail_groups($obj, $at, $srv, $data, $name);
 
     $mgroups = split_list($val);
     $val = join_list($mgroups);
@@ -324,7 +324,7 @@ function cgp_write_user_mail_groups_final (&$obj, &$at, $srv, &$ldap, $name, $va
     $id = preg_replace('/\@.*$/', '', $mail);
     $domain = get_config('mail_domain');
 
-    foreach ($ldap['_cgp_mail_groups'] as $mgroup => &$desc) {
+    foreach ($data['_cgp_mail_groups'] as $mgroup => &$desc) {
         $pos = array_search($id, $desc['Members']);
         $in_old = ($pos !== false);
         $in_new = (array_search($mgroup, $mgroups) !== false);
@@ -345,8 +345,8 @@ function cgp_write_user_mail_groups_final (&$obj, &$at, $srv, &$ldap, $name, $va
 }
 
 
-function cgp_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $mail = $ldap['_cgp_mail'];
+function cgp_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
+    $mail = $data['_cgp_mail'];
     $enc = get_config('cgp_pass_encryption');
     if (empty($enc)) {
         $obj['msg'][] =
@@ -404,34 +404,34 @@ function cgp_mailgroup_reader (&$obj, $srv, $id) {
 }
 
 
-function cgp_read_mailgroup_uid (&$obj, &$at, $srv, &$ldap, $name) {
+function cgp_read_mailgroup_uid (&$obj, &$at, $srv, &$data, $name) {
     return $obj['id'];
 }
 
 
-function cgp_read_mailgroup_members (&$obj, &$at, $srv, &$ldap, $name) {
-    return isset($ldap['Members']) ? join_list($ldap['Members']) : '';
+function cgp_read_mailgroup_members (&$obj, &$at, $srv, &$data, $name) {
+    return isset($data['Members']) ? join_list($data['Members']) : '';
 }
 
 
-function cgp_write_mailgroup_members (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    if ($val == cgp_read_mailgroup_members ($obj, $at, $srv, $ldap, $name))
+function cgp_write_mailgroup_members (&$obj, &$at, $srv, &$data, $name, $val) {
+    if ($val == cgp_read_mailgroup_members ($obj, $at, $srv, $data, $name))
         return false;
-    $ldap['Members'] = split_list($val);
+    $data['Members'] = split_list($val);
     return true;
 }
 
 
-function cgp_read_mailgroup_params (&$obj, &$at, $srv, &$ldap, $name) {
-    $data = $ldap; // make a local copy
+function cgp_read_mailgroup_params (&$obj, &$at, $srv, &$data, $name) {
+    $data = $data; // make a local copy
     unset($data['RealName']);
     unset($data['Members']);
     return empty($data) ? '' : cgp_pack($srv, $data);
 }
 
 
-function cgp_write_mailgroup_params (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $old = cgp_read_mailgroup_params($obj, $at, $srv, $ldap, $name);
+function cgp_write_mailgroup_params (&$obj, &$at, $srv, &$data, $name, $val) {
+    $old = cgp_read_mailgroup_params($obj, $at, $srv, $data, $name);
     if ($old == $val)
         return false;
     $res = cgp_unpack($srv, $val);
@@ -439,13 +439,13 @@ function cgp_write_mailgroup_params (&$obj, &$at, $srv, &$ldap, $name, $val) {
     $data = $res['data'];
     foreach ($data as $n => $v) {
         if ($n != 'RealName' && $n != 'Members')
-            $ldap[$n] = $v;
+            $data[$n] = $v;
     }
     return true;
 }
 
 
-function cgp_mailgroup_writer (&$obj, $srv, $id, $idold, &$ldap) {
+function cgp_mailgroup_writer (&$obj, $srv, $id, $idold, &$data) {
     // rename the group if needed
     $domain = get_config('mail_domain');
     if (!empty($idold) && $id != $idold) {
@@ -459,7 +459,7 @@ function cgp_mailgroup_writer (&$obj, $srv, $id, $idold, &$ldap) {
     }
 
     $cmd = empty($idold) ? 'CreateGroup' : 'SetGroup';
-    $res = cgp_cmd($srv, $cmd, $id.'@'.$domain, $ldap);
+    $res = cgp_cmd($srv, $cmd, $id.'@'.$domain, $data);
     if ($res['code']) {
         $res['error'] = _T('Cannot %s mail group "%s": %s',
                             (empty($idold) ? "create" : "update"), $id, $res['error']);

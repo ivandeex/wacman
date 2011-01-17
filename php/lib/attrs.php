@@ -46,23 +46,23 @@ $all_attrs = array(
 
         'dn' => array(
             'type' => 'dn',
-            'ldap' => 'uni',
+            'srv' => 'uni',
             'label' => 'UNIX DN',
             'readonly' => true,
         ),
         'ntDn' => array(
             'type' => 'dn',
-            'ldap' => 'ads',
+            'srv' => 'ads',
             'label' => 'Windows DN',
             'readonly' => true,
         ),
         'objectClass' => array(
             'type' => 'class',
-            'ldap' => 'uni',
+            'srv' => 'uni',
         ),
         'ntObjectClass' => array(
             'type' => 'class',
-            'ldap' => 'ads'
+            'srv' => 'ads'
         ),
 
         // ======== posixAccount... ========
@@ -70,7 +70,7 @@ $all_attrs = array(
         'uid' => array(
             'type' => 'number',
             'label' => 'Identifier',
-            'ldap' => array(
+            'srv' => array(
                 'uni' => '',
                 'ads' => '',
                 'cgp' => '_cgp_id'
@@ -79,11 +79,11 @@ $all_attrs = array(
         ),
         'givenName' => array(
             'label' => 'Name',
-            'ldap' => 'uni,ads',
+            'srv' => 'uni,ads',
         ),
         'sn' => array(
             'label' => 'Second name',
-            'ldap' => array(
+            'srv' => array(
                 'uni' => '',
                 'ads' => '',
                 'cgp' => 'surname'
@@ -91,7 +91,7 @@ $all_attrs = array(
         ),
         'cn' => array(
             'label' => 'Full name',
-            'ldap' => array(
+            'srv' => array(
                 'uni' => '',
                 'ads' => '',
                 'cgp' => 'RealName'
@@ -101,7 +101,7 @@ $all_attrs = array(
         'password' => array(
             'type' => 'pass',
             'label' => 'Password',
-            'ldap' => array(
+            'srv' => array(
                 'uni' => 'userPassword',
                 'ads' => 'unicodePwd',
                 'cgp' => 'Password'
@@ -110,7 +110,7 @@ $all_attrs = array(
         'password2' => array(
             'type' => 'pass',
             'label' => 'Again password',
-            'ldap' => array(
+            'srv' => array(
                 'uni' => 'userPassword',
                 'ads' => 'unicodePwd',
                 'cgp' => 'Password'
@@ -119,87 +119,87 @@ $all_attrs = array(
         ),
         'uidNumber' => array(
             'label' => 'User#',
-            'ldap' => 'uni,ads',
+            'srv' => 'uni,ads',
         ),
         'gidNumber' => array(
             'type' => array( 'ldap_read_unix_gidn', 'ldap_write_unix_gidn', null ),
             'label' => 'Group',
             'popup' => 'gid',
-            'ldap' => 'uni,ads',
+            'srv' => 'uni,ads',
         ),
         'moreGroups' => array(
             'type' => array( 'ldap_read_unix_groups', null, 'ldap_write_unix_groups_final' ),
             'label' => 'Other groups',
             'popup' => 'groups',
-            'ldap' => array( 'uni' => 'uid' ),
+            'srv' => array( 'uni' => 'uid' ),
         ),
         'homeDirectory' => array(
             'label' => 'Home directory',
-            'ldap' =>  array( 'uni' => '', 'ads' => 'unixHomeDirectory' ),
+            'srv' =>  array( 'uni' => '', 'ads' => 'unixHomeDirectory' ),
         ),
         'loginShell' => array(
             'label' => 'Login shell',
-            'ldap' => 'uni,ads',
+            'srv' => 'uni,ads',
         ),
 
         // ======== Active Directory... ========
 
         'accountExpires' => array(
             'defval' => NO_EXPIRE,
-            'ldap' => 'ads',
+            'srv' => 'ads',
             'conv' => 'adtime',
             'label' => 'Expires at',
         ),
         'sAMAccountName' => array(
-            'ldap' => 'ads',
+            'srv' => 'ads',
             'copyfrom' => 'uid',
         ),
         'displayName' => array(
-            'ldap' => 'ads',
+            'srv' => 'ads',
             'copyfrom' => 'cn',
         ),
         'instanceType' => array(
             'defval' => '4',
-            'ldap' => 'ads',
+            'srv' => 'ads',
         ),
         'userAccountControl' => array(
             'conv' => 'decihex',
             'label' => 'Account control',
-            'ldap' => 'ads',
+            'srv' => 'ads',
         ),
         'userPrincipalName' => array(
-            'ldap' => 'ads',
+            'srv' => 'ads',
             'label' => 'Principal name'
         ),
         'ntUserHomeDir' => array(
             'label' => 'Home directory',
-            'ldap' => array( 'ntuser' => '', 'ads' => 'homeDirectory' ),
+            'srv' => array( 'ntuser' => '', 'ads' => 'homeDirectory' ),
         ),
         'ntUserHomeDirDrive' => array(
             'label' => 'Drive',
-            'ldap' => array( 'ntuser' => '', 'ads' => 'homeDrive' ),
+            'srv' => array( 'ntuser' => '', 'ads' => 'homeDrive' ),
         ),
         'ntUserProfile' => array(
             'label' => 'Profile',
-            'ldap' => array( 'ntuser' => '', 'ads' => 'profilePath' ),
+            'srv' => array( 'ntuser' => '', 'ads' => 'profilePath' ),
         ),
         'ntUserScriptPath' => array(
             'label' => 'Logon script',
-            'ldap' => array( 'ntuser' => '', 'ads' => 'scriptPath' ),
+            'srv' => array( 'ntuser' => '', 'ads' => 'scriptPath' ),
         ),
         'PrimaryGroupID' => array(
             'type' => array( 'ad_read_pri_group', 'ad_write_pri_group', null ),
-            'ldap' => 'ads',
+            'srv' => 'ads',
         ),
         'SecondaryGroups' => array(
             'type' => array( 'ad_read_sec_groups', null, 'ad_write_sec_groups_final' ),
-            'ldap' => 'ads',
+            'srv' => 'ads',
         ),
         'sfuDomain' => array(
-            'ldap' => array( 'ads' => 'msSFU30NisDomain' ),
+            'srv' => array( 'ads' => 'msSFU30NisDomain' ),
         ),
         'sfuName' => array(
-            'ldap' => array( 'ads' => 'msSFU30Name' ),
+            'srv' => array( 'ads' => 'msSFU30Name' ),
             'copyfrom' => 'uid',
         ),
 
@@ -209,24 +209,24 @@ $all_attrs = array(
 
         'ntUserCreateNewAccount' => array(
             'defval' => 'false',
-            'ldap' => 'ntuser',
+            'srv' => 'ntuser',
         ),
         'ntUserDeleteAccount' => array(
             'defval' => 'false',
-            'ldap' => 'ntuser',
+            'srv' => 'ntuser',
         ),
         'ntUserAcctExpires' => array(
             'defval' => NO_EXPIRE,
             'conv' => 'adtime',
-            'ldap' => 'ntuser',
+            'srv' => 'ntuser',
         ),
         'ntUserLastLogon' => array(
             'conv' => 'adtime',
-            'ldap' => 'ntuser',
+            'srv' => 'ntuser',
             'disable' => true,
         ),
         'ntUserDomainId' => array(
-            'ldap' => 'ntuser',
+            'srv' => 'ntuser',
             'copyfrom' => 'uid',
             'disable' => true,
         ),
@@ -261,7 +261,7 @@ $all_attrs = array(
 
         'mail' => array(
             'label' => 'Mail',
-            'ldap' => array(
+            'srv' => array(
                 'uni' => '',
                 'ads' => '',
                 'cgp' => '_cgp_mail'
@@ -270,57 +270,57 @@ $all_attrs = array(
         'aliases' => array(
             'type' => array( 'cgp_read_aliases', null, 'cgp_write_aliases_final' ),
             'label' => 'Mail aliases',
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
         ),
         'telnum' => array(
             'type' => 'none',           // cgp_read_aliases/cgp_write_aliases handles this value
             'label' => 'Short number',
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
         ),
         'mailgroups' => array(
             'type' => array( 'cgp_read_user_mail_groups', null, 'cgp_write_user_mail_groups_final' ),
             'label' => 'Mail groups',
             'popup' => 'mailgroups',
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
         ),
         'domainIntercept' => array(
             'type' => array( 'cgp_read_domain_intercept', null, 'cgp_write_domain_intercept_final' ),
             'label' => 'Domain Intercept',
             'checkbox' => true,
             'disable' => true,
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
         ),
         'userIntercept' => array(
             'type' => array( 'cgp_read_user_intercept', null, 'cgp_write_user_intercept_final' ),
             'label' => 'User Intercept',
             'checkbox' => true,
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
         ),
 
         // ======== Personal / Extended... ========
 
         'telephoneNumber' => array(
             'label' => 'Telephone',
-            'ldap' => 'uni,ads',
+            'srv' => 'uni,ads',
         ),
         'facsimileTelephoneNumber' => array(
             'label' => 'Fax number',
-            'ldap' => 'uni,ads',
+            'srv' => 'uni,ads',
         ),
         'physicalDeliveryOfficeName' => array(
-            'ldap' => 'uni,ads',
+            'srv' => 'uni,ads',
         ),
-        'o' => array( 'ldap' => 'uni,ads', ),
-        'ou' => array( 'ldap' => 'uni,ads', ),
-        'label' => array( 'ldap' => 'uni,ads', ),
+        'o' => array( 'srv' => 'uni,ads', ),
+        'ou' => array( 'srv' => 'uni,ads', ),
+        'label' => array( 'srv' => 'uni,ads', ),
         'real_uidn' => array(
-            'ldap' => array( 'uni' => 'uidNumber' ),
+            'srv' => array( 'uni' => 'uidNumber' ),
             'type' => array( 'posix_read_real_uidn', null, null ),
             'label' => 'Real user id',
             'readonly' => true,
         ),
         'real_gidn' => array(
-            'ldap' => array( 'uni' => 'gidNumber' ),
+            'srv' => array( 'uni' => 'gidNumber' ),
             'type' => array( 'posix_read_real_gidn', null, null ),
             'label' => 'Real group id',
             'readonly' => true,
@@ -344,31 +344,31 @@ $all_attrs = array(
 
         'objectClass' => array(
             'type' => 'class',
-            'ldap' => 'uni',
+            'srv' => 'uni',
         ),
         'dn' => array(
             'type' => 'dn',
-            'ldap' => 'uni',
+            'srv' => 'uni',
             'label' => 'DN'
         ),
         'cn' => array(
             'label' => 'Group name',
-            'ldap' => 'uni',
+            'srv' => 'uni',
             'colwidth' => 130,  // mark for inclusion in the list panel
         ),
         'gidNumber' => array(
             'label' => 'Group number',
-            'ldap' => 'uni',
+            'srv' => 'uni',
         ),
         'description' => array(
             'label' => 'Description',
-            'ldap' => 'uni',
+            'srv' => 'uni',
         ),
         'memberUid' => array(
             'type' => array( 'ldap_read_unix_members', 'ldap_write_unix_members', null ),
             'label' => 'Members',
             'popup' => 'users',
-            'ldap' => 'uni',
+            'srv' => 'uni',
         ),
     ),
 
@@ -390,35 +390,31 @@ $all_attrs = array(
         'uid' => array(
             'type' => array( 'cgp_read_mailgroup_uid', null, null ),
             'label' => 'Group name',
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
             'colwidth' => 140,  // mark for inclusion in the list panel
         ),
         'cn' => array(
             'label' => 'Description',
-            'ldap' => array( 'cgp' => 'RealName' ),
+            'srv' => array( 'cgp' => 'RealName' ),
         ),
         'groupMember' => array(
             'type' => array( 'cgp_read_mailgroup_members', 'cgp_write_mailgroup_members', null ),
             'label' => 'Members',
             'popup' => 'mailusers',
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
         ),
         'params' => array(
             'type' => array( 'cgp_read_mailgroup_params', 'cgp_write_mailgroup_params', null ),
             'label' => 'Params',
-            'ldap' => 'cgp',
+            'srv' => 'cgp',
         ),
     ),
 
     // ======== mail alias (not for creation :) ) ========
 
     'alias' => array(
-        'uid' => array(
-            'ldap' => 'cgp',
-        ),
-        'aliasedObjectName' => array(
-            'ldap' => 'cgp',
-        ),
+        'uid' => array( 'srv' => 'cgp' ),
+        'aliasedObjectName' => array( 'srv' => 'cgp' )
     ),
 );
 

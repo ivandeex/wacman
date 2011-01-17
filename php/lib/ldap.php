@@ -33,7 +33,7 @@ function uldap_connect ($srv) {
     foreach (array('connected','failed','disable') as $prop)
         if (!isset($cfg[$prop]))  $cfg[$prop] = false;
     if (!isset($cfg['name']))  $cfg['name'] = $srv;
-    if (!isset($cfg['ldap']))  $cfg['ldap'] = null;
+    if (!isset($cfg['conn']))  $cfg['conn'] = null;
 
     if ($cfg['connected'])
         return 0;
@@ -58,8 +58,8 @@ function uldap_connect ($srv) {
     $creds = get_credentials($srv);
     $cfg['user'] = $creds['user'];
     $cfg['pass'] = $creds['pass'];
-    $cfg['ldap'] = @ldap_connect($cfg['uri']);
-    if (! $cfg['ldap']) {
+    $cfg['conn'] = @ldap_connect($cfg['uri']);
+    if (! $cfg['conn']) {
         log_error('error binding to server "%s"', $srv);
         return -1;
     }
@@ -68,17 +68,17 @@ function uldap_connect ($srv) {
     // Active directory requires this version.
     // Other servers might support it, let's try.
     // For renaming to work we need LDAP v3 everywhere.
-    $okay = @ldap_set_option($cfg['ldap'], LDAP_OPT_PROTOCOL_VERSION, 3);
-    if (! $okay) {
+    $ok = @ldap_set_option($cfg['conn'], LDAP_OPT_PROTOCOL_VERSION, 3);
+    if (!$ok) {
         log_error('cannot set protocol version 3 for server (%s): %s',
-                    $srv, ldap_error($cfg['ldap']));
+                    $srv, ldap_error($cfg['conn']));
         return -1;
     }
 
-    $okay = @ldap_bind($cfg['ldap'], $cfg['user'], $cfg['pass']);
-    if (! $okay) {
+    $ok = @ldap_bind($cfg['conn'], $cfg['user'], $cfg['pass']);
+    if (!$ok) {
         log_error('cannot bind to server "%s" (%s): %s',
-                    $cfg['uri'], $srv, ldap_error($cfg['ldap']));
+                    $cfg['uri'], $srv, ldap_error($cfg['conn']));
         return -1;
     }
 
@@ -99,7 +99,7 @@ function _uldap_connection ($srv, &$res) {
     }
     $res['code'] = 0;
     $res['error'] = '';
-    return $cfg['ldap'];
+    return $cfg['conn'];
 }
 
 
@@ -114,9 +114,9 @@ function _disconnect_all () {
         if ($srv == 'cgp') {
             cgp_disconnect($srv);
         } else {
-            @ldap_close($cfg['ldap']);
+            @ldap_unbind($cfg['conn']);
         }
-        unset($cfg['ldap']);
+        $cfg['conn'] = null;
         $cfg['connected'] = false;
         $cfg['failed'] = false;
     }
@@ -352,32 +352,32 @@ function ldap_write_none () {
 }
 
 
-function ldap_read_string (&$obj, &$at, $srv, &$ldap, $name) {
-    return uldap_value($ldap, $name);
+function ldap_read_string (&$obj, &$at, $srv, &$data, $name) {
+    return uldap_value($data, $name);
 }
 
 
-function ldap_write_string (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ldap_write_string (&$obj, &$at, $srv, &$data, $name, $val) {
     $changed = false;
     if (empty($val)) {
-		if (uldap_exists($ldap, $name)) {
-			uldap_delete($ldap, $name);
+		if (uldap_exists($data, $name)) {
+			uldap_delete($data, $name);
 			$changed = true;
 			log_debug('ldap_write_string(%s): remove', $name);
 		} else {
 			#log_debug('ldap_write_string(%s): already removed', $name);
 		}
-	} else if (uldap_exists($ldap, $name)) {
-		$old = nvl(uldap_value($ldap, $name));
+	} else if (uldap_exists($data, $name)) {
+		$old = nvl(uldap_value($data, $name));
 		if ($val != $old) {
-			uldap_replace($ldap, $name, $val);
+			uldap_replace($data, $name, $val);
 			$changed = true;
 			log_debug('ldap_write_string(%s): "%s" -> "%s"', $name, $old, $val);
 		} else {
 			#log_debug('ldap_write_string(%s): preserve "%s"', $attr, $val);			
 		}
 	} else {
-		uldap_add($ldap, $name, $val);
+		uldap_add($data, $name, $val);
 		$changed = true;
 		log_debug('ldap_write_string(%s): add "%s"', $name, $val);			
 	}
@@ -385,37 +385,37 @@ function ldap_write_string (&$obj, &$at, $srv, &$ldap, $name, $val) {
 }
 
 
-function ldap_read_dn (&$obj, &$at, $srv, &$ldap, $name) {
-	return uldap_dn($ldap);
+function ldap_read_dn (&$obj, &$at, $srv, &$data, $name) {
+	return uldap_dn($data);
 }
 
 
-function ldap_write_dn (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $prev = nvl(uldap_dn($ldap));
+function ldap_write_dn (&$obj, &$at, $srv, &$data, $name, $val) {
+    $prev = nvl(uldap_dn($data));
     $val = nvl($val);
     log_debug('ldap_write_dn(%s): attr="%s" dn="%s", prev="%s"',
                 $srv, $at['name'], $val, $prev);
     if ($val == $prev || $val == '')
         return false;
-    uldap_set_dn($ldap, $val);
+    uldap_set_dn($data, $val);
     return true;
 }
 
 
-function ldap_read_class (&$obj, &$at, $srv, &$ldap, $name) {
-    return join_list(uldap_value($ldap, $name, true));
+function ldap_read_class (&$obj, &$at, $srv, &$data, $name) {
+    return join_list(uldap_value($data, $name, true));
 }
 
 
-function ldap_write_class (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ldap_write_class (&$obj, &$at, $srv, &$data, $name, $val) {
     $name = 'objectClass';
     $changed = false;
     $ca = array();
-    foreach (uldap_value($ldap, $name, true) as $c)
+    foreach (uldap_value($data, $name, true) as $c)
         $ca[strtolower($c)] = 1;
     foreach (split_list($val) as $c) {
         if (isset($ca[strtolower($c)]))  continue;
-        uldap_add($ldap, $name, $c);
+        uldap_add($data, $name, $c);
         $changed = true;
     }
     log_debug('ldap_write_class(%s): attr="%s" class="%s" dn="%s" changed=%d',
@@ -424,7 +424,7 @@ function ldap_write_class (&$obj, &$at, $srv, &$ldap, $name, $val) {
 }
 
 
-function ldap_read_pass (&$obj, &$at, $srv, &$ldap, $name) {
+function ldap_read_pass (&$obj, &$at, $srv, &$data, $name) {
     // this value is cached because LDAP structure might have removed it for security
     if (isset($at['oldpass']))
         return $at['oldpass'];
@@ -433,7 +433,7 @@ function ldap_read_pass (&$obj, &$at, $srv, &$ldap, $name) {
     if (!str2bool(get_config('show_password')) || $servers[$srv]['disable']) {
         $val = OLD_PASS;
     } else if ($srv == 'cgp') {
-        $val = ldap_read_string($obj, $at, $srv, $ldap, $name);
+        $val = ldap_read_string($obj, $at, $srv, $data, $name);
     } else {
         $val = '';
     }
@@ -443,24 +443,24 @@ function ldap_read_pass (&$obj, &$at, $srv, &$ldap, $name) {
 }
 
 
-function ldap_write_pass (&$obj, &$at, $srv, &$ldap, $name, $val) {
-    $oldpass = nvl(ldap_read_pass($obj, $at, $srv, $ldap, $name));
+function ldap_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
+    $oldpass = nvl(ldap_read_pass($obj, $at, $srv, $data, $name));
     // 'verify' is true if this field is a second password copy
     if ($at['desc']['verify'] || $val == $oldpass)
         return false;
     if ($srv == 'ads')
-        return false;###FIXME ad_write_pass($at, $srv, $ldap, $name, $val);
+        return false;###FIXME ad_write_pass($at, $srv, $data, $name, $val);
     return false;
 }
 
 
-function ldap_write_pass_final (&$obj, &$at, $srv, &$ldap, $name, $val) {
+function ldap_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
     if ($at['desc']['verify'] || $val == nvl($at['oldpass']))
         return false;
     if ($srv == 'uni')
-        return false;###FIXME unix_write_pass_final($obj, $at, $srv, $ldap, $name, $val);
+        return false;###FIXME unix_write_pass_final($obj, $at, $srv, $data, $name, $val);
     if ($srv == 'cgp')
-        return cgp_write_pass_final($obj, $at, $srv, $ldap, $name, $val);
+        return cgp_write_pass_final($obj, $at, $srv, $data, $name, $val);
     return false;
 }
 

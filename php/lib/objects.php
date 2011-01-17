@@ -39,6 +39,7 @@ function setup_all_attrs () {
             if (! isset($desc['colwidth']))  $desc['colwidth'] = null;
             if (! isset($desc['popup']))  $desc['popup'] = null;
             if (! isset($desc['checkbox']))  $desc['checkbox'] = false;
+            if (! isset($desc['srv']))  $desc['srv'] = '';
             if ($desc['checkbox'])  $desc['popup'] = 'yesno';
 
             // attributes can have a default value
@@ -66,26 +67,26 @@ function setup_all_attrs () {
             if (! attribute_enabled($objtype, $name))  $desc['disable'] = true;
 
             // parse and setup per-server mappings for the attribute
-            $ldap = isset($desc['ldap']) ? $desc['ldap'] : '';
-            if (! is_array($ldap)) {
+            if (! is_array($desc['srv'])) {
                 // if all server attributes have the same name
                 // as the main attribute, we can use a simple string
                 // with server names separated by commas
-                $arr = split_list($ldap);
-                $ldap = array();
-                foreach ($arr as $x)  $ldap[$x] = '';
+                $arr = split_list($desc['srv']);
+                $desc['srv'] = array();
+                foreach ($arr as $x)  $desc['srv'][$x] = '';
             }
 
-            foreach (array_keys($ldap) as $srv) {
+            foreach (array_keys($desc['srv']) as $srv) {
 
                 // 'ntuser' is a special set of unix attributes
                 // they can be either supported as 'uni' or unsupported
                 if ($srv == 'ntuser') {
                     if (get_config('ntuser_support', false)) {
-                        $ldap[$srv = 'uni'] = $ldap['ntuser'];
-                        unset($ldap['ntuser']);
+                        $desc['srv']['uni'] = $desc['srv']['ntuser'];
+                        $srv = 'uni';
+                        unset($desc['srv']['ntuser']);
                     } else {
-                        unset($ldap['ntuser']);
+                        unset($desc['srv']['ntuser']);
                         continue;
                     }
                 }
@@ -98,9 +99,10 @@ function setup_all_attrs () {
 
                 // user can omit parameter name for a particular server
                 // if it coninsides with main parameter name.
-                if (empty($ldap[$srv]))  $ldap[$srv] = $name;
+                if (empty($desc['srv'][$srv]))
+                    $desc['srv'][$srv] = $name;
 
-                $ldap_attr = $ldap[$srv];
+                $ldap_attr = $desc['srv'][$srv];
 				$cfg =& $servers[$srv];
                 // check that attribute mappings to servers
                 // do not duplicate each other
@@ -114,10 +116,8 @@ function setup_all_attrs () {
                     $cfg['attrhash'][$objtype][$ldap_attr] = 1;
             }
 
-            // server mapping is done
-            $desc['ldap'] = $ldap;
             // disable attributes without servers
-            if (empty($ldap))  $desc['disable'] = true;
+            if (empty($desc['srv']))  $desc['disable'] = true;
 
             // setup readers and writers
             if ($desc['disable'])
@@ -176,7 +176,7 @@ function & create_obj ($objtype) {
         'changed' => false,
         'renamed' => false,
         'attrs' => array(),
-        'ldap' => array(),
+        'data' => array(),
         'attrlist' => array(),
         '_accessors' => array(),
         );
@@ -192,7 +192,7 @@ function & create_obj ($objtype) {
             'name'  => $name,
             'type'  => $desc['type'],
             'desc'  => &$desc,
-            'ldap'  => array(),
+            'srv'  => array(),
             'val'   => '',
             'dirty' => false,
         );
@@ -200,11 +200,11 @@ function & create_obj ($objtype) {
 
     foreach (array_keys($servers) as $srv) {
         $obj['attrlist'][$srv] =& $servers[$srv]['attrlist'][$objtype];
-        $obj['ldap'][$srv] = array();
+        $obj['data'][$srv] = array();
 
         $cleaner = @$obj['_accessors'][$srv]['clean'];
         if ($cleaner)
-            $cleaner($obj, $srv, $obj['ldap'][$srv]);
+            $cleaner($obj, $srv, $obj['data'][$srv]);
     }
 
     return $obj;
@@ -219,7 +219,7 @@ function obj_read (&$obj, $srv, $id) {
 
     $obj['idold'] = null;
     $obj['id'] = $id;
-    $obj['ldap'][$srv] = array();
+    $obj['data'][$srv] = array();
     $obj['msg'] = '';
 
     if ($servers[$srv]['disable'])  return null;
@@ -239,7 +239,7 @@ function obj_read (&$obj, $srv, $id) {
         $res = $reader($obj, $srv, $id);
     }
 
-    $obj['ldap'][$srv] = uldap_pop($res);
+    $obj['data'][$srv] = uldap_pop($res);
 
     if (empty($res['data'])) {
         log_debug('obj_read(%s) [%s]: failed with "%s"',
@@ -249,14 +249,14 @@ function obj_read (&$obj, $srv, $id) {
 
     if ($obj['msg'])  return $obj['msg'];
 
-    $ldap =& $obj['ldap'][$srv];
+    $data =& $obj['data'][$srv];
 
     foreach ($obj['attrs'] as $attr_name => &$at) {
-        if (! isset($at['desc']['ldap'][$srv])) // attribute exists for this server?
+        if (! isset($at['desc']['srv'][$srv])) // attribute exists for this server?
             continue;
         $read_func = $at['desc']['ldap_read'];
-        $ldap_name = $at['desc']['ldap'][$srv];
-        $val = nvl($read_func($obj, $at, $srv, $ldap, $ldap_name));
+        $ldap_attr = $at['desc']['srv'][$srv];
+        $val = nvl($read_func($obj, $at, $srv, $data, $ldap_attr));
         // FIXME: use NULL as a "don't change" mark
         if (empty($at['val']) && !empty($val))
             $at['val'] = $val;
@@ -285,10 +285,10 @@ function obj_write (&$obj, $srv, $id, $idold) {
     $obj['id'] = $id;
     $obj['renamed'] = false;    // can be set to true by subordinate writes
     $obj['msg'] = array();
-    $ldap =& $obj['ldap'][$srv];
+    $data =& $obj['data'][$srv];
     $changed = false;
 
-    $dn_old = uldap_dn($ldap);
+    $dn_old = uldap_dn($data);
     if (is_array($writer) && !empty($idold) && empty($dn_old)) {
         log_info('old DN is missing when writing to server "%s". will create.', $srv);
         $idold = null;
@@ -296,7 +296,7 @@ function obj_write (&$obj, $srv, $id, $idold) {
 
     // Convert object attributes into low-level values
     foreach ($obj['attrs'] as $attr_name => &$at) {
-        if (! isset($at['desc']['ldap'][$srv]))
+        if (! isset($at['desc']['srv'][$srv]))
             continue;
 
         // If we used call_user_func(), all parameters would be passed by value,
@@ -308,12 +308,12 @@ function obj_write (&$obj, $srv, $id, $idold) {
         // The variable function used here honors pass by reference
         // in function prototypes (at least in PHP 5.2.16).
         $write_func = $at['desc']['ldap_write'];
-        $ldap_name = $at['desc']['ldap'][$srv];
-        $retval = $write_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val']));
+        $ldap_attr = $at['desc']['srv'][$srv];
+        $retval = $write_func($obj, $at, $srv, $data, $ldap_attr, nvl($at['val']));
         if ($retval)  $changed = $obj['changed'] = true;
 	}
 
-    $dn = uldap_dn($ldap);
+    $dn = uldap_dn($data);
     if (is_array($writer) && empty($dn))
         return log_error('new DN is missing when writing to server "%s"', $srv);
 
@@ -337,16 +337,16 @@ function obj_write (&$obj, $srv, $id, $idold) {
         // Either changed during update or creating a new record.
         if (is_array($writer)) {
             // As usual, array means LDAP
-            uldap_set_dn($ldap, null);
+            uldap_set_dn($data, null);
             // Empty $idold means a brand new record
             if (empty($idold))
-                $res = uldap_entry_create($srv, $dn, $ldap);
+                $res = uldap_entry_create($srv, $dn, $data);
             else
-                $res = uldap_entry_update($srv, $dn, $ldap);
-###log_info("srv=$srv action=".(empty($idold)?"create":"update")." dn=($dn) ldap=".json_encode($ldap)." res=".json_encode($res));
+                $res = uldap_entry_update($srv, $dn, $data);
+###log_info("srv=$srv action=".(empty($idold)?"create":"update")." dn=($dn) data=".json_encode($data)." res=".json_encode($res));
         } else {
             // As usual, string means a custom function
-            $res = $writer($obj, $srv, $id, $idold, $ldap);
+            $res = $writer($obj, $srv, $id, $idold, $data);
         }
         log_debug('writing to "%s" returns "%s"', $srv, $res['error']);
         // Note: code 82 == "no values to update"
@@ -362,11 +362,11 @@ function obj_write (&$obj, $srv, $id, $idold) {
 
     // Perform post-update operations
     foreach ($obj['attrs'] as $attr_name => &$at) {
-        if (! isset($at['desc']['ldap'][$srv]))
+        if (! isset($at['desc']['srv'][$srv]))
             continue;
         $post_func = $at['desc']['ldap_write_final'];
-        $ldap_name = $at['desc']['ldap'][$srv];
-        $retval = $post_func($obj, $at, $srv, $ldap, $ldap_name, nvl($at['val']));
+        $ldap_attr = $at['desc']['srv'][$srv];
+        $retval = $post_func($obj, $at, $srv, $data, $ldap_attr, nvl($at['val']));
         if ($retval)  $changed = $obj['changed'] = true;
     }
 
