@@ -75,9 +75,9 @@ function unix_write_user_groups_final (&$obj, &$at, $srv, &$data, $name, $val) {
 
     // perform the modifications
     foreach (split_list($del) as $gidn)
-        _modify_unix_group($obj, $srv, $gidn, $uid, false);
+        modify_unix_group($obj, $srv, $gidn, $uid, false);
     foreach (split_list($add) as $gidn)
-        _modify_unix_group($obj, $srv, $gidn, $uid, true);
+        modify_unix_group($obj, $srv, $gidn, $uid, true);
 
     return !(empty($del) && empty($add));
 }
@@ -126,7 +126,7 @@ function _get_unix_group_ids (&$obj, $srv, $val, $warn = false) {
 }
 
 
-function _modify_unix_group (&$obj, $srv, $gidn, $uid, $add) {
+function modify_unix_group (&$obj, $srv, $gidn, $uid, $add) {
     $action = $add ? 'add' : 'remove';
     log_debug('modify_unix_group(%s,%s,%s): begin', $gidn, $action, $uid);
 

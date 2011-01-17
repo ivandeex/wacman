@@ -24,13 +24,13 @@ if ($res['code'])
     $msg[] = _T('Error deleting Unix user "%s" (%s): %s', $id, $dn, $res['error']);
 
 // Delete user from unix groups
+$dummy_usr = create_obj('user');
 $res = uldap_search($srv, "(&(objectClass=posixGroup)(memberUid=$id))", array('gidNumber'));
 foreach (uldap_entries($res) as $ge) {
     $gidn = uldap_value($ge, 'gidNumber');
-    $retval = modify_unix_group($srv, $gidn, $id, 'remove');
-    if ($retval != "OK" && $retval != "SAME")
-        $msg[] = _T('Error modifying group %s: %s', $gidn, $retval);
+    modify_unix_group($dummy_usr, $srv, $gidn, $id, false);
 }
+foreach ($obj['msg'] as $line)  $msg[] = $line;
 
 // Delete AD account
 $cn = uldap_value($ue, 'cn');
