@@ -39,6 +39,7 @@ function setup_all_attrs () {
             if (! isset($desc['popup']))  $desc['popup'] = null;
             if (! isset($desc['checkbox']))  $desc['checkbox'] = false;
             if (! isset($desc['srv']))  $desc['srv'] = '';
+            if (! isset($desc['wipe']))  $desc['wipe'] = array();
             if ($desc['checkbox'])  $desc['popup'] = 'yesno';
 
             // attributes can have a default value
@@ -299,6 +300,16 @@ function obj_write (&$obj, $srv, $id, $idold) {
     foreach ($obj['attrs'] as $attr_name => &$at) {
         if (! isset($at['desc']['srv'][$srv]) || $at['desc']['readonly'])
             continue;
+
+        // There are some attributes that Windows returns during reads but hates
+        // when we write them (at least from PHP, I recall it worked from Perl).
+        // As a workaround I completely wipe them off the data record.
+        if (array_search($srv, $at['desc']['wipe']) !== false) {
+            $ldap_attr = $at['desc']['srv'][$srv];
+            unset($data[$ldap_attr]);
+            unset($data[strtolower($ldap_attr)]);
+            continue;
+        }
 
         // If we used call_user_func(), all parameters would be passed by value,
         // and the "renamed" magic would not work.
