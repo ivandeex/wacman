@@ -16,7 +16,7 @@ Userman.RIGHT_GAP = 20;
 Userman.COL_GAP = 2;
 Userman.LABEL_WIDTH = 150;
 Userman.TAB_PADDING = "10px";
-Userman.AJAX_TIMEOUT = 20;
+Userman.AJAX_TIMEOUT = 30;
 Userman.VIEWPORT_PADDING = "5px";
 
 //
