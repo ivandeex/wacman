@@ -440,7 +440,7 @@ function ldap_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
 
 function ldap_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
     $old = ldap_read_pass($obj, $at, $srv, $data, $name);
-    if ($val == $old)
+    if (empty($val) || $val == $old)
         return false;
     switch($srv) {
         case 'uni':
