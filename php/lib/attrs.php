@@ -33,6 +33,7 @@ $all_attrs = array(
                         ),
             'ads' => array(
                         'read' => array('objectClass' => 'user', 'cn' => '$cn'),
+                        'prewrite' => 'ad_fix_update_data',
                         'write' => array()
                         ),
             'cgp' => array(
@@ -82,7 +83,6 @@ $all_attrs = array(
                 'ads' => '',
                 'cgp' => 'RealName'
             ),
-            'wipe' => array('ads'),
             'colwidth' => 160,
         ),
         'password' => array(
@@ -134,7 +134,6 @@ $all_attrs = array(
         'ntObjectClass' => array(
             'type' => 'class',
             'srv' => array('ads' => 'objectClass'),
-            'wipe' => array('ads'),
         ),
         'accountExpires' => array(
             'defval' => NO_EXPIRE,
@@ -153,7 +152,6 @@ $all_attrs = array(
         'instanceType' => array(
             'defval' => '4',
             'srv' => 'ads',
-            'wipe' => array('ads'),
         ),
         'userAccountControl' => array(
             'conv' => 'decihex',
