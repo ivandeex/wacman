@@ -27,12 +27,12 @@ $all_attrs = array(
         // if value is not an array, the string contains relevant function
         '_accessors' => array(
             'uni' => array(
-                        'read' => array('objectClass' => 'person', 'uid' => '$_ID'),
+                        'read' => array('objectClass' => 'person', 'uid' => '$(_ID)'),
                         'write' => array(),
                         'list' => array('objectClass' => 'person')
                         ),
             'ads' => array(
-                        'read' => array('objectClass' => 'user', 'cn' => '$cn'),
+                        'read' => array('objectClass' => 'user', 'cn' => '$(cn)'),
                         'prewrite' => 'ad_fix_update_data',
                         'write' => array()
                         ),
@@ -326,7 +326,7 @@ $all_attrs = array(
         // Read/write methods
         '_accessors' => array(
             'uni' => array(
-                        'read' => array('objectClass' => 'posixGroup', 'cn' => '$_ID'),
+                        'read' => array('objectClass' => 'posixGroup', 'cn' => '$(_ID)'),
                         'write' => array(),
                         'list' => array('objectClass' => 'posixGroup')
                         )

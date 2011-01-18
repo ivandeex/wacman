@@ -223,7 +223,6 @@ function obj_read (&$obj, $srv, $id) {
 
     $obj['idold'] = null;
     $obj['id'] = $id;
-    $obj['msg'] = array();
 
     if ($servers[$srv]['disable'])  return null;
 
@@ -285,7 +284,6 @@ function obj_write (&$obj, $srv, $id, $idold) {
     // Prepare writing parameters
     $obj['idold'] = $idold;
     $obj['id'] = $id;
-    $obj['msg'] = array();
     $data =& $obj['data'][$srv];
     $changed = false;
 
@@ -436,18 +434,43 @@ function _obj_list_sort ($a, $b) {
 //
 function _array_to_filter($array, $obj = null) {
     $filter = "";
-
-    foreach ($array as $name => $val) {
-        if ($val === '$_ID')
-            $val = $obj['id'];
-        else if (is_string($val) && $val[0] == '$')
-            $val = get_attr($obj, substr($val, 1));
-        $filter .= "(" . $name . "=" . $val . ")";
-    }
-
+    foreach ($array as $name => $val)
+        $filter .= "(" . $name . "=" . obj_format_string($val, $obj) . ")";
     if (count($array) > 1)
         $filter = "(&"  . $filter . ")";
     return $filter;
+}
+
+
+//
+// Substitute fields represented in the string as $(FIELD) by their values
+//
+function obj_format_string ($str, $obj = null, $override = null) {
+    global $_obj_fmt;
+    $_obj_fmt = array('obj' => $obj, 'ovr' => $override, 'err' => false);
+    $res = preg_replace_callback('!\$\((\w+)\)!', '_obj_replace_match', $str);
+    if ($_obj_fmt['err'])  $res = null;
+    return $res;
+}
+
+$_obj_fmt = null;
+
+function _obj_replace_match ($matches) {
+    $name = $matches[1];
+    global $_obj_fmt;
+    if (isset($_obj_fmt['ovr'][$name]))
+        return $_obj_fmt['ovr'][$name];
+    if (empty($_obj_fmt['obj'])) {
+        $_obj_fmt['err'] = true;
+        return '';
+    }
+    if ($name == '_ID')
+        $val = isset($_obj_fmt['obj']['id']) ? $_obj_fmt['obj']['id'] : '';
+    else
+        $val = get_attr($_obj_fmt['obj'], $name);
+    if (empty($val))
+        $_obj_fmt['err'] = true;
+    return $val;
 }
 
 

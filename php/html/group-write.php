@@ -14,7 +14,7 @@ $grp = create_obj('group');
 $idold = req_param("_idold");
 if (!empty($idold)) {
     // it's an update of existing group
-    $msg = obj_read($grp, $srv, $idold, array('objectClass' => 'posixGroup', 'cn' => '$_ID'));
+    $msg = obj_read($grp, $srv, $idold, array('objectClass' => 'posixGroup', 'cn' => '$(_ID)'));
     if ($msg)  error_page($msg);
 }
 obj_update($grp);

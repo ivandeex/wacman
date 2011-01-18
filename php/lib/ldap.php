@@ -196,7 +196,7 @@ function uldap_search ($srv, $filter, $attrs) {
     set_error();
     if ($debug)
         log_info('uldap_search(%s,filter:[%s],attrs:[%s]) OK: %s',
-                $srv, $filter, json_encode($attrs), json_encode($res['data']));
+                $srv, $filter, /*join_list($attrs)*/ '...', json_encode($res['data']));
     return $res;
 }
 
