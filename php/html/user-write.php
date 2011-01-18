@@ -14,16 +14,26 @@ $idold = req_param('_idold');
 if (!empty($idold)) {
     // it's an update of existing user
     foreach (array_keys($servers) as $srv) {
-        $msg = obj_read($usr, $srv, $idold);
+        switch ($srv) {
+            case 'uni': $cur_oid = $idold; break;
+            case 'ads': $cur_oid = get_attr($usr, 'cn'); break;
+            case 'cgp': $cur_oid = get_attr($usr, 'mail'); break;
+            default:    $cur_oid = ''; break;
+        }
+        if (empty($cur_oid))  continue;
+
+        $msg = obj_read($usr, $srv, $cur_oid);
         if ($msg && $srv == 'uni')
             error_page($msg);
-        else if ($msg)
+        if ($msg)
             log_error('user "%s" not found on server %s', $idold, $srv);
+        $obj['msg'] = array();
     }
 }
 
 $mail_old = get_attr($usr, 'mail');
 $cn_old = get_attr($usr, 'cn');
+
 obj_update($usr);
 
 foreach (array_keys($servers) as $srv) {
@@ -40,7 +50,9 @@ foreach (array_keys($servers) as $srv) {
             break;
     }
     $msg = obj_write($usr, $srv, $cur_oid, $old_oid);
-    if ($msg)  error_page($msg);
+    if ($msg && $srv == 'uni')
+        error_page($msg);
 }
-echo(json_ok(array('refresh' => $usr['renamed'])));
+
+echo($msg ? json_error($msg) : json_ok(array('refresh' => $usr['renamed'])));
 ?>

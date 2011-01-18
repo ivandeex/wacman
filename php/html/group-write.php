@@ -20,6 +20,5 @@ if (!empty($idold)) {
 obj_update($grp);
 
 $msg = obj_write($grp, $srv, $id, $idold);
-if ($msg)  error_page($msg);
-echo(json_ok(array('refresh' => $grp['renamed'])));
+echo($msg ? json_error($msg) : json_ok(array('refresh' => $grp['renamed'])));
 ?>
