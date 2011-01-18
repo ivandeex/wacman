@@ -344,12 +344,14 @@ function obj_write (&$obj, $srv, $id, $idold) {
 
     if ($obj['msg'])  return $obj['msg'];
 
+    // DN is passed to the updating routine directly
+    uldap_set_dn($data, null);
+
     // Update object attributes
     if ($changed || empty($idold)) {
         // Either changed during update or creating a new record.
         if (is_array($writer)) {
             // As usual, array means LDAP
-            uldap_set_dn($data, null);
             // Empty $idold means a brand new record
             if (empty($idold))
                 $res = uldap_entry_create($srv, $dn, $data);
@@ -370,6 +372,9 @@ function obj_write (&$obj, $srv, $id, $idold) {
     }
 
     if ($obj['msg'])  return $obj['msg'];
+
+    // DN can be handy for post-update routines
+    uldap_set_dn($data, $dn);
 
     // Perform post-update operations
     foreach ($obj['attrs'] as $attr_name => &$at) {

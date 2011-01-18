@@ -88,11 +88,7 @@ $all_attrs = array(
         'password' => array(
             'type' => 'pass',
             'label' => 'Password',
-            'srv' => array(
-                'uni' => 'userPassword',
-                'ads' => 'unicodePwd',
-                'cgp' => 'Password'
-			),
+            'srv' => 'uni,ads,cgp',
         ),
         'password2' => array(
             'type' => 'pass',

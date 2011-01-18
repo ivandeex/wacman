@@ -7,35 +7,36 @@
 //
 
 
-function encode_ad_pass ($pass) {
-    $enc = array();
-    foreach (str_split("\"$pass\"") as $c) {
-        $enc[] = $c;
-        $enc[] = 0;
+//
+// There are some attributes that Windows returns during reads but hates
+// when we UPDATE them (at least from PHP, I recall it worked from Perl).
+// As a workaround I completely wipe them off the data record.
+//
+function ad_fix_update_data (&$obj, $srv, $id, $idold, &$data) {
+    static $offenders = array('cn', 'objectClass', 'instanceType');
+    if (!empty($idold)) {
+        // if updating
+        foreach ($offenders as $name)
+            uldap_delete($data, $name);
     }
-    return pack('c*', $enc);
+    return array('code' => 0);
 }
 
 
-function decode_ad_pass ($pass) {
-    $chars = unpack('c*', $pass);
-    $dec = '';
-    $n = count($chars);
-    for ($i = 0; $i < $n; $i++) {
-        if (($i == 0 || $i == $n - 1) && $chars[$i] == '"') // FIXME ord?
-            continue;
-        if ($c != 0) // FIXME ord?
-            $dec .= $c;
+function ad_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
+    // encode password to unicode for active directory
+    $enc = "";
+    foreach (str_split("\"$val\"") as $ch)  $enc .= "$ch\000";
+
+    $dn = uldap_dn($data);
+    $res = uldap_entry_update($srv, $dn, array('unicodePwd' => $enc));
+    if ($res['code']) {
+        $obj['msg'][] = log_error('ad_write_pass_final(%s) [%s] error: %s',
+                                    $srv, $dn, $res['error']);
+        return false;
     }
-    return $dec;
-}
 
-
-function ad_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
-    // 'replace' works only for administrator.
-    // unprivileged users need to use change(delete=old,add=new)
-    uldap_replace($data, $name, encode_ad_pass($val));
-    log_debug("ad_write_pass($name)");
+    log_debug('ad_write_pass_final(%s) [%s] OK', $srv, $dn);
     return true;
 }
 

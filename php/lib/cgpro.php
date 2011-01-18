@@ -364,12 +364,7 @@ function cgp_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
         return false;
     }
 
-    $cgpass = $val;
-    if (preg_match('/^\{\w{2,5}\}\w+$/', $cgpass)
-            && str2bool(get_config('show_password')))
-        $cgpass = "\x2" . $cgpass;
-
-    $res = cgp_cmd($srv, 'SetAccountPassword', $mail, $cgpass);
+    $res = cgp_cmd($srv, 'SetAccountPassword', $mail, $val);
     if ($res['code']) {
         $obj['msg'][] =
             log_error('Cannot change mail password for "%s" on "%s": %s',

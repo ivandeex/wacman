@@ -8,10 +8,8 @@ function real_path ($path) {
     return empty($real) ? $path : $real;
 }
 
-define('HTDOCDIR', realpath(LIBDIR.'../html').'/');
 define('CONFDIR',  realpath(LIBDIR.'../config').'/');
-define('CSSDIR',   'css/');
-define('JSDIR',    'js/');
+define('BINDIR',   realpath(LIBDIR.'../bin').'/');
 
 
 /////////////////////////////////
@@ -278,5 +276,51 @@ function error_handler ($errno, $errstr, $file, $lineno) {
         phpversion(), php_sapi_name(), $server)
         );
 }
+
+
+//
+// Perform a predefined action
+//
+function run_action ($action, $param) {
+    return exec_helper("helper.sh", array($action, $param), array());
+}
+
+
+//
+// Run a helper script
+//
+function exec_helper ($prog, $args, $stdin_lines) {
+    $prog = BINDIR . "setpass.pl";
+    if (!is_executable($prog))
+        return array('code' => -1, 'error' => _T("%s: required executable not found", $prog));
+
+    $cmd = $prog . ' ' . implode(' ', array_map('escapeshellarg', $args));
+    $iodesc = array(
+        0 => array('pipe', 'r'),
+        1 => array('pipe', 'w'),
+        2 => array('pipe', 'w')
+        );
+    $pipes = array();
+
+    $process = proc_open($cmd, $iodesc, $pipes, BINDIR, null);
+    if (is_resource($process)) {
+        foreach ($stdin_lines as $line)  fwrite($pipes[0], "$line\n");
+        fclose($pipes[0]);
+
+        $out = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $status = proc_close($process);
+    } else {
+        $status = -1;
+        $out = "cannot fork";
+    }
+
+    log_debug('exec_helper: cmd={%s} stdin=%s status=%s out="%s"',
+            $cmd, json_encode($stdin_lines), $status, str_replace("\n", "^^", $out));
+    return array('code' => $status, 'error' => $out);
+}
+
 
 ?>

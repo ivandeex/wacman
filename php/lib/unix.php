@@ -164,30 +164,28 @@ function modify_unix_group (&$obj, $srv, $gidn, $uid, $add) {
 
 
 function unix_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
-    global $servers;
-    $conf =& $servers[$srv];
-    if (! isset($conf['extop'])) {
-        $conf['extop'] = false; # FIXME $data->root_dse->supported_extension('1.3.6.1.4.1.4203.1.11.1');
-    }
-    $extop = $conf['extop'];
-    $dn = get_attr($obj, 'dn');
-    if ($extop) {
-        // set_password() without 'oldpasswd' works only for administrator
-        // ordinary users need to supply 'oldpasswd'
-        #$res = $conf['conn']->set_password(user => $dn, newpasswd => $val);
+    $dn = uldap_dn($data);
+    $cfg =& get_server($srv);
+    $use_set_password = str2bool( @$cfg['use_set_password'] );
+    if ($use_set_password) {
+        // LDAP library in PHP does not support the PASSMOD action from RFC 3062.
+        // The SetPassword extension is absent in contrast with Net::LDAP in Perl.
+        // As a workaround we use helper script written in Perl.
+        $params = array($cfg['uri'], $cfg['user'], $cfg['pass'], $dn, $val);
+        $args = array();
+        foreach ($params as $x)  $args[] = '-';
+        $res = exec_helper("setpass.pl", $args, $params);
     } else {
-        // 'replace' works only for administrator.
-        // unprivileged users need to use change(delete=old,add=new)
-        $res = uldap_modify($data, $dn, $name, $val);
+        $pass = password_hash($val, get_config('unix_pass_encryption'));
+        $res = uldap_entry_update($srv, $dn, array('userPassword' => $pass));
     }
-    log_debug('change password on "%s": dn="%s" extop=%d attr=%s code=%d',
-                $srv, $dn, $extop, $name, $res['code']);
     if ($res['code']) {
-        message_box('error', 'close',
-                    _T('Cannot change password for "%s" on "%s": %s',
-                        $dn, $srv, $res['error']));
+        $obj['msg'][] = log_error('unix_write_pass_final(%s) [%s] error: %s',
+                                    $srv, $dn, $res['error']);
         return false;
     }
+
+    log_debug('unix_write_pass_final(%s) [%s] OK', $srv, $dn);
     return true;
 }
 

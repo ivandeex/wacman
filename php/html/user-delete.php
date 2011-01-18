@@ -58,7 +58,8 @@ if (!empty($mail) && !$servers['cgp']['disable']) {
 // Delete user's home directory
 $home = uldap_value($ue, 'homeDirectory');
 if (!empty($home) && str2bool(get_config('remove_homes'))) {
-    run_helper("delete", $home);
+    $res = run_action("delete", $home);
+    if ($res['code'])  $msg[] = log_error($res['error']);
 }
 
 echo(empty($msg) ? json_ok() : json_error($msg));

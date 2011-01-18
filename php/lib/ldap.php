@@ -424,42 +424,32 @@ function ldap_write_class (&$obj, &$at, $srv, &$data, $name, $val) {
 }
 
 
+//
+// we never try to read the password, just return some
+// impossible to type string which will trigger a change condition
+//
 function ldap_read_pass (&$obj, &$at, $srv, &$data, $name) {
-    // this value is cached because LDAP structure might have removed it for security
-    if (isset($at['old']))  return $at['old'];
-
-    global $servers;
-    if (!str2bool(get_config('show_password')) || $servers[$srv]['disable']) {
-        $val = OLD_PASS;
-    } else if ($srv == 'cgp') {
-        $val = ldap_read_string($obj, $at, $srv, $data, $name);
-    } else {
-        $val = '';
-    }
-
-    $at['old'] = $val;
-    return $val;
+    return OLD_PASS;
 }
 
 
 function ldap_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
-    $old = nvl(ldap_read_pass($obj, $at, $srv, $data, $name));
-    if ($val == $old)
-        return false;
-    if ($srv == 'ads')
-        return false;###FIXME ad_write_pass($at, $srv, $data, $name, $val);
     return false;
 }
 
 
 function ldap_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
-    $old = nvl(ldap_read_pass($obj, $at, $srv, $data, $name));
+    $old = ldap_read_pass($obj, $at, $srv, $data, $name);
     if ($val == $old)
         return false;
-    if ($srv == 'uni')
-        return false;###FIXME unix_write_pass_final($obj, $at, $srv, $data, $name, $val);
-    if ($srv == 'cgp')
-        return cgp_write_pass_final($obj, $at, $srv, $data, $name, $val);
+    switch($srv) {
+        case 'uni':
+            return unix_write_pass_final($obj, $at, $srv, $data, $name, $val);
+        case 'ads':
+            return ad_write_pass_final($obj, $at, $srv, $data, $name, $val);
+        case 'cgp':
+            return cgp_write_pass_final($obj, $at, $srv, $data, $name, $val);
+    }
     return false;
 }
 

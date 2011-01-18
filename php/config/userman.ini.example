@@ -4,6 +4,7 @@ uri = "ldaps://ldap.ourdom.com:636"
 base = "dc=ourdom,dc=com"
 debug = 0
 disable = 0
+use_set_password = 0
 
 # windows active directory server
 [ads]
@@ -34,7 +35,6 @@ ext_js = js/ext/adapter/ext/ext-base.js,js/ext/ext-all-debug.js
 ext_js_lang = js/ext/src/locale/ext-lang-%s.js
 add_button_css = 'gentle-frame'
 
-helper_script = ~/userman-helper
 create_homes  = 1
 remove_homes  = 1
 home_root     = /group

@@ -162,9 +162,7 @@ function random_salt ($length) {
 //        crypt, ext_des, md5crypt, blowfish, md5, sha, smd5, ssha, or clear.
 //
 function password_hash ($password_clear, $enc_type) {
-    $enc_type = strtolower($enc_type);
-
-    switch ($enc_type) {
+    switch (strtolower($enc_type)) {
         case 'crypt':
             $new_value = '{CRYPT}' . crypt($password_clear, random_salt(2));
             break;
@@ -173,13 +171,13 @@ function password_hash ($password_clear, $enc_type) {
             // extended des crypt. see OpenBSD crypt man page.
             if (! defined('CRYPT_EXT_DES') || CRYPT_EXT_DES == 0)
                 log_('Your system crypt library does not support extended DES encryption.');
-            $new_value = '{CRYPT}' . crypt( $password_clear, '_' . random_salt(8) );
+            $new_value = '{CRYPT}' . crypt($password_clear, '_' . random_salt(8));
             break;
 
         case 'md5crypt':
             if (! defined('CRYPT_MD5') || CRYPT_MD5 == 0)
                 log_error('Your system crypt library does not support md5crypt encryption.');
-            $new_value = '{CRYPT}' . crypt( $password_clear , '$1$' . random_salt(9) );
+            $new_value = '{CRYPT}' . crypt($password_clear , '$1$' . random_salt(9));
             break;
 
         case 'blowfish':
