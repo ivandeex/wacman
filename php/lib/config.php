@@ -127,6 +127,7 @@ function get_credentials ($srv) {
             $no++;
             if (preg_match('/^\s*$/', $line) || preg_match('/^\s*#/', $line))
                 continue;
+
             $parts = array();
             if (! preg_match("/^\s*([^\s'\"]+|'[^']*'|\"[^\"]*\")\s+".
                              "([^\s'\"]+|'[^']*'|\"[^\"]*\")\s+".
@@ -135,10 +136,11 @@ function get_credentials ($srv) {
                 log_error('syntax error in line %d of "%s"', $no, $secret);
                 continue;
             }
+
             $iserv = strip_quotes($parts[1]);
             $iuser = strip_quotes($parts[2]);
             $ipass = strip_quotes($parts[3]);
-            //log_debug('secret: srv="%s" user="%s" pass="%s"', $iserv, $iuser, $ipass);
+
             if ($iserv == $srv) {
                 if ((!empty($user) && ($iuser == $user || $iuser == '*'))
                         || (empty($user) && $iuser != '*')) {
@@ -162,6 +164,76 @@ function is_reserved ($id) {
             return true;
     }
     return false;
+}
+
+
+//
+// Create user home directory
+//
+function create_user_home (&$usr, $home) {
+
+    $skel = get_config('skel_dir');
+    if (! $skel) {
+        $usr['msg'][] = log_error('skel_dir: parameter missing');
+        return $usr['msg'];
+    }
+
+    if (!is_executable(BINDIR . 'personify.pl')) {
+        $usr['msg'][] = log_error('personify.pl not found');
+        return $usr['msg'];
+    }
+
+    $uid = get_attr($usr, 'uid');
+    $uidn = $gidn = 0;
+    if (str2bool(get_config('prefer_nss_ids'))) {
+        $pwent = posix_getpwnam($uid);
+        if ($pwent && isset($pwent['uid']))
+            $uidn = $pwent['uid'];
+        if ($pwent && isset($pwent['gid']))
+            $gidn = $pwent['gid'];
+    }
+    if (!$uidn)
+        $uidn = get_attr($usr, 'uidNumber');
+    if (!$gidn) {
+        $gidn = get_attr($usr, 'gidNumber');
+        $gidn = join_list(unix_get_group_ids($usr, 'uni', $gidn, true));
+    }
+    if (!$uidn || !$gidn) {
+        $usr['msg'][] = log_error('create_user_home(%s): cannot find user/group id', $uid);
+        return $usr['msg'];
+    }
+
+    $args = array('cp_dir', $home, $skel, $uidn, $gidn);
+    $res = exec_helper('suhelper.sh', $args, array(), true);
+    if ($res['code'])
+        $usr['msg'][] = $res['error'];
+
+    if (is_dir($home)) {
+        $exclude = split_list(get_config('home_exclude'));
+
+        $args = array('subst', $home, implode('|', $exclude));
+		for ($i = 0; $i < 10; $i++) {
+			$src = obj_format_string(get_config("homes_from_$i"), $usr);
+			$dst = obj_format_string(get_config("homes_to_$i"), $usr);
+			if ($src && $dst)
+			    $args[] = $src .'|'. $dst;
+		}
+
+        if (count($args) > 3) {
+            $res = exec_helper('suhelper.sh', $args, array(), true);
+            if ($res['code']) $usr['msg'][] = $res['error'];
+        }
+    }
+
+    return $usr['msg'];
+}
+
+
+//
+// Remove user home directory
+//
+function remove_user_home ($home) {
+    return exec_helper('suhelper.sh', array('rm_dir', $home), array(), true);
 }
 
 

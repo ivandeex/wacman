@@ -54,5 +54,10 @@ foreach (array_keys($servers) as $srv) {
         error_page($msg);
 }
 
+// create user's home directory
+$home = get_attr($usr, 'homeDirectory');
+if ($home && str2bool(get_config('create_homes')))
+    $msg = create_user_home($usr, $home);
+
 echo($msg ? json_error($msg) : json_ok(array('refresh' => $usr['renamed'])));
 ?>

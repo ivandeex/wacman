@@ -65,8 +65,8 @@ function unix_write_user_groups_final (&$obj, &$at, $srv, &$data, $name, $val) {
 
     // get previous and current lists of groups
     $old = isset($at['old']) ? $at['old'] : '';
-    $old = _get_unix_group_ids($obj, $srv, $old, false);
-    $new = _get_unix_group_ids($obj, $srv, $val, true);
+    $old = unix_get_group_ids($obj, $srv, $old, false);
+    $new = unix_get_group_ids($obj, $srv, $val, true);
     log_debug('write_unix_groups(1): old=(%s) new=(%s)', json_encode($old), json_encode($new));
 
     // find groups to delete user from and to add user to
@@ -83,7 +83,7 @@ function unix_write_user_groups_final (&$obj, &$at, $srv, &$data, $name, $val) {
 }
 
 
-function _get_unix_group_ids (&$obj, $srv, $val, $warn = false) {
+function unix_get_group_ids (&$obj, $srv, $val, $warn = false) {
     $arr_ids = split_list($val);
     if (empty($arr_ids))  return array();
 
@@ -174,7 +174,7 @@ function unix_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
         $params = array($cfg['uri'], $cfg['user'], $cfg['pass'], $dn, $val);
         $args = array();
         foreach ($params as $x)  $args[] = '-';
-        $res = exec_helper("setpass.pl", $args, $params);
+        $res = exec_helper("setpass.pl", $args, $params, false);
     } else {
         $pass = password_hash($val, get_config('unix_pass_encryption'));
         $res = uldap_entry_update($srv, $dn, array('userPassword' => $pass));
@@ -255,14 +255,14 @@ function unix_write_group_members (&$obj, &$at, $srv, &$data, $name, $val) {
 //
 
 function posix_read_real_uidn (&$obj, &$at, $srv, &$data, $name) {
-    $username = nvl(uldap_value($data, 'uid'));
+    $username = uldap_value($data, 'uid');
     $pwent = posix_getpwnam($username);
     return $pwent === false ? '' : $pwent['uid'];
 }
 
 
 function posix_read_real_gidn (&$obj, &$at, $srv, &$data, $name) {
-    $username = nvl(uldap_value($data, 'uid'));
+    $username = uldap_value($data, 'uid');
     $pwent = posix_getpwnam($username);
     return $pwent === false ? '' : $pwent['gid'];
 }

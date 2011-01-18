@@ -279,22 +279,25 @@ function error_handler ($errno, $errstr, $file, $lineno) {
 
 
 //
-// Perform a predefined action
-//
-function run_action ($action, $param) {
-    return exec_helper("helper.sh", array($action, $param), array());
-}
-
-
-//
 // Run a helper script
 //
-function exec_helper ($prog, $args, $stdin_lines) {
-    $prog = BINDIR . "setpass.pl";
+function exec_helper ($prog, $args, $stdin_lines, $use_sudo) {
+    if ($prog[0] != '/')  $prog = BINDIR . $prog;
     if (!is_executable($prog))
         return array('code' => -1, 'error' => _T("%s: required executable not found", $prog));
 
-    $cmd = $prog . ' ' . implode(' ', array_map('escapeshellarg', $args));
+    $sudo = '';
+    if ($use_sudo) {
+        foreach (array('/bin/sudo', '/usr/bin/sudo') as $sudo) {
+            if (is_executable($sudo))
+                break;
+        }
+        if (empty($sudo))
+            return array('code' => -1, 'error' => _T('sudo not found', $prog));
+        $sudo .= ' ';
+    }
+
+    $cmd = $sudo . $prog . ' ' . implode(' ', array_map('escapeshellarg', $args));
     $iodesc = array(
         0 => array('pipe', 'r'),
         1 => array('pipe', 'w'),
@@ -314,10 +317,10 @@ function exec_helper ($prog, $args, $stdin_lines) {
         $status = proc_close($process);
     } else {
         $status = -1;
-        $out = "cannot fork";
+        $out = 'cannot fork';
     }
 
-    log_debug('exec_helper: cmd={%s} stdin=%s status=%s out="%s"',
+    log_info('exec_helper: cmd={%s} stdin=%s status=%s out="%s"',
             $cmd, json_encode($stdin_lines), $status, str_replace("\n", "^^", $out));
     return array('code' => $status, 'error' => $out);
 }

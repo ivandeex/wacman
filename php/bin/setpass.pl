@@ -1,8 +1,9 @@
 #!/usr/bin/perl
+# $Id$
 #
 # Requires: perl-ldap, perl-IO-Socket-SSL
 #
-# usage: setpass.pl <uri> <bind_dn> <bind_pass> <user_dn> <new_pass>
+# usage: setpass.pl URI BIND_DN BIND_PASS USER_DN NEW_PASS
 #
 # LDAP library in PHP does not support the PASSMOD action from RFC 3062.
 # The SetPassword extension is absent in contrast to Net::LDAP in Perl.
@@ -16,6 +17,8 @@ use Net::LDAP::Extension::SetPassword;
 use constant TIMEOUT => 10;
 use constant DEBUG => 0;
 
+# having passwords in command line is insecure
+# we can send them via STDIN to keep privacy
 my @args = @ARGV;
 for my $i (0 .. $#args) {
     if ($args[$i] eq '-') {
