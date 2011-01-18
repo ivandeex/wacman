@@ -2584,9 +2584,9 @@ if(!defined('PHP_CGP_CLI_CLASS')) {
 
         // logging
         function _logDebug($line) {
-            if ($this->debug == 2 && function_exists("log_debug"))
-                log_debug("CLI: " . preg_replace('/[\r\n]+$/', '', $line));
-            elseif ($this->debug)
+            if ($this->debug == 2 && function_exists("log_info"))
+                log_info("CLI: " . preg_replace('/[\r\n]+$/', '', $line));
+            elseif ($this->debug) // old style
                 echo($line);
         }
 
