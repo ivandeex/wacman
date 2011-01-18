@@ -8,26 +8,26 @@
 
 
 function encode_ad_pass ($pass) {
-    $encoded = array();
-    foreach (preg_split('//', '"' . $pass . '"', -1, PREG_SPLIT_NO_EMPTY) as $c) {
-        $encoded[] = $c;
-        $encoded[] = 0;
+    $enc = array();
+    foreach (str_split("\"$pass\"") as $c) {
+        $enc[] = $c;
+        $enc[] = 0;
     }
-    return pack('c*', $encoded);
+    return pack('c*', $enc);
 }
 
 
 function decode_ad_pass ($pass) {
     $chars = unpack('c*', $pass);
-    $decoded = '';
+    $dec = '';
     $n = count($chars);
     for ($i = 0; $i < $n; $i++) {
         if (($i == 0 || $i == $n - 1) && $chars[$i] == '"') // FIXME ord?
             continue;
         if ($c != 0) // FIXME ord?
-            $decoded .= $c;
+            $dec .= $c;
     }
-    return $decoded;
+    return $dec;
 }
 
 
@@ -35,6 +35,7 @@ function ad_write_pass (&$obj, &$at, $srv, &$data, $name, $val) {
     // 'replace' works only for administrator.
     // unprivileged users need to use change(delete=old,add=new)
     uldap_replace($data, $name, encode_ad_pass($val));
+    log_debug("ad_write_pass($name)");
     return true;
 }
 
