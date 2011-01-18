@@ -320,8 +320,9 @@ function exec_helper ($prog, $args, $stdin_lines, $use_sudo) {
         $out = 'cannot fork';
     }
 
-    log_info('exec_helper: cmd={%s} stdin=%s status=%s out="%s"',
-            $cmd, json_encode($stdin_lines), $status, str_replace("\n", "^^", $out));
+    log_debug('exec_helper: cmd={%s} stdin=%s status=%s out="%s"',
+                $cmd, json_encode($stdin_lines), $status,
+                str_replace("\n", "^^", $out));
     return array('code' => $status, 'error' => $out);
 }
 

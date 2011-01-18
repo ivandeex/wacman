@@ -8,7 +8,7 @@
 #
 
 use strict;
-use constant DEBUG => 1;
+use constant DEBUG => 0;
 
 my ($root_dir, $arg_excl, @arg_repl) = @ARGV;
 
