@@ -5,9 +5,14 @@
 
 require '../lib/common.php';
 
+send_headers();
+if ($servers['cgp']['disable']) {
+    echo(json_error('cgp disabled'));
+    exit();
+}
+
 $res = cgp_cmd('cgp', 'ListAccounts', get_config('mail_domain'));
 if ($res['code'])  error_page($res['error']);
-send_headers();
 
 $arr = array();
 foreach ($res['data'] as $name => $dummy)
