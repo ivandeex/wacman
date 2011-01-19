@@ -96,15 +96,21 @@ function setup_all_attrs () {
                     error_page(_T('wrong server "%s" in objtype "%s" descriptor "%s"',
                                 print_r($srv, 1), $objtype, $name));
 
-                // user can omit parameter name for a particular server
-                // if it coninsides with main parameter name.
+                // skip attribute mapping if server is disabled
+                $cfg =& $servers[$srv];
+                if ($cfg['disable'])  {
+                    unset($desc['srv'][$srv]);
+                    continue;
+                }
+
+                // user can omit a server attribute name
+                // if it coinsides with the main field name.
                 if (empty($desc['srv'][$srv]))
                     $desc['srv'][$srv] = $name;
 
-                $ldap_attr = $desc['srv'][$srv];
-				$cfg =& $servers[$srv];
                 // check that attribute mappings to servers
                 // do not duplicate each other
+                $ldap_attr = $desc['srv'][$srv];
                 if (isset($cfg['attrhash'][$objtype][$ldap_attr])) {
                     if (! empty($desc['is_duplicate']))
                         log_error('duplicate attribute "%s" as "%s" for server "%s"',
@@ -115,7 +121,7 @@ function setup_all_attrs () {
                     $cfg['attrhash'][$objtype][$ldap_attr] = 1;
             }
 
-            // disable attributes without servers
+            // disable attributes without server mappings
             if (empty($desc['srv']))  $desc['disable'] = true;
 
             // setup readers and writers
