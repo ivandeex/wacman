@@ -399,13 +399,6 @@ $all_attrs = array(
             'srv' => 'cgp',
         ),
     ),
-
-    // ======== mail alias (not for creation :) ) ========
-
-    'alias' => array(
-        'uid' => array( 'srv' => 'cgp' ),
-        'aliasedObjectName' => array( 'srv' => 'cgp' )
-    ),
 );
 
 
