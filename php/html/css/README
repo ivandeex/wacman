@@ -1,9 +1,0 @@
-You can use an alternative theme, browse for available themes at http://extjs.fudini.net/.
-
-wget http://extjs.fudini.net/themes/ext_theme_12.zip
-unzip -q ext_theme_12.zip
-mv 12 theme-12
-
-Then edit userman.ini and set the theme_css parameter, e.g.:
-theme_css = css/theme-12/resources/css/ext-all.css
-

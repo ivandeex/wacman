@@ -1,0 +1,59 @@
+Userman.
+Additional installation steps.
+
+[1] Install Ext JS 3.3.x open source (required)
+
+Download ExtJS from http://www.sencha.com/products/js/download.php
+or from http://www.vitki.net/sites/vitki.net/files/attachments/ext-3.3.1.zip
+then unzip ext-3.3.x/ under directory ./html/js
+and create symbolic link from "ext-3.3.x" to "ext".
+For example:
+ cd ./html/js
+ wget http://www.vitki.net/sites/vitki.net/files/attachments/ext-3.3.1.zip
+ unzip ext-3.3.1.zip
+ ln -s ext-3.3.1 ext
+
+[2] Install LovCombo (required)
+
+Download LovCombo from http://lovcombo.extjs.eu/ into directory ./html/js
+For example:
+ cd ./html/js
+ mkdir lovcombo
+ cd lovcombo
+ wget http://www.vitki.net/sites/vitki.net/files/attachments/lovcombo.tar.gz
+ tar xzf lovcombo.tar.gz
+ ln -s ../ext .
+
+[3] Setup alternative theme (optional)
+
+You can use an alternative WebUI theme under ./html/css.
+See available themes at http://extjs.fudini.net/.
+Example of installation:
+ cd ./html/css
+ wget http://extjs.fudini.net/themes/ext_theme_12.zip
+ unzip -q ext_theme_12.zip
+ mv 12 theme-12
+
+After installing new theme edit ./config/userman.ini
+and modify the "theme_css" parameter, e.g.:
+ theme_css = css/theme-12/resources/css/ext-all.css
+
+[4] Secure your configuration files (required)
+
+Your configuration files contain such sensitive information as passwords.
+To avoid inappropriate access set file permissions as follows:
+ cd ./config
+ chown root:apache *
+ chmod 644 *
+
+[5] Configure root access rights for helper scripts (optional)
+
+If you plan to use such features as automatic creation or removal
+of user home directories, you should allow sudo'ing of helper scripts.
+Run the "visudo" command and add the following lines:
+ Defaults:apache !requiretty
+ apache ALL=(ALL) NOPASSWD:      /path/to/userman/bin/suhelper.sh *
+
+Note: Normally PHP is run by web server as user "apache".
+      If your case differs, use approriate user name in snippets above.
+
