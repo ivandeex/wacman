@@ -42,9 +42,9 @@ and modify the "theme_css" parameter, e.g.:
 
 Your configuration files contain such sensitive information as passwords.
 To avoid inappropriate access set file permissions as follows:
- cd ./config
- chown root:apache *
- chmod 644 *
+ chown root:apache ./config/* ./bin/*
+ chmod 640 ./config/*
+ chmod 750 ./bin/*
 
 [5] Configure root access rights for helper scripts (optional)
 
