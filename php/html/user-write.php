@@ -26,8 +26,9 @@ if (!empty($idold)) {
         if ($msg && $srv == 'uni')
             error_page($msg);
         if ($msg)
-            log_error('user "%s" not found on server %s', $idold, $srv);
-        $obj['msg'] = array();
+            log_error('user "%s" not found on server %s: %s', $idold, $srv, json_encode($msg));
+        // flush reading errors
+        $usr['msg'] = array();
     }
 }
 
