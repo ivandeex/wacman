@@ -202,7 +202,7 @@ function unix_read_group_members (&$obj, &$at, $srv, &$data, $name) {
     $uids = array();
     foreach ($uidns as $uidn) {
         if (preg_match('!^\d+$!', $uidn)) {
-            $res = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
+            $res = uldap_search($srv, "(&(objectClass=posixAccount)(uidNumber=$uidn))", array('uid'));
             $ue = $res['data'];
             $uid = $ue ? nvl(uldap_value($ue, 'uid')) : '';
             $uids[] = empty($uid) ? $uidn : $uid;
@@ -224,7 +224,7 @@ function unix_write_group_members (&$obj, &$at, $srv, &$data, $name, $val) {
             $uid_hash[$uidn] = 1;
             continue;
         }
-        $res = uldap_search($srv, "(&(objectClass=person)(uidNumber=$uidn))", array('uid'));
+        $res = uldap_search($srv, "(&(objectClass=posixAccount)(uidNumber=$uidn))", array('uid'));
         $uid = nvl(uldap_value(uldap_pop($res), 'uid'));
         if ($uid != '') {
             log_debug('search for uidn="%d" returns uid="%s"', $uidn, $uid);

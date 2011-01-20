@@ -27,9 +27,9 @@ $all_attrs = array(
         // if value is not an array, the string contains relevant function
         '_accessors' => array(
             'uni' => array(
-                        'read' => array('objectClass' => 'person', 'uid' => '$(_ID)'),
+                        'read' => array('objectClass' => 'posixAccount', 'uid' => '$(_ID)'),
                         'write' => array(),
-                        'list' => array('objectClass' => 'person')
+                        'list' => array('objectClass' => 'posixAccount')
                         ),
             'ads' => array(
                         'read' => array('objectClass' => 'user', 'cn' => '$(cn)'),

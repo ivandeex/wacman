@@ -12,7 +12,7 @@ if (is_reserved($id))  error_page("Cannot delete reserved object");
 
 // Find Unix, AD and CGP identifiers of the user
 $srv = 'uni';
-$res = uldap_search($srv, "(&(objectClass=person)(uid=$id))", array('dn', 'cn', 'mail', 'homeDirectory'));
+$res = uldap_search($srv, "(&(objectClass=posixAccount)(uid=$id))", array('dn', 'cn', 'mail', 'homeDirectory'));
 if (empty($res['data']))  error_page('User not found');
 $msg = array();
 $ue = uldap_pop($res);
