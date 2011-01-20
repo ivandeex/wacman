@@ -64,6 +64,16 @@ function uldap_connect ($srv) {
         return -1;
     }
 
+    // StartTLS
+    if (str2bool(@$cfg['start_tls'])) {
+        $ok = @ldap_start_tls($cfg['conn']);
+        if (!$ok) {
+            log_error('cannot start tls for server (%s): %s',
+                    $srv, ldap_error($cfg['conn']));
+            return -1;
+        }
+    }
+
     // Attempt to set LDAP protocol version 3.
     // Active directory requires this version.
     // Other servers might support it, let's try.

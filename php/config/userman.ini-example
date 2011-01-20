@@ -1,6 +1,7 @@
 # unix directory server
 [uni]
-uri = "ldaps://ldap.ourdom.com:636"
+uri = "ldap://unix.ourdom.com:389"
+start_tls = 1
 base = "dc=ourdom,dc=com"
 debug = 0
 disable = 0
@@ -8,7 +9,8 @@ use_set_password = 0
 
 # windows active directory server
 [ads]
-uri = "ldaps://windows.ourdom.com:636"
+uri = "ldaps://activedir.ourdom.com:636"
+start_tls = 0
 base = "dc=ourdom,dc=local"
 debug = 0
 disable = 0
