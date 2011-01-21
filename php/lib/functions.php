@@ -1,7 +1,7 @@
 <?php
 // $Id$
 
-// Collection of functions used throughout userman.
+// Collection of functions used throughout Wacman.
 
 function real_path ($path) {
     $real = realpath($path);

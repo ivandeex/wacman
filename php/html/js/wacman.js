@@ -1,39 +1,39 @@
 // $Id$
 
 //
-// Userman namespace
+// Wacman namespace
 //
-Ext.ns("Userman");
+Ext.ns("Wacman");
 
 /////////////////////////////////////////////////////////
 // Global constants
 //
 
-Userman.MAX_ID_LEN = 16;
-Userman.THROBBER_ACTIVE = "images/throbber-24.gif";
-Userman.THROBBER_IDLE = "images/userman-32.png";
-Userman.RIGHT_GAP = 20;
-Userman.COL_GAP = 2;
-Userman.LABEL_WIDTH = 150;
-Userman.TAB_PADDING = "10px";
-Userman.AJAX_TIMEOUT = 30;
-Userman.VIEWPORT_PADDING = "5px";
+Wacman.MAX_ID_LEN = 16;
+Wacman.THROBBER_ACTIVE = "images/throbber-24.gif";
+Wacman.THROBBER_IDLE = "images/wacman-32.png";
+Wacman.RIGHT_GAP = 20;
+Wacman.COL_GAP = 2;
+Wacman.LABEL_WIDTH = 150;
+Wacman.TAB_PADDING = "10px";
+Wacman.AJAX_TIMEOUT = 30;
+Wacman.VIEWPORT_PADDING = "5px";
 
 //
 // Global variables
 //
 
-Userman.translations = [];
-Userman.config = {};
-Userman.all_attrs = {};
-Userman.gui_attrs = {};
+Wacman.translations = [];
+Wacman.config = {};
+Wacman.all_attrs = {};
+Wacman.gui_attrs = {};
 
 //
 // Translates and formats a string
 //
-Userman.T = function (msg /*, ... */) {
+Wacman.T = function (msg /*, ... */) {
     var msg = arguments[0];
-    msg = Userman.translations[msg] || msg;
+    msg = Wacman.translations[msg] || msg;
     for (var i = 1; i < arguments.length; i++)
         msg = msg.replace("%s", arguments[i]);
     return msg;
@@ -42,9 +42,9 @@ Userman.T = function (msg /*, ... */) {
 //
 // Formats, translates and prints a debugging message
 //
-Userman.debug = function (msg /*, ...*/) {
-    if (Userman.toBool(Userman.getConfig("debug"))) {
-        var msg = Userman.T.apply(Userman, arguments);
+Wacman.debug = function (msg /*, ...*/) {
+    if (Wacman.toBool(Wacman.getConfig("debug"))) {
+        var msg = Wacman.T.apply(Wacman, arguments);
         if (typeof console !== "undefined" && console)
             console.log(msg);
     }
@@ -53,8 +53,8 @@ Userman.debug = function (msg /*, ...*/) {
 //
 // Returns value of a configuration parameter
 //
-Userman.getConfig = function (name) {
-    return (name in Userman.config ? Userman.config[name] : null);
+Wacman.getConfig = function (name) {
+    return (name in Wacman.config ? Wacman.config[name] : null);
 }
 
 /////////////////////////////////////////////////////////
@@ -64,7 +64,7 @@ Userman.getConfig = function (name) {
 //
 // Remove blanks at front and end of the string
 //
-Userman.trim = function (s) {
+Wacman.trim = function (s) {
     s = (s == undefined ? "" : "" + s);
     return s.replace(/^\s\s*/, "").replace(/\s\s*$/, "");
 }
@@ -73,17 +73,17 @@ Userman.trim = function (s) {
 // Strings "yes", "true", "on" or "1" (case insensitive)
 // are true, all others are false.
 //
-Userman.toBool = function (s) {
+Wacman.toBool = function (s) {
     if (!s)
         return false;
-    s = Userman.trim(s);
+    s = Wacman.trim(s);
     if (s.length < 1)
         return false;
     return ("yto1".indexOf(s.charAt(0).toLowerCase()) >= 0);
 }
 
-Userman.fromBool = function (v) {
-    return (Userman.toBool(v) ? "Yes" : "No");
+Wacman.fromBool = function (v) {
+    return (Wacman.toBool(v) ? "Yes" : "No");
 }
 
 //
@@ -91,7 +91,7 @@ Userman.fromBool = function (v) {
 // by latin equivalents, makes it lower case and removes all non
 // alphanumeric letters replacing them by underscores.
 //
-Userman.toId = (function() { // begin closure
+Wacman.toId = (function() { // begin closure
 
     // This conversion table performs simple conversion
     // from cyrillic unicode letters to latin
@@ -127,10 +127,10 @@ Userman.toId = (function() { // begin closure
     }
 
     function _toId (s) {
-        s = Userman.trim(s);
+        s = Wacman.trim(s);
         var n = s.length;
-        if (n > Userman.MAX_ID_LEN)
-            n = Userman.MAX_ID_LEN;
+        if (n > Wacman.MAX_ID_LEN)
+            n = Wacman.MAX_ID_LEN;
         var r = "";
         for (var i = 0; i < n; i++) {
             var c = s.charCodeAt(i);
@@ -148,9 +148,9 @@ Userman.toId = (function() { // begin closure
 //
 // Format internal telephone as left zero-padded 
 //
-Userman.formatTelnum = function (telnum) {
-    telnum = Userman.trim(telnum).replace(/[^0-9]/g, "");
-    var len = Userman.getConfig("telnum_len");
+Wacman.formatTelnum = function (telnum) {
+    telnum = Wacman.trim(telnum).replace(/[^0-9]/g, "");
+    var len = Wacman.getConfig("telnum_len");
     if (telnum.length < len) {
         while (telnum.length < len)
             telnum = "0" + telnum;
@@ -165,7 +165,7 @@ Userman.formatTelnum = function (telnum) {
 // Convert any value to string.
 // Use delimiters to join array members.
 //
-Userman.anyToString = function (val, delimiter) {
+Wacman.anyToString = function (val, delimiter) {
     if (!val)
         return "";
     if (!(typeof val == "object" && val instanceof Array))
@@ -174,25 +174,25 @@ Userman.anyToString = function (val, delimiter) {
         return "";
     if (!delimiter)
         delimiter = "\n";
-    var str = "" + Userman.anyToString(val[0]);
+    var str = "" + Wacman.anyToString(val[0]);
     for (var i = 1; i < val.length; i++)
-        str += delimiter + Userman.anyToString(val[i]);
+        str += delimiter + Wacman.anyToString(val[i]);
     return str;
 }
 
 //
 // Check whether particular identifier is reserved by the system
 //
-Userman.isReserved = function (id, msg) {
-    id = Userman.trim(id);
-    var names = Userman.getConfig("reserved_names").split(",");
+Wacman.isReserved = function (id, msg) {
+    id = Wacman.trim(id);
+    var names = Wacman.getConfig("reserved_names").split(",");
     for (var i in names) {
-        var name = Userman.trim(names[i]);
+        var name = Wacman.trim(names[i]);
         if (name != "" && id == name) {
             if (msg) {
                 if (msg == "!")
                     msg = "Cannot delete reserved object";
-                Ext.Msg.alert(id, Userman.T(msg));
+                Ext.Msg.alert(id, Wacman.T(msg));
             }
             return true;
         }
@@ -203,7 +203,7 @@ Userman.isReserved = function (id, msg) {
 //
 // Convert path to LDAP DN
 //
-Userman.path2dn = function (path, prefix, delimiter) {
+Wacman.path2dn = function (path, prefix, delimiter) {
     if (!prefix)  prefix = "dc";
     if (!delimiter)  delimiter = ".";
     var arr = path.split(delimiter);
@@ -216,23 +216,23 @@ Userman.path2dn = function (path, prefix, delimiter) {
 // List functions
 //
 
-Userman.splitList = function (str, as_string) {
-    str = Userman.trim(str);
+Wacman.splitList = function (str, as_string) {
+    str = Wacman.trim(str);
     if (!str.length)  return [];
     var arr = str.split(",");
     arr.sort();
     return (as_string ? arr.join(",") : arr);
 }
 
-Userman.joinList = function (arr) {
+Wacman.joinList = function (arr) {
     if (!arr.length)  return "";
     arr.sort();
     return arr.join(",");
 }
 
-Userman.appendList = function (a, b, as_string) {
-    a = (a instanceof Array) ? a : Userman.splitList(a);
-    b = (b instanceof Array) ? b : Userman.splitList(b);
+Wacman.appendList = function (a, b, as_string) {
+    a = (a instanceof Array) ? a : Wacman.splitList(a);
+    b = (b instanceof Array) ? b : Wacman.splitList(b);
     var i, h = {}, r = [];
     for (i = 0; i < a.length; i++)  h[a[i]] = 1;
     for (i = 0; i < b.length; i++)  h[b[i]] = 1;
@@ -245,11 +245,11 @@ Userman.appendList = function (a, b, as_string) {
 // AJAX indicator icon
 //
 
-Userman.Throbber = Ext.extend(Ext.Button, {
+Wacman.Throbber = Ext.extend(Ext.Button, {
     disabled: true,
     scale: "medium",
     ajax_urls : null,
-    icon: Userman.THROBBER_IDLE,
+    icon: Wacman.THROBBER_IDLE,
 
     initComponent : function() {
         this.ajax_urls = [];
@@ -261,14 +261,14 @@ Userman.Throbber = Ext.extend(Ext.Button, {
     addReq: function (conn, o) {
         if (this.ajax_urls.indexOf(o.url) < 0) {
             this.ajax_urls.push(o.url);
-            this.setIcon(Userman.THROBBER_ACTIVE);
+            this.setIcon(Wacman.THROBBER_ACTIVE);
         }
     },
 
     remReq: function (conn, resp, o) {
         this.ajax_urls.remove(o.url);
         if (this.ajax_urls.length <= 0)
-            this.setIcon(Userman.THROBBER_IDLE);
+            this.setIcon(Wacman.THROBBER_IDLE);
     },
 });
 
@@ -278,7 +278,7 @@ Userman.Throbber = Ext.extend(Ext.Button, {
 // auto-inserted blanks don't pass regexp in setValue
 //
 
-Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
+Wacman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
     getCheckedDisplay:function() {
         return this.getCheckedValue(this.displayField);
     }
@@ -288,7 +288,7 @@ Userman.MultiComboBox = Ext.extend(Ext.ux.form.LovCombo, {
 // API with PHP
 //
 
-Userman.FormAction = Ext.extend(Ext.form.Action, {
+Wacman.FormAction = Ext.extend(Ext.form.Action, {
 
     //
     // Start the AJAX request
@@ -304,7 +304,7 @@ Userman.FormAction = Ext.extend(Ext.form.Action, {
             method: method,
             url: o.url,
             headers: o.headers,
-            timeout: Userman.AJAX_TIMEOUT * 1000,
+            timeout: Wacman.AJAX_TIMEOUT * 1000,
             success: function (response) { this.handler(response, true); },
             failure: function (response) { this.handler(response, false); },
             scope: this
@@ -389,13 +389,13 @@ Userman.FormAction = Ext.extend(Ext.form.Action, {
         // Build the error message
         var ermes = result.message
                     || "Invalid response from server";
-        ermes = Userman.T(Userman.anyToString(ermes, "<br>"));
+        ermes = Wacman.T(Wacman.anyToString(ermes, "<br>"));
         if (!conn_ok)
-            ermes = Userman.T("Connection failed: ") + ermes;
+            ermes = Wacman.T("Connection failed: ") + ermes;
         this._error = ermes;
 
         // Bring the alert popup
-        var title = this.options._waitTitle + ": " + Userman.T("error");
+        var title = this.options._waitTitle + ": " + Wacman.T("error");
         Ext.Msg.alert(title, ermes);
     },
 
@@ -405,11 +405,11 @@ Userman.FormAction = Ext.extend(Ext.form.Action, {
 // Data object
 //
 
-Userman.Object = Ext.extend(Ext.util.Observable, {
+Wacman.Object = Ext.extend(Ext.util.Observable, {
 
     // configuration attributes
     name: undefined,    // object name
-    list: undefined,    // index in Userman.std_lists
+    list: undefined,    // index in Wacman.std_lists
     title: undefined,   // title for the list panel
     affect_lists: [],   // other lists affected by this object list changes
 
@@ -447,8 +447,8 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         with (this) {
             attr = {};
             list_cols = [];
-            list_width = Userman.COL_GAP + 1;
-            list_store = Userman.std_lists[list].store;
+            list_width = Wacman.COL_GAP + 1;
+            list_store = Wacman.std_lists[list].store;
             form_tabs = [];
 
             // setup AJAX URLs
@@ -458,7 +458,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
 
         // setup visual attributes
-        var form_attrs = Userman.gui_attrs[this.name] || [];
+        var form_attrs = Wacman.gui_attrs[this.name] || [];
         for (var i = 0; i < form_attrs.length; i++) {
             var tab_name = form_attrs[i][0];
             var tab_attrs = form_attrs[i][1];
@@ -473,11 +473,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             if (fields.length) {
                 this.form_tabs.push({
                     xtype: "panel",
-                    title: Userman.T(tab_name),
+                    title: Wacman.T(tab_name),
                     layout: "form",
                     autoScroll: true,
-                    bodyStyle: "padding: " + Userman.TAB_PADDING,
-                    labelWidth: Userman.LABEL_WIDTH,
+                    bodyStyle: "padding: " + Wacman.TAB_PADDING,
+                    labelWidth: Wacman.LABEL_WIDTH,
                     labelSeparator: "",
                     activeItem: 0,
                     items: fields
@@ -486,7 +486,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         }
 
         // setup hidden attributes
-        for (var name in Userman.all_attrs[this.name]) {
+        for (var name in Wacman.all_attrs[this.name]) {
             // visual attributes were configured above
             if (!(name in this.attr))
                 this.initAttr(name);
@@ -501,9 +501,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             //
             var desc = this.attr[name].desc;
             if (desc.colwidth) {
-                this.list_width += desc.colwidth + Userman.COL_GAP;
+                this.list_width += desc.colwidth + Wacman.COL_GAP;
                 this.list_cols.push({
-                    header: Userman.T(desc.label),
+                    header: Wacman.T(desc.label),
                     dataIndex: desc.name,
                     sortable: true,
                     width: desc.colwidth,
@@ -513,7 +513,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         with (this) {
             obj_attrs = [];
-            for (var name in Userman.all_attrs[name])
+            for (var name in Wacman.all_attrs[name])
                 obj_attrs.push(name);
             Data = Ext.data.Record.create(obj_attrs);
             data = new Data ();
@@ -524,7 +524,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // setup data attribute
     //
     initAttr: function (name) {
-        var desc = Userman.all_attrs[this.name][name];
+        var desc = Wacman.all_attrs[this.name][name];
         this.attr[name] = {
             // can_set=true: if field can be auto-calculatable,
             can_set: true,
@@ -589,18 +589,18 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         this.clear();
         this.list_store.reload();
         for (var i = 0; i < this.affect_lists.length; i++)
-            Userman.std_lists[this.affect_lists[i]].store.reload();
+            Wacman.std_lists[this.affect_lists[i]].store.reload();
     },
 
     //
     // Ask user if he is sure and proceed to record deletion if yes
     //
     onDelete: function () {
-        if (! this.id_value || Userman.isReserved(this.id_value, "!"))
+        if (! this.id_value || Wacman.isReserved(this.id_value, "!"))
             return;
         var _this = this;
         Ext.Msg.confirm(this.id_value,
-                        Userman.T("Really delete?"),
+                        Wacman.T("Really delete?"),
                         function (reply) {
                             if (reply == "yes")  _this.doDelete();
                         });
@@ -613,11 +613,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var params = {};
         params[this.id_attr] = this.id_value;
         this.form.doAction(
-            new Userman.FormAction(this.form, {
+            new Wacman.FormAction(this.form, {
                 url: this.delete_url,
                 params: params,
                 _waitTitle: this.id_value,
-                _waitMsg: Userman.T("Deleting..."),
+                _waitMsg: Wacman.T("Deleting..."),
                 _isLoad: false,
                 scope: this,
                 success: function (form, action) {
@@ -638,11 +638,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var params = {};
         params.id = this.id_value = rec.get(this.id_attr);
         this.form.doAction(
-            new Userman.FormAction(this.form, {
+            new Wacman.FormAction(this.form, {
                 url: this.read_url,
                 params: params,
                 _waitTitle: this.id_value,
-                _waitMsg: Userman.T("Loading..."),
+                _waitMsg: Wacman.T("Loading..."),
                 _isLoad: true,
                 scope: this,
                 success: this.onLoadSuccess
@@ -685,12 +685,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         params[this.id_attr] = params._id = this.vget(this.id_attr);
 
         this.form.doAction(
-            new Userman.FormAction(this.form, {
+            new Wacman.FormAction(this.form, {
                 url: this.write_url,
                 method: "post",
                 params: params,
                 _waitTitle: this.vget(this.id_attr),
-                _waitMsg: Userman.T(this.id_value ? "Updating..." : "Creating..."),
+                _waitMsg: Wacman.T(this.id_value ? "Updating..." : "Creating..."),
                 _isLoad: false,
                 scope: this,
                 success: function (form, action) {
@@ -713,7 +713,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             return;
         var _this = this;
         Ext.Msg.confirm(this.vget(this.id_attr),
-                        Userman.T("Really revert changes?"),
+                        Wacman.T("Really revert changes?"),
                         function (reply) {
                             if (reply == "yes")  _this.doRevert();
                         });
@@ -737,7 +737,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // It will auto-fill some fields
     //
     onChange: function (field) {
-        var val = Userman.trim(field.getValue());
+        var val = Wacman.trim(field.getValue());
         if (val == this.vget(field._attr.name))
             return;
         this.vset(field._attr.name, val);
@@ -796,7 +796,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var at = this.attr[name];
         if (at.disable)
             return;
-        val = Userman.trim(val);
+        val = Wacman.trim(val);
         this.data.set(name, val);
 
         // Define whether field can be auto-filled
@@ -823,7 +823,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // Return field value
     //
     vget: function (name) {
-        return Userman.trim(this.data.get(name));
+        return Wacman.trim(this.data.get(name));
     },
 
     //
@@ -843,13 +843,13 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
     // contain values of other fields substitued in.
     //
     getSubst: function (what, override) {
-        var dn = Userman.getConfig(what) || "";
+        var dn = Wacman.getConfig(what) || "";
         var name;
     	while ((name = dn.match(/\$\((\w+)\)/)) != null) {
 	    	name = name[1];
 	    	var val = "";
 	    	if (override != undefined && override != null && (name in override))
-	    	    val = Userman.trim(override[name]);
+	    	    val = Wacman.trim(override[name]);
 	    	if (val == "")
 	    	    val = this.vget(name);
          	if (val == "") {
@@ -890,12 +890,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             return;
         at.requesting = at.requested = true;
 
-        //Userman.debug("nextSeq(%s,%s/%s)...", which, this.name, name);
+        //Wacman.debug("nextSeq(%s,%s/%s)...", which, this.name, name);
         Ext.Ajax.request({
             url: "next-id.php",
             method: "GET",
             params: { which: which },
-            timeout: Userman.AJAX_TIMEOUT * 1000,
+            timeout: Wacman.AJAX_TIMEOUT * 1000,
 
             success: function (resp, opts) {
                 at.requesting = false;
@@ -908,7 +908,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 if (!(result && (typeof result == "object")))
                     result = {};
                 var data = result.data || "";
-                var id = Userman.trim(data).replace(/[^0-9]/g, "");
+                var id = Wacman.trim(data).replace(/[^0-9]/g, "");
                 if (format)
                     id = format(id);
                 // user might have already filled the value while the request
@@ -918,12 +918,12 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                     if (this.attr[name].field)
                         this.attr[name].field.setValue(id);
                 }
-                Userman.debug("nextSeq(%s,%s/%s)=\"%s\"", which, this.name, name, id);
+                Wacman.debug("nextSeq(%s,%s/%s)=\"%s\"", which, this.name, name, id);
             },
 
             failure: function (resp, opts) {
                 at.requesting = false;
-                Userman.debug("nextSeq(%s,%s/%s):FAIL", which, this.name, name);
+                Wacman.debug("nextSeq(%s,%s/%s):FAIL", which, this.name, name);
             },
             scope: this
         });
@@ -946,15 +946,15 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         var cfg = {
             id: at.id,
             name: at.name,
-            fieldLabel: Userman.T(desc.label),
+            fieldLabel: Wacman.T(desc.label),
             readonly: desc.readonly,
-            anchor: "-" + Userman.RIGHT_GAP,
+            anchor: "-" + Wacman.RIGHT_GAP,
             _attr: at,
         };
 
         // hide keystrokes in password fields
         if (desc.type == "pass"
-                && !Userman.toBool(Userman.getConfig("show_password")))
+                && !Wacman.toBool(Wacman.getConfig("show_password")))
             cfg.inputType = "password";
 
         // the popup property controls whether field is a
@@ -980,7 +980,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         } else if (popup == "gid") {
             // add single-select drop-down list of groups to the field
-            var list = Userman.std_lists["groups"];
+            var list = Wacman.std_lists["groups"];
             Ext.apply(cfg, {
                 store: list.store,
                 mode: "local",
@@ -992,9 +992,9 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
             });
             at.field = new Ext.form.ComboBox(cfg);
 
-        } else if (popup in Userman.std_lists) {
+        } else if (popup in Wacman.std_lists) {
             // add multi-select drop-down list with a given dictionary
-            var list = Userman.std_lists[popup];
+            var list = Wacman.std_lists[popup];
             Ext.apply(cfg, {
                 store: list.store,
                 mode: "local",  // standard lists are auto-loaded at startup
@@ -1006,11 +1006,11 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
                 valueField: list.attr,
                 checkField: "_checked_" + cfg.id
             });
-            at.field = new Userman.MultiComboBox(cfg);
+            at.field = new Wacman.MultiComboBox(cfg);
 
         } else {
             // shame on me!
-            alert(Userman.T("Unknown popup type \"%s\"", popup));
+            alert(Wacman.T("Unknown popup type \"%s\"", popup));
             at.field = null;
         }
 
@@ -1063,21 +1063,21 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
             bbar: [ "->", {
                 // this button submits the form
-                text: Userman.T("Save"),
+                text: Wacman.T("Save"),
                 icon: "images/apply.png",
                 scale: "medium",
                 // add_button_css is a CSS selector which allows
                 // for additional button effects, e.g. gentle border
-                ctCls: Userman.getConfig("add_button_css"),
+                ctCls: Wacman.getConfig("add_button_css"),
                 handler: this.save,
                 scope: this,
                 id: this.btnId("save")
             },{
                 // this button reverts changes
-                text: Userman.T("Revert"),
+                text: Wacman.T("Revert"),
                 icon: "images/revert.png",
                 scale: "medium",
-                ctCls: Userman.getConfig("add_button_css"),
+                ctCls: Wacman.getConfig("add_button_css"),
                 handler: this.onRevert,
                 scope: this,
                 id: this.btnId("revert")
@@ -1090,7 +1090,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
         // list of all object records
         this.list_panel = new Ext.grid.GridPanel({
             store: this.list_store,
-            title: Userman.T(this.title),
+            title: Wacman.T(this.title),
             id: this.name + "_list",
 
             colModel: new Ext.grid.ColumnModel({
@@ -1113,40 +1113,40 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 
         var buttons = [ " ", {
                 // "create" button will clear up the form
-                text: Userman.T("Create"),
+                text: Wacman.T("Create"),
                 icon: "images/add.png",
                 scale: "medium",
-                ctCls: Userman.getConfig("add_button_css"),
+                ctCls: Wacman.getConfig("add_button_css"),
                 handler: this.clear,
                 scope: this,
                 id: this.btnId("add")
             },{
                 // "delete" button will send request to delete current record
-                text: Userman.T("Delete"),
+                text: Wacman.T("Delete"),
                 icon: "images/delete.png",
                 scale: "medium",
-                ctCls: Userman.getConfig("add_button_css"),
+                ctCls: Wacman.getConfig("add_button_css"),
                 handler: this.onDelete,
                 scope: this,
                 id: this.btnId("delete")
             },{
                 // refresh record list and clear up the form
-                text: Userman.T("Refresh"),
+                text: Wacman.T("Refresh"),
                 icon: "images/refresh.png",
                 scale: "medium",
-                ctCls: Userman.getConfig("add_button_css"),
+                ctCls: Wacman.getConfig("add_button_css"),
                 handler: this.refresh,
                 scope: this,
                 id: this.btnId("refresh")
             },
             // on the bottom right is the ajax activity indicator
             "->",
-            new Userman.Throbber()
+            new Wacman.Throbber()
             ];
 
         // combine list and form into single panel
         this.obj_panel = new Ext.Panel({
-            title: Userman.T(this.title),
+            title: Wacman.T(this.title),
             id: this.name + "_gui",
             layout: "border",
             items: [ this.list_panel, this.form_panel ],
@@ -1166,7 +1166,7 @@ Userman.Object = Ext.extend(Ext.util.Observable, {
 // Users
 //
 
-Userman.User = Ext.extend(Userman.Object, {
+Wacman.User = Ext.extend(Wacman.Object, {
     name: "user",
     list: "users",
     title: " Users ",
@@ -1195,11 +1195,11 @@ Userman.User = Ext.extend(Userman.Object, {
         // identifier
         if (this.isAuto("uid"))
             uid = sn == "" ? gn : gn.substr(0, 1) + sn;
-        this.vset("uid", (uid = Userman.toId(uid)));
+        this.vset("uid", (uid = Wacman.toId(uid)));
 
         this.vset("objectClass",
-                    Userman.appendList(this.vget("objectClass"),
-                                        Userman.getConfig("unix_user_classes"),
+                    Wacman.appendList(this.vget("objectClass"),
+                                        Wacman.getConfig("unix_user_classes"),
                                         true));
 
         this.vset("dn", this.getSubst("unix_user_dn"));
@@ -1215,27 +1215,27 @@ Userman.User = Ext.extend(Userman.Object, {
 
         // mail
         if (uid != "")
-            this.setIf("mail", uid + "@" + Userman.getConfig("mail_domain"));
+            this.setIf("mail", uid + "@" + Wacman.getConfig("mail_domain"));
 
         // home directory
         if (uid != "")
-            this.setIf("homeDirectory", Userman.getConfig("home_root") + "/" + uid);
+            this.setIf("homeDirectory", Wacman.getConfig("home_root") + "/" + uid);
 
         // ############# Active Directory ############
 
         this.vset("ntObjectClass",
-                    Userman.appendList(this.vget("ntObjectClass"),
-                                        Userman.getConfig("ad_user_classes"),
+                    Wacman.appendList(this.vget("ntObjectClass"),
+                                        Wacman.getConfig("ad_user_classes"),
                                         true));
 
         this.setIf("objectCategory",
-                    Userman.getConfig("ad_user_category") + ","
-                    + Userman.path2dn(Userman.getConfig("ad_domain")));
+                    Wacman.getConfig("ad_user_category") + ","
+                    + Wacman.path2dn(Wacman.getConfig("ad_domain")));
 
-        this.setIf("userPrincipalName", uid + "@" + Userman.getConfig("ad_domain"));
+        this.setIf("userPrincipalName", uid + "@" + Wacman.getConfig("ad_domain"));
 
         //#var pass = this.vget("password");
-        //#if (pass === Userman.getConfig("OLD_PASS")) {
+        //#if (pass === Wacman.getConfig("OLD_PASS")) {
         //#    this.vset("userAccountControl", this.vget("userAccountControl", array(orig => true)));
         //#} else {
         //#    var uac = this.vget("userAccountControl") || ADS_UF_NORMAL_ACCOUNT;
@@ -1247,11 +1247,11 @@ Userman.User = Ext.extend(Userman.Object, {
         // ######## CommuniGate Pro ########
 
         var telnum = this.vget("telnum");
-        this.vset("telnum", Userman.formatTelnum(telnum));
-        this.nextSeq("cgp_telnum", "telnum", Userman.formatTelnum);
+        this.vset("telnum", Wacman.formatTelnum(telnum));
+        this.nextSeq("cgp_telnum", "telnum", Wacman.formatTelnum);
 
-        this.vset("domainIntercept", Userman.fromBool(this.vget("domainIntercept")) );
-        this.vset("userIntercept", Userman.fromBool(this.vget("userIntercept")) );
+        this.vset("domainIntercept", Wacman.fromBool(this.vget("domainIntercept")) );
+        this.vset("userIntercept", Wacman.fromBool(this.vget("userIntercept")) );
     }
 
 });
@@ -1260,7 +1260,7 @@ Userman.User = Ext.extend(Userman.Object, {
 // Groups
 //
 
-Userman.Group = Ext.extend(Userman.Object, {
+Wacman.Group = Ext.extend(Wacman.Object, {
     name: "group",
     list: "groups",
     title: " Groups ",
@@ -1271,8 +1271,8 @@ Userman.Group = Ext.extend(Userman.Object, {
     },
 
     rework: function () {
-        this.vset("objectClass", Userman.getConfig("unix_group_classes"));
-        this.vset("cn", Userman.toId(this.vget("cn")));
+        this.vset("objectClass", Wacman.getConfig("unix_group_classes"));
+        this.vset("cn", Wacman.toId(this.vget("cn")));
         this.vset("gidNumber", this.vget("gidNumber").replace(/[^0-9]/g, ""));
         this.nextSeq("unix_gidn", "gidNumber");
         this.vset("dn", this.getSubst("unix_group_dn"));
@@ -1284,7 +1284,7 @@ Userman.Group = Ext.extend(Userman.Object, {
 // Mail groups
 //
 
-Userman.Mailgroup = Ext.extend(Userman.Object, {
+Wacman.Mailgroup = Ext.extend(Wacman.Object, {
     name: "mailgroup",
     list: "mailgroups",
     title: " Mail groups ",
@@ -1295,7 +1295,7 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
     },
 
     rework: function () {
-        this.vset("uid", Userman.toId(this.vget("uid")));
+        this.vset("uid", Wacman.toId(this.vget("uid")));
         this.setIf("cn", this.vget("uid"));
 
         // ###### constant (& not copyfrom) fields ########
@@ -1312,7 +1312,7 @@ Userman.Mailgroup = Ext.extend(Userman.Object, {
 //
 // Creates a nice animated effect ending the UI preloading message.
 //
-Userman.hidePreloader = function () {
+Wacman.hidePreloader = function () {
     var pre_mask = Ext.get("preloading-mask");
     var pre_box = Ext.get("preloading-box");
 
@@ -1337,7 +1337,7 @@ Userman.hidePreloader = function () {
 // are kept in a central place to avoid extra requests
 // due to their use both in object lists and in helper fields.
 //
-Userman.std_lists = {
+Wacman.std_lists = {
     "users": {
         url: "user-list.php",
         attr: "uid",
@@ -1360,14 +1360,14 @@ Userman.std_lists = {
 //
 // Main routine
 //
-Userman.main = function () {
+Wacman.main = function () {
 
-    Userman.hidePreloader();
+    Wacman.hidePreloader();
     Ext.QuickTips.init();
 
     // create data stores for all standard lists
-    for (var name in Userman.std_lists) {
-        var list = Userman.std_lists[name];
+    for (var name in Wacman.std_lists) {
+        var list = Wacman.std_lists[name];
         var fields = list.fields || [ list.attr ];
         list.store = new Ext.data.JsonStore({
             url: list.url,
@@ -1380,20 +1380,20 @@ Userman.main = function () {
 
     // create tabbed panels for all objects
     var tabs = [];
-    var objs = [ new Userman.User(), new Userman.Group(), new Userman.Mailgroup() ];
+    var objs = [ new Wacman.User(), new Wacman.Group(), new Wacman.Mailgroup() ];
     objs.forEach(function(obj) {
         if (obj.isComplete())
             tabs.push(obj.createPanel());
     });
 
     // fire up loading of list stores
-    for (var name in Userman.std_lists)
-        Userman.std_lists[name].store.load();
+    for (var name in Wacman.std_lists)
+        Wacman.std_lists[name].store.load();
 
     // create main UI
     new Ext.Viewport({
         defaults: {
-            bodyStyle: "padding: " + Userman.VIEWPORT_PADDING,
+            bodyStyle: "padding: " + Wacman.VIEWPORT_PADDING,
         },
         layout: "border",
         id: "viewport",
@@ -1415,7 +1415,7 @@ Userman.main = function () {
 };
 
 
-Ext.onReady(Userman.main);
+Ext.onReady(Wacman.main);
 
 /////////////////////////////////////////////////////////////
 

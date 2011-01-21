@@ -1,4 +1,7 @@
-Userman.
+Wacman
+Web panel for managing Unix LDAP, Active Directory and Communigate Pro.
+Copyright (C) 2011, vitki.net
+
 Additional installation steps.
 
 [1] Install Ext JS 3.3.x open source (required)
@@ -10,7 +13,7 @@ and create symbolic link from "ext-3.3.x" to "ext".
 For example:
  cd ./html/js
  wget http://www.vitki.net/sites/vitki.net/files/attachments/ext-3.3.1.zip
- unzip ext-3.3.1.zip
+ unzip -q ext-3.3.1.zip
  ln -s ext-3.3.1 ext
 
 [2] Install LovCombo (required)
@@ -33,8 +36,11 @@ Example of installation:
  wget http://extjs.fudini.net/themes/ext_theme_12.zip
  unzip -q ext_theme_12.zip
  mv 12 theme-12
+ wget http://extjs.fudini.net/themes/ext_theme_22_grey.zip
+ unzip -q ext_theme_21_grey.zip
+ mv 21 theme-21
 
-After installing new theme edit ./config/userman.ini
+After installing new theme edit ./config/wacman.ini
 and modify the "theme_css" parameter, e.g.:
  theme_css = css/theme-12/resources/css/ext-all.css
 
@@ -52,7 +58,7 @@ If you plan to use such features as automatic creation or removal
 of user home directories, you should allow sudo'ing of helper scripts.
 Run the "visudo" command and add the following lines:
  Defaults:apache !requiretty
- apache ALL=(ALL) NOPASSWD:      /path/to/userman/bin/suhelper.sh *
+ apache ALL=(ALL) NOPASSWD:      /path/to/wacman/bin/suhelper.sh *
 
 Note: Normally PHP is run by web server as user "apache".
       If your case differs, use approriate user name in snippets above.

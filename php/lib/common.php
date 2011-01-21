@@ -1,7 +1,7 @@
 <?php
 // $Id$
 
-// Code to be executed at the top of each Userman page.
+// Code to be executed at the top of each Wacman page.
 
 @define('LIBDIR','../lib/');
 ini_set('display_errors',1);
@@ -16,7 +16,7 @@ require_once realpath(LIBDIR.'functions.php');
 #ob_end_clean();
 
 if (phpversion() < 5)
-    error_page('Sorry, Userman is a PHP5 application.');
+    error_page('Sorry, Wacman is a PHP5 application.');
 
 // Our error handler receives all error notices that pass the error_reporting() level set above.
 #set_error_handler('error_handler');
@@ -69,7 +69,7 @@ if (get_magic_quotes_gpc() && (! isset($slashes_stripped) || ! $slashes_stripped
     $slashes_stripped = true;
 }
 
-# FIXME: check for existance of userman.ini and userman.secret
+# FIXME: check for existance of wacman.ini and wacman.secret
 configure();
 $config['OLD_PASS'] = OLD_PASS; // for javascript
 setup_language();

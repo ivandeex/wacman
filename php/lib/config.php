@@ -4,13 +4,12 @@
 // Configuration file parser
 
 $config = array(
-    'config_files'      => array('~/userman.ini'),
-    'passfile'          => '~/userman.secret',
+    'config_files'      => array('~/wacman.ini'),
+    'passfile'          => '~/wacman.secret',
     'home_root'         => '/home',
-    'helper_script'     => '~/userman-helper',
     'unix_user_classes' => 'top,person,organizationalPerson,inetOrgPerson,posixAccount,shadowAccount', # 'ntUser',
     'unix_group_classes'=> 'top,posixGroup',
-    'unix_pass_encryption'=>'md5',
+    'unix_pass_hash'    => 'MD5',
     'ad_user_classes'   => 'top,user,person,organizationalPerson',	
     'ad_user_category'  => 'cn=Person,cn=Schema,cn=Configuration',
     'cgp_user_classes'  => 'top,person,organizationalPerson,inetOrgPerson,CommuniGateAccount',

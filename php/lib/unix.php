@@ -176,7 +176,7 @@ function unix_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
         foreach ($params as $x)  $args[] = '-';
         $res = exec_helper("setpass.pl", $args, $params, false);
     } else {
-        $pass = password_hash($val, get_config('unix_pass_encryption'));
+        $pass = password_hash($val, get_config('unix_pass_hash'));
         $res = uldap_entry_update($srv, $dn, array('userPassword' => $pass));
     }
     if ($res['code']) {

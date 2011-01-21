@@ -1,3 +1,5 @@
+# wacman.ini
+
 # unix directory server
 [uni]
 uri = "ldap://unix.ourdom.com:389"
@@ -15,26 +17,28 @@ base = "dc=ourdom,dc=local"
 debug = 0
 disable = 0
 
-# CGP CLI interface
+# communigate pro cli interface
 [cgp]
 uri = pwd://localhost:106/
 debug = 0
 disable = 0
 
-# Common options
+# common options
 [config]
 debug = 0
 ntuser_support = 0
 show_bulbs = 0
-passfile = /etc/userman.secret
 
 skel_dir = /etc/skel
 prefer_nss_ids = 0
 reserved_names = 'public,office,pubadmin,pubwrite'
+unix_pass_hash = SSHA
+
 language = en
+locale = 'en_US.utf8'
 theme_css = js/ext/resources/css/ext-all.css,js/ext/resources/css/xtheme-gray.css
-ext_js = js/ext/adapter/ext/ext-base.js,js/ext/ext-all-debug.js
-ext_js_lang = js/ext/src/locale/ext-lang-%s.js
+#ext_js = js/ext/adapter/ext/ext-base-debug.js,js/ext/ext-all-debug.js
+#ext_js_lang = js/ext/src/locale/ext-lang-%s.js
 add_button_css = 'gentle-frame'
 
 create_homes  = 1

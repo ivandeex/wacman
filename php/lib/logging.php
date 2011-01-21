@@ -4,7 +4,7 @@
 // Syslog logging.
 
 define_syslog_variables();
-openlog('userman', LOG_ODELAY, LOG_DAEMON);
+openlog('wacman', LOG_ODELAY, LOG_DAEMON);
 
 $last_error = '';
 

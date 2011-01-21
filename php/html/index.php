@@ -19,12 +19,12 @@ ob_end_clean();
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.0//EN" "http://www.w3.org/TR/xhtml-basic/xhtml-basic10.dtd">
 <html>
 <head>
-  <title>Userman</title>
-  <link rel="shortcut icon" href="userman.ico" type="image/x-icon" />
+  <title>Wacman</title>
+  <link rel="shortcut icon" href="wacman.ico" type="image/x-icon" />
 <?php foreach (split_list(get_config('theme_css')) as $css): ?>
   <link rel="stylesheet" type="text/css" href="<?php echo $css ?>" />
 <?php endforeach ?>
-  <link rel="stylesheet" type="text/css" href="css/userman.css" />
+  <link rel="stylesheet" type="text/css" href="css/wacman.css" />
 <?php foreach (split_list(get_config('ext_js')) as $js): ?>
   <script type="text/javascript" src="<?php echo $js ?>"></script>
 <?php endforeach ?>
@@ -34,7 +34,7 @@ ob_end_clean();
 <?php if ($ext_js_lang): ?>
   <script type="text/javascript" src="<?php echo $ext_js_lang ?>"></script>
 <?php endif ?>
-  <script type="text/javascript" src="js/userman.js"></script>
+  <script type="text/javascript" src="js/wacman.js"></script>
   <script type="text/javascript" src="config-config.php"></script>
 </head>
 <body>
