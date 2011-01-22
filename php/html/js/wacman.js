@@ -663,6 +663,7 @@ Wacman.Object = Ext.extend(Ext.util.Observable, {
         // update GUI
         this.refocus();
         this.markChanged(false, true);
+        this.form_panel.setTitle(this.formTitle() + " ...");
     },
 
     //
