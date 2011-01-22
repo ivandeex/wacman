@@ -370,28 +370,28 @@ function ldap_read_string (&$obj, &$at, $srv, &$data, $name) {
 function ldap_write_string (&$obj, &$at, $srv, &$data, $name, $val) {
     $changed = false;
     if (empty($val)) {
-		if (uldap_exists($data, $name)) {
-			uldap_delete($data, $name);
-			$changed = true;
-			log_debug('ldap_write_string(%s): remove', $name);
-		} else {
-			#log_debug('ldap_write_string(%s): already removed', $name);
-		}
-	} else if (uldap_exists($data, $name)) {
-		$old = nvl(uldap_value($data, $name));
-		if ($val != $old) {
-			uldap_replace($data, $name, $val);
-			$changed = true;
-			log_debug('ldap_write_string(%s): "%s" -> "%s"', $name, $old, $val);
-		} else {
-			#log_debug('ldap_write_string(%s): preserve "%s"', $attr, $val);			
-		}
-	} else {
-		uldap_add($data, $name, $val);
-		$changed = true;
-		log_debug('ldap_write_string(%s): add "%s"', $name, $val);			
-	}
-	return $changed;
+        if (uldap_exists($data, $name)) {
+            uldap_delete($data, $name);
+            $changed = true;
+            log_debug('ldap_write_string(%s): remove', $name);
+        } else {
+            #log_debug('ldap_write_string(%s): already removed', $name);
+        }
+    } else if (uldap_exists($data, $name)) {
+        $old = nvl(uldap_value($data, $name));
+        if ($val != $old) {
+            uldap_replace($data, $name, $val);
+            $changed = true;
+            log_debug('ldap_write_string(%s): "%s" -> "%s"', $name, $old, $val);
+        } else {
+            #log_debug('ldap_write_string(%s): preserve "%s"', $attr, $val);			
+        }
+    } else {
+        uldap_add($data, $name, $val);
+        $changed = true;
+        log_debug('ldap_write_string(%s): add "%s"', $name, $val);			
+    }
+    return $changed;
 }
 
 
