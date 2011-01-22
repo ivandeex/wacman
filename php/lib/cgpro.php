@@ -418,10 +418,10 @@ function cgp_write_mailgroup_members (&$obj, &$at, $srv, &$data, $name, $val) {
 
 
 function cgp_read_mailgroup_params (&$obj, &$at, $srv, &$data, $name) {
-    $data = $data; // make a local copy
-    unset($data['RealName']);
-    unset($data['Members']);
-    return empty($data) ? '' : cgp_pack($srv, $data);
+    $params = $data; // make a local copy
+    unset($params['RealName']);
+    unset($params['Members']);
+    return empty($params) ? '' : cgp_pack($srv, $params);
 }
 
 
@@ -431,10 +431,9 @@ function cgp_write_mailgroup_params (&$obj, &$at, $srv, &$data, $name, $val) {
         return false;
     $res = cgp_unpack($srv, $val);
     if ($res['code'])  error_page($res['error']);
-    $data = $res['data'];
-    foreach ($data as $n => $v) {
-        if ($n != 'RealName' && $n != 'Members')
-            $data[$n] = $v;
+    foreach ($res['data'] as $pname => $pval) {
+        if ($pname != 'RealName' && $pname != 'Members')
+            $data[$pname] = $pval;
     }
     return true;
 }

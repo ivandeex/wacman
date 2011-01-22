@@ -318,7 +318,7 @@ function obj_write (&$obj, $srv, $id, $idold) {
         $ldap_attr = $at['desc']['srv'][$srv];
         $retval = $write_func($obj, $at, $srv, $data, $ldap_attr, nvl($at['val']));
         if ($retval)  $changed = $obj['changed'] = true;
-	}
+    }
 
     $dn = uldap_dn($data);
     if (is_array($writer) && empty($dn))
