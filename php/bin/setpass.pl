@@ -3,7 +3,7 @@
 #
 # Requires: perl-ldap, perl-IO-Socket-SSL
 #
-# usage: setpass.pl URI BIND_DN BIND_PASS USER_DN NEW_PASS
+# usage: setpass.pl URI [TLS,...] BIND_DN BIND_PASS USER_DN NEW_PASS
 #
 # LDAP library in PHP does not support the PASSMOD action from RFC 3062.
 # The SetPassword extension is absent in contrast to Net::LDAP in Perl.
@@ -27,11 +27,15 @@ for my $i (0 .. $#args) {
     }
 }
 
-my ($uri, $bind_dn, $bind_pass, $user_dn, $new_pass) = @args;
+my ($uri, $opts, $bind_dn, $bind_pass, $user_dn, $new_pass) = @args;
 print "uri=$uri bind_dn=$bind_dn bind_pass=$bind_pass user_dn=$user_dn new_pass=$new_pass\n" if DEBUG;
 
-my $ldap = Net::LDAP->new($uri, timeout => TIMEOUT);
+my $ldap = Net::LDAP->new($uri, timeout => TIMEOUT, version => 3);
 die "Connection failure\n" unless defined $ldap;
+
+if ($opts =~ /\bTLS\b/) {
+    $ldap->start_tls() or die "StartTLS failed\n";
+}
 
 my $res = $ldap->bind($bind_dn, password => $bind_pass);
 die "Bind: ".$res->error."\n" if $res->code;

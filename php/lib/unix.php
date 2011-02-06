@@ -171,7 +171,9 @@ function unix_write_pass_final (&$obj, &$at, $srv, &$data, $name, $val) {
         // LDAP library in PHP does not support the PASSMOD action from RFC 3062.
         // The SetPassword extension is absent in contrast with Net::LDAP in Perl.
         // As a workaround we use helper script written in Perl.
-        $params = array($cfg['uri'], $cfg['user'], $cfg['pass'], $dn, $val);
+        $opts = ".";
+        if (str2bool(@$cfg['start_tls']))  $opts .= ",TLS";
+        $params = array($cfg['uri'], $opts, $cfg['user'], $cfg['pass'], $dn, $val);
         $args = array();
         foreach ($params as $x)  $args[] = '-';
         $res = exec_helper("setpass.pl", $args, $params, false);
