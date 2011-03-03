@@ -55,7 +55,6 @@ $all_attrs = array(
             'srv' => 'uni',
         ),
         'uid' => array(
-            'type' => 'number',
             'label' => 'Identifier',
             'srv' => array(
                 'uni' => '',
@@ -101,6 +100,7 @@ $all_attrs = array(
             ),
         ),
         'uidNumber' => array(
+            'type' => 'number',
             'label' => 'User#',
             'srv' => 'uni,ads',
         ),
