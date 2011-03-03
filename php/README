@@ -7,12 +7,12 @@ Additional installation steps.
 [1] Install Ext JS 3.3.x open source (required)
 
 Download ExtJS from http://www.sencha.com/products/js/download.php
-or from http://www.vitki.net/sites/vitki.net/files/attachments/ext-3.3.1.zip
+or from http://www.vitki.net/sites/vitki.net/files/large-attachments/ext-3.3.1.zip
 then unzip ext-3.3.x/ under directory ./html/js
 and create symbolic link from "ext-3.3.x" to "ext".
 For example:
  cd ./html/js
- wget http://www.vitki.net/sites/vitki.net/files/attachments/ext-3.3.1.zip
+ wget http://www.vitki.net/sites/vitki.net/files/large-attachments/ext-3.3.1.zip
  unzip -q ext-3.3.1.zip
  ln -s ext-3.3.1 ext
 
@@ -33,10 +33,10 @@ You can use an alternative WebUI theme under ./html/css.
 See available themes at http://extjs.fudini.net/.
 Example of installation:
  cd ./html/css
- wget http://extjs.fudini.net/themes/ext_theme_12.zip
+ wget http://www.vitki.net/sites/vitki.net/files/attachments/ext_theme_12.zip
  unzip -q ext_theme_12.zip
  mv 12 theme-12
- wget http://extjs.fudini.net/themes/ext_theme_22_grey.zip
+ wget http://www.vitki.net/sites/vitki.net/files/attachments/ext_theme_21_grey.zip
  unzip -q ext_theme_21_grey.zip
  mv 21 theme-21
 
