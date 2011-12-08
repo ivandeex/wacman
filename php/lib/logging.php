@@ -3,7 +3,6 @@
 
 // Syslog logging.
 
-define_syslog_variables();
 openlog('wacman', LOG_ODELAY, LOG_DAEMON);
 
 $last_error = '';
