@@ -23,6 +23,11 @@ function cgp_user_cleaner (&$obj, $srv, &$data) {
 
 
 function cgp_user_reader (&$obj, $srv, $id) {
+    if ($id == "-") {
+        $data = array();
+        cgp_user_cleaner($obj, $srv, $data);
+        return array('code' => 0, 'error' => '', 'data' => $data);
+    }
 
     $mail = cgp_verify_mail($id);
     if (empty($mail))
@@ -103,19 +108,22 @@ function cgp_user_reader (&$obj, $srv, $id) {
 
 
 function cgp_user_writer (&$obj, $srv, $id, $idold, &$data) {
+    if ($id == "-")
+        return array('code' => 0, 'error' => '');
+
     $mail = cgp_verify_mail($id);
     if (empty($mail))
         return array('code' => -1, 'error' => _T('wrong target mail "%s"', $id));
 
     // detect if mail user did not exist
-    if (!$data['_cgp_exist'] && !empty($idold)) {
+    if (!$data['_cgp_exist'] && !empty($idold) && $idold != "-") {
         log_info('mail user "%s" (%s) does not exist and will be created',
                     $data['_cgp_mail'], $idold);
         $idold = '';
     }
 
     // rename user if needed
-    if (!empty($idold) && $id != $idold) {
+    if (!empty($idold) && $id != $idold && $id != "-" && $idold != "-")  {
         $mail_old = cgp_verify_mail($idold);
         if (empty($mail_old))
             return array('code' => -1, 'error' => _T('wrong source mail "%s"', $idold));
@@ -143,7 +151,7 @@ function cgp_user_writer (&$obj, $srv, $id, $idold, &$data) {
         $params[$key] = $val;
     }
 
-    if (empty($idold)) {
+    if (empty($idold) || $idold == "-") {
         $res = cgp_cmd($srv, 'CreateAccount',
                         array('accountName' => $mail, 'settings' => $params));
     } else {

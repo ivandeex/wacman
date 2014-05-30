@@ -223,7 +223,7 @@ $all_attrs = array(
 
         // ======== Active Directory disabled... ========
 
-        'ufn'			=> array( 'conv' => 'bkslash', ),
+        'ufn'		=> array( 'conv' => 'bkslash', ),
         'objectSid'     => array( 'conv' => 'binary', ),
         'objectGuid'	=> array( 'conv' => 'binary', ),
         'systemFlags'	=> array( 'conv' => 'decihex', ),

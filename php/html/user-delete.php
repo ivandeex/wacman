@@ -49,7 +49,7 @@ if (!empty($cn) && !$servers['ads']['disable']) {
 
 // Delete CGP account
 $mail = uldap_value($ue, "mail");
-if (!empty($mail) && !$servers['cgp']['disable']) {
+if (!empty($mail) && !$servers['cgp']['disable'] && $mail != "-") {
     $res = cgp_cmd('cgp', 'DeleteAccount', $mail);
     if ($res['code'])
         $msg[] = _T('Error deleting mail "%s" (%s): %s', $id, $mail, $res['error']);
@@ -57,7 +57,7 @@ if (!empty($mail) && !$servers['cgp']['disable']) {
 
 // Delete user's home directory
 $home = uldap_value($ue, 'homeDirectory');
-if ($home && str2bool(get_config('remove_homes'))) {
+if ($home && str2bool(get_config('remove_homes')) && $home != "-") {
     $res = remove_user_home($home);
     if ($res['code'])
         $msg[] = log_error($res['error']);
